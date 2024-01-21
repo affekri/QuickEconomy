@@ -6,16 +6,10 @@ author: AffeKri
 commands:
   balance:
     usage: /<command> <subcommand> <float> <player>
-    description: See your balance.
-    permission: quickeconomy.balance
-    permission-message: You do not have <permission>
+    description: See your balance or send coins to other players.
   bal:
     usage: /<command> <subcommand> <float> <player>
-    description: See your balance.
-    permission: quickeconomy.balance
-    permission-message: You do not have <permission>
+    description: See your balance or send coins to other players.
   quickeconomy:
     usage: /<command>
     description: Misc
-    permission: quickeconomy.quickeconomy
-    permission-message: You do not have <permission>

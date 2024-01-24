@@ -3,6 +3,7 @@ package net.derfla.quickeconomy;
 import net.derfla.quickeconomy.commands.balanceCommand;
 import net.derfla.quickeconomy.commands.quickeconomyCommand;
 import net.derfla.quickeconomy.files.balanceFile;
+import net.derfla.quickeconomy.listeners.PlayerJoinListener;
 import net.derfla.quickeconomy.listeners.inventoryClickListener;
 import net.derfla.quickeconomy.listeners.playerClickSignListener;
 import net.derfla.quickeconomy.listeners.playerPlaceSignListener;
@@ -26,6 +27,7 @@ public final class main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new playerPlaceSignListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new playerClickSignListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new inventoryClickListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerJoinListener(), this);
 
         // Config file
         getConfig().options().copyDefaults(true);

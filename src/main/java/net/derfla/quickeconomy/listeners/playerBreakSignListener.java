@@ -1,6 +1,5 @@
 package net.derfla.quickeconomy.listeners;
 
-import net.derfla.quickeconomy.utils.bankInventory;
 import org.bukkit.Material;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
@@ -27,6 +26,7 @@ public class playerBreakSignListener implements Listener {
         if (player.isOp() || lines[2].equals("§f" + player.getName())){
             return;
         }
+        event.getPlayer().sendMessage("§cYou are not allowed to remove this sign!");
         event.setCancelled(true);
     }
 }

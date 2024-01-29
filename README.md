@@ -22,7 +22,14 @@ The /quickeconomy command displays helpful information about the plugin.
 
 ## Signs
 
-This plugin modifies the behavior of the different signs. As a server operator  
-placing or editing a sign that says [BANK] on the first line creates e modified  
-sign that functions as a bank. Any player can make a shop by writing [SHOP] on  
-the first line of a sign linked to a chest. The shop functionality is not implemented yet. 
+This plugin modifies the behavior of the different signs.  
+
+### Bank
+
+As a server operator placing or editing a sign that says  
+[BANK] on the first line creates e modified sign that functions as a bank.  
+
+### Shop
+
+Any player can make a shop by writing [SHOP] on the first line of a sign  
+that is placed on the side of a chest. Write the price of the items on the second line.    

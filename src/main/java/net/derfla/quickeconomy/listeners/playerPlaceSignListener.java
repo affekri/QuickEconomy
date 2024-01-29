@@ -1,6 +1,9 @@
 package net.derfla.quickeconomy.listeners;
 
+import net.derfla.quickeconomy.utils.FindChest;
+import net.derfla.quickeconomy.utils.typeChecker;
 import org.bukkit.Material;
+import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,24 +24,33 @@ public class playerPlaceSignListener implements Listener {
         Sign sign = (Sign) event.getBlock().getState();
         String[] lines = event.getLines();
         Player player = event.getPlayer();
-        switch (lines[0]) {
-            case "[BANK]":
-                if(!(player.isOp())) break;
-                event.setLine(0, "§6[BANK]");
-                event.setLine(1, "§fDeposit items");
-                event.setLine(2, "§ffor coins!");
-                sign.update();
-                player.sendMessage("§eBank created!");
-                break;
-            case "[SHOP]":
-                event.setLine(0, "§a[SHOP]");
-                event.setLine(2, "§f" + player.getName());
-                sign.update();
-                player.sendMessage("Shop created!");
-                // TODO
-                break;
+        if (lines[0].equals("[BANK]")) {
+            if(!(player.isOp())) return;
+            event.setLine(0, "§6[BANK]");
+            event.setLine(1, "§fDeposit items");
+            event.setLine(2, "§ffor coins!");
+            sign.update();
+            player.sendMessage("§eBank created!");
+            return;
+        } else if (lines[0].equals("[SHOP]")) {
+            if (blockType.equals(Material.OAK_SIGN)) return;
+            if (FindChest.get(sign) == null) return;
+            Chest chest = FindChest.get(sign);
+            if (!typeChecker.isFloat(lines[1])) return;
+            float cost = Float.parseFloat(lines[1]);
+
+            // TODO Check if double chest
+
+            // TODO Check if chest is locked
+
+            // TODO Lock chest to player
+
+            event.setLine(0, "§a[SHOP]");
+            event.setLine(1, "§f" + cost);
+            event.setLine(2, "§f" + player.getName());
+            sign.update();
+            player.sendMessage("Shop created!");
+            return;
         }
-
-
     }
 }

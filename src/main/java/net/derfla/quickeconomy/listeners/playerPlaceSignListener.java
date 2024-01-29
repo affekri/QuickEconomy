@@ -38,6 +38,7 @@ public class playerPlaceSignListener implements Listener {
             Chest chest = FindChest.get(sign);
             if (!typeChecker.isFloat(lines[1])) return;
             float cost = Float.parseFloat(lines[1]);
+            if (cost < 0) return;
 
             // TODO Check if double chest
 

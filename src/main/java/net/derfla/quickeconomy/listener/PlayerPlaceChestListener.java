@@ -11,7 +11,7 @@ public class PlayerPlaceChestListener implements Listener {
 
     @EventHandler
     public void onPlayerPlaceChest (BlockPlaceEvent event) {
-        // TODO Check if making a shop chest to a double
+        // Check if making a shop chest to a double
         if (!(event.getBlockPlaced().getState() instanceof Chest)) return;
         if (!event.getBlockPlaced().getType().equals(Material.CHEST)) return;
         if (!(event.getBlockAgainst().getState() instanceof Chest)) return;

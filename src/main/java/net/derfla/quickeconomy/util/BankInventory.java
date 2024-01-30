@@ -44,32 +44,36 @@ public class BankInventory implements InventoryHolder {
         player.openInventory(inventory);
     }
 
-    public Boolean trigger(ItemStack itemStack, int slot) {
-        //check if the clicked item is stone
-        if (itemStack.getType() == Material.DIAMOND && slot == 13) {
-            // Withdraw logic
-            if (Balances.getPlayerBalance(target.getName()) < 10f){
-                target.closeInventory();
-                target.sendMessage("§cYou do not have enough coins!");
-                return true;
+    public Boolean trigger(ItemStack itemStack, int slot, boolean bankInventory) {
+        //check if the clicked item is in the BankInventory
+        if (bankInventory) {
+            switch (itemStack.getType()) {
+                case DIAMOND:
+                    if (Balances.getPlayerBalance(target.getName()) < 10f){
+                        target.closeInventory();
+                        target.sendMessage("§cYou do not have enough coins!");
+                        return true;
+                    }
+                    Balances.subPlayerBalance(target.getName(), 10f);
+                    target.getInventory().addItem(new ItemStack(Material.DIAMOND));
+                    return true;
+                case GOLD_INGOT:
+                    // Deposit logic
+                    target.sendMessage("§fClick diamonds in your inventory to deposit!");
+                    return true;
+                case GOLD_BLOCK:
+                    // Check balance logic
+                    target.closeInventory();
+                    target.sendMessage("§eYour balance is " + Balances.getPlayerBalance(target.getName()) + " coins!");
+                    return true;
             }
-            Balances.subPlayerBalance(target.getName(), 10f);
-            target.getInventory().addItem(new ItemStack(Material.DIAMOND));
-            return true;
-        } else if (itemStack.getType() == Material.GOLD_INGOT && slot == 11) {
-            // Deposit logic
-            target.sendMessage("§fClick diamonds in your inventory to deposit!");
-            return true;
-        } else if (itemStack.getType() == Material.DIAMOND) {
+        }
+        if (itemStack.getType() == Material.DIAMOND) {
             // Deposit logic
             target.getInventory().removeItem(new ItemStack(Material.DIAMOND));
             Balances.addPlayerBalance(target.getName(), 10f);
-        } else if (itemStack.getType() == Material.GOLD_BLOCK) {
-            // Check balance logic
-            target.closeInventory();
-            target.sendMessage("§eYour balance is " + Balances.getPlayerBalance(target.getName()) + " coins!");
+            return true;
         }
-        //don't cancel the event
         return false;
     }
 

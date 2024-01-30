@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.FindChest;
 import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.Material;
@@ -40,11 +41,21 @@ public class PlayerPlaceSignListener implements Listener {
             float cost = Float.parseFloat(lines[1]);
             if (cost < 0) return;
 
-            // TODO Check if double chest
+            // Check if double chest
+            if (FindChest.isDouble(chest)) {
+                player.sendMessage("§cYou can only use single chests for shops!");
+                return;
+            }
 
-            // TODO Check if chest is locked
+            // Check if chest is locked
+            if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
+                player.sendMessage("§cThis chest is locked!");
+                event.setCancelled(true);
+                return;
+            }
 
-            // TODO Lock chest to player
+            // Lock chest to player
+            BlockOwner.setPlayerOwned(chest, player.getName(), true);
 
             event.setLine(0, "§a[SHOP]");
             event.setLine(1, "§f" + cost);

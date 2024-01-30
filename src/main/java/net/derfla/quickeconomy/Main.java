@@ -26,6 +26,9 @@ public final class Main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new InventoryClickListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerJoinListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerOpenChestListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerBreakChestListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerBreakSignListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceChestListener(), this);
 
         // Config file
         getConfig().options().copyDefaults(true);

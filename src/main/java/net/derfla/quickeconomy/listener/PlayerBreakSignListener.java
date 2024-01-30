@@ -1,6 +1,9 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.util.BlockOwner;
+import net.derfla.quickeconomy.util.FindChest;
 import org.bukkit.Material;
+import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -24,6 +27,9 @@ public class PlayerBreakSignListener implements Listener {
         }
         Player player = event.getPlayer();
         if (player.isOp() || lines[2].equals("§f" + player.getName())){
+            if (FindChest.get(sign) == null) return;
+            Chest chest = FindChest.get(sign);
+            BlockOwner.setPlayerOwned(chest, player.getName(), false);
             return;
         }
         event.getPlayer().sendMessage("§cYou are not allowed to remove this sign!");

@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.util;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -43,5 +44,14 @@ public class FindChest {
         if (!block.getType().equals(Material.CHEST)) return null;
         Chest chest = (Chest) block.getState();
         return chest;
+    }
+
+    public static boolean isDouble (Chest chest) {
+        Pattern pattern = Pattern.compile("type=([a-z]+)");
+        Matcher matcher = pattern.matcher(chest.getBlock().toString());
+        if (!matcher.find()) return false;
+        String type = matcher.group(1);
+        if (type.equals("single")) return false;
+        return true;
     }
 }

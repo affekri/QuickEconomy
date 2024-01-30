@@ -4,19 +4,22 @@ package net.derfla.quickeconomy.util;
 import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.Plugin;
 
 public class Balances {
+
+    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
 
     public static float getPlayerBalance(String playerName) {
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
-            Bukkit.getLogger().warning("balance.yml not found!");
+            plugin.getLogger().warning("balance.yml not found!");
             return 0.0f;
         }
 
         if (!(file.contains("players." + playerName + ".balance"))) {
-            Bukkit.getLogger().info("No balance found for player: " + playerName);
+            plugin.getLogger().info("No balance found for player: " + playerName);
             return 0.0f;
         }
 
@@ -29,14 +32,14 @@ public class Balances {
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
-            Bukkit.getLogger().warning("balance.yml not found!");
+            plugin.getLogger().warning("balance.yml not found!");
             return;
         }
 
         float multMoney = money * 100;
         int intMoney = (int) multMoney;
         file.set("players." + playerName + ".balance", intMoney);
-        Bukkit.getLogger().info("Set balance of " + playerName + " to " + money);
+        plugin.getLogger().info("Set balance of " + playerName + " to " + money);
         BalanceFile.save();
     }
 
@@ -55,7 +58,7 @@ public class Balances {
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
-            Bukkit.getLogger().warning("balance.yml not found!");
+            plugin.getLogger().warning("balance.yml not found!");
             return 0.0f;
         }
         if (!(file.contains("players." + playerName + ".change"))) {
@@ -70,7 +73,7 @@ public class Balances {
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
-            Bukkit.getLogger().warning("balance.yml not found!");
+            plugin.getLogger().warning("balance.yml not found!");
             return;
         }
 

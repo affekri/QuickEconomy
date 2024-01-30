@@ -1,6 +1,5 @@
-package net.derfla.quickeconomy.utils;
+package net.derfla.quickeconomy.util;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;

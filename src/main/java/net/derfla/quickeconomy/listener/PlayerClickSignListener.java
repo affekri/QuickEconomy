@@ -1,9 +1,9 @@
-package net.derfla.quickeconomy.listeners;
+package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.utils.FindChest;
-import net.derfla.quickeconomy.utils.ShopInventory;
-import net.derfla.quickeconomy.utils.bankInventory;
-import net.derfla.quickeconomy.utils.typeChecker;
+import net.derfla.quickeconomy.util.FindChest;
+import net.derfla.quickeconomy.util.ShopInventory;
+import net.derfla.quickeconomy.util.BankInventory;
+import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
@@ -13,7 +13,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 
-public class playerClickSignListener implements Listener {
+public class PlayerClickSignListener implements Listener {
 
     @EventHandler
     public void onPlayerClickSign(PlayerInteractEvent event){
@@ -35,7 +35,7 @@ public class playerClickSignListener implements Listener {
 
         if (lines[0].equals("§6[BANK]")) {
             event.setCancelled(true);
-            new bankInventory(player);
+            new BankInventory(player);
         } else if (lines[0].equals("§a[SHOP]")) {
             event.setCancelled(true);
             if (FindChest.get(sign) == null) {
@@ -44,7 +44,7 @@ public class playerClickSignListener implements Listener {
             }
             Chest chest = FindChest.get(sign);
             String costString = lines[1].replace("§f", "");
-            if (!typeChecker.isFloat(costString)) {
+            if (!TypeChecker.isFloat(costString)) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
                 return;
             }

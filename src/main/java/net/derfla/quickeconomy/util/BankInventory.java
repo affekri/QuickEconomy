@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.utils;
+package net.derfla.quickeconomy.util;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -9,13 +9,13 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-public class bankInventory implements InventoryHolder {
+public class BankInventory implements InventoryHolder {
 
     private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Bank");
     private Player target;
 
 
-    public bankInventory(Player player) {
+    public BankInventory(Player player) {
         this.target = player;
         // Creating items for inventory
         ItemStack withdrawItem = new ItemStack(Material.DIAMOND);
@@ -48,12 +48,12 @@ public class bankInventory implements InventoryHolder {
         //check if the clicked item is stone
         if (itemStack.getType() == Material.DIAMOND && slot == 13) {
             // Withdraw logic
-            if (balances.getPlayerBalance(target.getName()) < 10f){
+            if (Balances.getPlayerBalance(target.getName()) < 10f){
                 target.closeInventory();
                 target.sendMessage("§cYou do not have enough coins!");
                 return true;
             }
-            balances.subPlayerBalance(target.getName(), 10f);
+            Balances.subPlayerBalance(target.getName(), 10f);
             target.getInventory().addItem(new ItemStack(Material.DIAMOND));
             return true;
         } else if (itemStack.getType() == Material.GOLD_INGOT && slot == 11) {
@@ -63,11 +63,11 @@ public class bankInventory implements InventoryHolder {
         } else if (itemStack.getType() == Material.DIAMOND) {
             // Deposit logic
             target.getInventory().removeItem(new ItemStack(Material.DIAMOND));
-            balances.addPlayerBalance(target.getName(), 10f);
+            Balances.addPlayerBalance(target.getName(), 10f);
         } else if (itemStack.getType() == Material.GOLD_BLOCK) {
             // Check balance logic
             target.closeInventory();
-            target.sendMessage("§eYour balance is " + balances.getPlayerBalance(target.getName()) + " coins!");
+            target.sendMessage("§eYour balance is " + Balances.getPlayerBalance(target.getName()) + " coins!");
         }
         //don't cancel the event
         return false;

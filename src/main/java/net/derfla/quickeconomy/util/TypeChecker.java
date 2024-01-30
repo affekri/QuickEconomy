@@ -1,6 +1,6 @@
-package net.derfla.quickeconomy.utils;
+package net.derfla.quickeconomy.util;
 
-public class typeChecker {
+public class TypeChecker {
 
     public static boolean isFloat(String string) {
         try {

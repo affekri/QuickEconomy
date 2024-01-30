@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.listeners;
+package net.derfla.quickeconomy.listener;
 
 import org.bukkit.Material;
 import org.bukkit.block.Chest;

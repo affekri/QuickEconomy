@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.listeners;
+package net.derfla.quickeconomy.listener;
 
 import org.bukkit.Material;
 import org.bukkit.block.Sign;
@@ -7,7 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 
-public class playerBreakSignListener implements Listener {
+public class PlayerBreakSignListener implements Listener {
 
     @EventHandler
     public void onPlayerBreakSign(BlockBreakEvent event) {

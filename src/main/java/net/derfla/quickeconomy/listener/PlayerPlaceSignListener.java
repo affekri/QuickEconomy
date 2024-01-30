@@ -1,7 +1,7 @@
-package net.derfla.quickeconomy.listeners;
+package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.utils.FindChest;
-import net.derfla.quickeconomy.utils.typeChecker;
+import net.derfla.quickeconomy.util.FindChest;
+import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
@@ -10,7 +10,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.SignChangeEvent;
 
-public class playerPlaceSignListener implements Listener {
+public class PlayerPlaceSignListener implements Listener {
 
     @EventHandler
     public void onPlayerPlaceSign(SignChangeEvent event) {
@@ -36,7 +36,7 @@ public class playerPlaceSignListener implements Listener {
             if (blockType.equals(Material.OAK_SIGN)) return;
             if (FindChest.get(sign) == null) return;
             Chest chest = FindChest.get(sign);
-            if (!typeChecker.isFloat(lines[1])) return;
+            if (!TypeChecker.isFloat(lines[1])) return;
             float cost = Float.parseFloat(lines[1]);
             if (cost < 0) return;
 

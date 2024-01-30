@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.files;
+package net.derfla.quickeconomy.file;
 
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -6,7 +6,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 
-public class balanceFile {
+public class BalanceFile {
 
     private static File file;
     private static FileConfiguration customFile;

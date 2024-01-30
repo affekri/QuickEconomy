@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.utils;
+package net.derfla.quickeconomy.util;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;

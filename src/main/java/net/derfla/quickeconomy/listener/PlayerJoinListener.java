@@ -1,7 +1,7 @@
-package net.derfla.quickeconomy.listeners;
+package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.files.balanceFile;
-import net.derfla.quickeconomy.utils.balances;
+import net.derfla.quickeconomy.file.BalanceFile;
+import net.derfla.quickeconomy.util.Balances;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -14,7 +14,7 @@ public class PlayerJoinListener implements Listener {
     @EventHandler
     public void onPlayerJoin (PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        FileConfiguration file = balanceFile.get();
+        FileConfiguration file = BalanceFile.get();
         if (file == null) {
             Bukkit.getLogger().warning("balances.yml not found!");
             return;
@@ -22,11 +22,11 @@ public class PlayerJoinListener implements Listener {
         if (!(file.contains("players." + player.getName() + ".change"))) {
             return;
         }
-        float change = balances.getPlayerBalanceChange(player.getName());
+        float change = Balances.getPlayerBalanceChange(player.getName());
         if (change == 0.0f) {
             return;
         }
         player.sendMessage("§eWelcome back! While you were away you received " + change + " coins!");
-        balances.setPlayerBalanceChange(player.getName(), 0.0f);
+        Balances.setPlayerBalanceChange(player.getName(), 0.0f);
     }
 }

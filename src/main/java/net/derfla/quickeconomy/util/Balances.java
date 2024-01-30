@@ -1,14 +1,14 @@
-package net.derfla.quickeconomy.utils;
+package net.derfla.quickeconomy.util;
 
 
-import net.derfla.quickeconomy.files.balanceFile;
+import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 
-public class balances {
+public class Balances {
 
     public static float getPlayerBalance(String playerName) {
-        FileConfiguration file = balanceFile.get();
+        FileConfiguration file = BalanceFile.get();
 
         if (file == null){
             Bukkit.getLogger().warning("balance.yml not found!");
@@ -26,7 +26,7 @@ public class balances {
     }
 
     public static void setPlayerBalance(String playerName, float money) {
-        FileConfiguration file = balanceFile.get();
+        FileConfiguration file = BalanceFile.get();
 
         if (file == null){
             Bukkit.getLogger().warning("balance.yml not found!");
@@ -37,7 +37,7 @@ public class balances {
         int intMoney = (int) multMoney;
         file.set("players." + playerName + ".balance", intMoney);
         Bukkit.getLogger().info("Set balance of " + playerName + " to " + money);
-        balanceFile.save();
+        BalanceFile.save();
     }
 
     public static void addPlayerBalance(String playerName, float money){
@@ -52,7 +52,7 @@ public class balances {
     }
 
     public static float getPlayerBalanceChange(String playerName) {
-        FileConfiguration file = balanceFile.get();
+        FileConfiguration file = BalanceFile.get();
 
         if (file == null){
             Bukkit.getLogger().warning("balance.yml not found!");
@@ -67,7 +67,7 @@ public class balances {
         return fMoney / 100;
     }
     public static void setPlayerBalanceChange(String playerName, float money) {
-        FileConfiguration file = balanceFile.get();
+        FileConfiguration file = BalanceFile.get();
 
         if (file == null){
             Bukkit.getLogger().warning("balance.yml not found!");
@@ -77,7 +77,7 @@ public class balances {
         float multMoney = money * 100;
         int intMoney = (int) multMoney;
         file.set("players." + playerName + ".change", intMoney);
-        balanceFile.save();
+        BalanceFile.save();
     }
 
     public static void addPlayerBalanceChange(String playerName, float money) {

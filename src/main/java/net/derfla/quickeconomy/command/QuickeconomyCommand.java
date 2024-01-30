@@ -1,11 +1,11 @@
-package net.derfla.quickeconomy.commands;
+package net.derfla.quickeconomy.command;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
-public class quickeconomyCommand implements CommandExecutor {
+public class QuickeconomyCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {

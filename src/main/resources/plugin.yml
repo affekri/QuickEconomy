@@ -1,6 +1,6 @@
 name: QuickEconomy
 version: '${project.version}'
-main: net.derfla.quickeconomy.main
+main: net.derfla.quickeconomy.Main
 api-version: '1.20'
 author: AffeKri
 commands:

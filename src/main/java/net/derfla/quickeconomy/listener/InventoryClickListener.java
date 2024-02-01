@@ -26,7 +26,7 @@ public class InventoryClickListener implements Listener {
             event.setCancelled(true);
             boolean bankInventory = false;
             if (inventoryType == InventoryType.CHEST) bankInventory = true;
-            Boolean cancel = ((BankInventory) event.getInventory().getHolder()).trigger(event.getCurrentItem(), event.getSlot(), bankInventory);
+            Boolean cancel = ((BankInventory) event.getInventory().getHolder()).trigger(event.getCurrentItem(), bankInventory);
             return;
 
             // Check if it is the ShopInventory

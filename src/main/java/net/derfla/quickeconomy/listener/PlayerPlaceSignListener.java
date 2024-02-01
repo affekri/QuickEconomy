@@ -49,7 +49,12 @@ public class PlayerPlaceSignListener implements Listener {
 
             // Check if chest is locked
             if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
-                player.sendMessage("§cThis chest is locked!");
+                player.sendMessage("§cThis chest is locked to another player!");
+                event.setCancelled(true);
+                return;
+            }
+            if (BlockOwner.isLocked(chest)) {
+                player.sendMessage("§cYou already have a shop on this chest!");
                 event.setCancelled(true);
                 return;
             }

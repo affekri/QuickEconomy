@@ -8,11 +8,14 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.Plugin;
 
 public class BankInventory implements InventoryHolder {
 
     private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Bank");
     private Player target;
+
+    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
 
 
     public BankInventory(Player player) {
@@ -44,17 +47,18 @@ public class BankInventory implements InventoryHolder {
         player.openInventory(inventory);
     }
 
-    public Boolean trigger(ItemStack itemStack, int slot, boolean bankInventory) {
+    public Boolean trigger(ItemStack itemStack, boolean bankInventory) {
+        float exchangeRate = getExchangeRate();
         //check if the clicked item is in the BankInventory
         if (bankInventory) {
             switch (itemStack.getType()) {
                 case DIAMOND:
-                    if (Balances.getPlayerBalance(target.getName()) < 10f){
+                    if (Balances.getPlayerBalance(target.getName()) < exchangeRate){
                         target.closeInventory();
                         target.sendMessage("§cYou do not have enough coins!");
                         return true;
                     }
-                    Balances.subPlayerBalance(target.getName(), 10f);
+                    Balances.subPlayerBalance(target.getName(), exchangeRate);
                     target.getInventory().addItem(new ItemStack(Material.DIAMOND));
                     return true;
                 case GOLD_INGOT:
@@ -70,8 +74,9 @@ public class BankInventory implements InventoryHolder {
         }
         if (itemStack.getType() == Material.DIAMOND) {
             // Deposit logic
-            target.getInventory().removeItem(new ItemStack(Material.DIAMOND));
-            Balances.addPlayerBalance(target.getName(), 10f);
+            int itemAmount = itemStack.getAmount();
+            target.getInventory().removeItem(itemStack);
+            Balances.addPlayerBalance(target.getName(), itemAmount * exchangeRate);
             return true;
         }
         return false;
@@ -80,5 +85,16 @@ public class BankInventory implements InventoryHolder {
     @Override
     public Inventory getInventory() {
         return this.inventory;
+    }
+
+    private static float getExchangeRate() {
+        float exchangeRate = 10f;
+        if (plugin.getConfig().contains("exchangeRate") && plugin.getConfig().getString("exchangeRate") != null) {
+            if (TypeChecker.isFloat(plugin.getConfig().getString("exchangeRate"))) exchangeRate = Float.parseFloat(plugin.getConfig().getString("exchangeRate"));
+        } else {
+            plugin.getLogger().warning("Could not find exchangeRate in config.yml!");
+        }
+
+        return exchangeRate;
     }
 }

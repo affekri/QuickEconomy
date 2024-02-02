@@ -14,7 +14,7 @@ public class Balances {
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
-            plugin.getLogger().warning("balance.yml not found!");
+            plugin.getLogger().severe("balance.yml not found!");
             return 0.0f;
         }
 
@@ -22,10 +22,11 @@ public class Balances {
             plugin.getLogger().info("No balance found for player: " + playerName);
             return 0.0f;
         }
-
-        int playerBalance = file.getInt("players." + playerName + ".balance");
-        float fMoney = (float) playerBalance;
-        return fMoney / 100;
+        if (file.get("players." + playerName + ".balance") == null) {
+            plugin.getLogger().info("No balance found for player: " + playerName);
+            return 0.0f;
+        }
+        return (float) file.getDouble("players." + playerName + ".balance");
     }
 
     public static void setPlayerBalance(String playerName, float money) {
@@ -35,10 +36,7 @@ public class Balances {
             plugin.getLogger().warning("balance.yml not found!");
             return;
         }
-
-        float multMoney = money * 100;
-        int intMoney = (int) multMoney;
-        file.set("players." + playerName + ".balance", intMoney);
+        file.set("players." + playerName + ".balance", money);
         plugin.getLogger().info("Set balance of " + playerName + " to " + money);
         BalanceFile.save();
     }

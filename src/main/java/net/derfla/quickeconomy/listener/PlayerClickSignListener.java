@@ -50,8 +50,10 @@ public class PlayerClickSignListener implements Listener {
             }
             float cost = Float.parseFloat(costString);
             String seller = lines[2].replace("§f", "");
+            boolean singleItem = false;
+            if (lines[3].replace("§f", "").equalsIgnoreCase("item")) singleItem = true;
 
-            new ShopInventory(player, chest, cost, seller);
+            new ShopInventory(player, chest, cost, seller, singleItem);
         }
     }
 }

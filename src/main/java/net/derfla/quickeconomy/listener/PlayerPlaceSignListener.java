@@ -62,6 +62,10 @@ public class PlayerPlaceSignListener implements Listener {
             // Lock chest to player
             BlockOwner.setPlayerOwned(chest, player.getName(), true);
 
+            if (lines[2].equalsIgnoreCase("item") || lines[3].equalsIgnoreCase("item")) {
+                event.setLine(3, "§fItem");
+            } else event.setLine(3, "§fStack");
+
             event.setLine(0, "§a[SHOP]");
             event.setLine(1, "§f" + cost);
             event.setLine(2, "§f" + player.getName());

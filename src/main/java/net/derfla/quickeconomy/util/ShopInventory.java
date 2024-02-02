@@ -13,12 +13,13 @@ public class ShopInventory implements InventoryHolder {
     private static String shopOwner;
     private static float shopCost;
     private static  Chest shopChest;
+    private static boolean singleShopItem;
 
     private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Shop");
     private Player target;
 
 
-    public ShopInventory(Player player, Chest chest, float cost, String owner) {
+    public ShopInventory(Player player, Chest chest, float cost, String owner, boolean singleItem) {
         this.target = player;
         if (chest.getBlockInventory().isEmpty()) {
             player.sendMessage("§eThis shop is currently empty!");
@@ -28,6 +29,7 @@ public class ShopInventory implements InventoryHolder {
         shopOwner = owner;
         shopCost = cost;
         shopChest = chest;
+        singleShopItem = singleItem;
 
         ItemStack[] shopContent =  chest.getBlockInventory().getContents();
         inventory.setContents(shopContent);
@@ -58,4 +60,5 @@ public class ShopInventory implements InventoryHolder {
     public static String getShopOwner() {
         return shopOwner;
     }
+    public static boolean isSingleItem() {return singleShopItem;}
 }

@@ -3,6 +3,7 @@ package net.derfla.quickeconomy.listener;
 import net.derfla.quickeconomy.util.ShopInventory;
 import net.derfla.quickeconomy.util.Balances;
 import net.derfla.quickeconomy.util.BankInventory;
+import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,6 +18,7 @@ public class InventoryClickListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         // Filter out bad events
         if (event.getInventory() == null || event.getCurrentItem() == null) return;
+        if (event.getCurrentItem().getType().equals(Material.AIR)) return;
 
         InventoryType inventoryType = event.getClickedInventory().getType();
 
@@ -73,5 +75,4 @@ public class InventoryClickListener implements Listener {
             new ShopInventory(player, chest, cost, owner, singleItem);
         }
     }
-
 }

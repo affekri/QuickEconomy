@@ -8,6 +8,9 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ShopInventory implements InventoryHolder {
 
     private static String shopOwner;
@@ -37,8 +40,17 @@ public class ShopInventory implements InventoryHolder {
         shopChest = chest;
         singleShopItem = singleItem;
 
-        ItemStack[] shopContent =  chest.getBlockInventory().getContents();
-        inventory.setContents(shopContent);
+        // Sorts the chest inventory
+        ItemStack[] chestContent = chest.getBlockInventory().getContents();
+        List<ItemStack> newChestContent = new ArrayList<>();
+        for (ItemStack item : chestContent){
+            if (item != null) newChestContent.add(item);
+        }
+        ItemStack[] filteredChestContent = new ItemStack[chestContent.length];
+        newChestContent.toArray(filteredChestContent);
+        chest.getBlockInventory().setContents(filteredChestContent);
+
+        inventory.setContents(filteredChestContent);
 
 
         player.openInventory(inventory);

@@ -12,6 +12,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class PlayerClickSignListener implements Listener {
 
@@ -19,16 +23,12 @@ public class PlayerClickSignListener implements Listener {
     public void onPlayerClickSign(PlayerInteractEvent event){
         Player player = event.getPlayer();
 
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
-            return;
-        }
-        if (!(event.getClickedBlock().getState() instanceof Sign)) {
-            return;
-        }
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+        if (!(event.getClickedBlock().getState() instanceof Sign)) return;
         Material blockType = event.getClickedBlock().getType();
-        if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) {
-            return;
-        }
+        if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) return;
+
         Sign sign = (Sign) event.getClickedBlock().getState();
         String[] lines = sign.getLines();
 
@@ -50,8 +50,7 @@ public class PlayerClickSignListener implements Listener {
             }
             float cost = Float.parseFloat(costString);
             String seller = lines[2].replace("§f", "");
-            boolean singleItem = false;
-            if (lines[3].replace("§f", "").equalsIgnoreCase("item")) singleItem = true;
+            boolean singleItem = lines[3].replace("§f", "").equalsIgnoreCase("item");
 
             new ShopInventory(player, chest, cost, seller, singleItem);
         }

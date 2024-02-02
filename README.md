@@ -1,6 +1,6 @@
 # QuickEconomy
 
-An economy plugin for small Minecraft servers running PaperMC.
+An economy plugin for small Minecraft servers running PaperMC.  
 
 ## Commands
 
@@ -32,4 +32,6 @@ As a server operator placing or editing a sign that says
 ### Shop
 
 Any player can make a shop by writing [SHOP] on the first line of a sign  
-that is placed on the side of a chest. Write the price of the items on the second line.    
+that is placed on the side of a chest. Write the price of the items on the second line.  
+You can write Item or Stack on the third or fourth line to choose what type of shop  
+you want. If you write nothing the shop will default to Stack.  

@@ -21,9 +21,15 @@ public class ShopInventory implements InventoryHolder {
 
     public ShopInventory(Player player, Chest chest, float cost, String owner, boolean singleItem) {
         this.target = player;
+        // Check if shop is empty
         if (chest.getBlockInventory().isEmpty()) {
             player.sendMessage("§eThis shop is currently empty!");
-            //TODO Add message to owner
+            // TODO Add message to owner
+            return;
+        }
+        // Check if the player inventory is full
+        if (player.getInventory().firstEmpty() == -1) {
+            player.sendMessage("§cYour inventory is full! Make some space to buy things.");
             return;
         }
         shopOwner = owner;

@@ -12,10 +12,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class PlayerClickSignListener implements Listener {
 
@@ -39,20 +35,36 @@ public class PlayerClickSignListener implements Listener {
         } else if (lines[0].equals("§a[SHOP]")) {
             event.setCancelled(true);
             if (FindChest.get(sign) == null) {
-                player.sendMessage("Unable to find chest.");
-                return;
-            }
-            Chest chest = FindChest.get(sign);
-            String costString = lines[1].replace("§f", "");
-            if (!TypeChecker.isFloat(costString)) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
                 return;
             }
-            float cost = Float.parseFloat(costString);
-            String seller = lines[2].replace("§f", "");
-            boolean singleItem = lines[3].replace("§f", "").equalsIgnoreCase("item");
+            Chest chest = FindChest.get(sign);
+            if (chest == null) return;
+            String string1 = lines[1].replace("§f", "");
+            if (!string1.contains("/")) {
+                player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
+                return;
+            }
+            String[] splitLine1 = string1.split("/");
+            if (!TypeChecker.isFloat(splitLine1[0])) {
+                player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
+                return;
+            }
+            float cost = Float.parseFloat(splitLine1[0]);
+            String shopType;
+            if (splitLine1[1].equalsIgnoreCase("item")) {
+                shopType = "Item";
+            } else shopType = "Stack";
+            String owner2;
+            if (lines[3].contains("§f")){
+                owner2 = lines[3].replace("§f", "");
+            } else owner2 = "";
 
-            new ShopInventory(player, chest, cost, seller, singleItem);
+
+            String seller = lines[2].replace("§f", "");
+            boolean singleItem = shopType.equalsIgnoreCase("item");
+
+            new ShopInventory(player, chest, cost, seller, singleItem, owner2);
         }
     }
 }

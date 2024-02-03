@@ -45,8 +45,9 @@ public class InventoryClickListener implements Listener {
             Player player = (Player) event.getWhoClicked();
             // Sets cost variable
             float cost = ShopInventory.getShopCost();
-            // Sets owner variable
+            // Sets owner variables
             String owner = ShopInventory.getShopOwner();
+            String owner2 = ShopInventory.getShopOwner2();
             // Sets the chest variable
             Chest chest = ShopInventory.getShopChest();
             // Sets the singleItem variable
@@ -64,8 +65,14 @@ public class InventoryClickListener implements Listener {
             }
             // Removes the cost from the buying player
             Balances.subPlayerBalance(player.getName(), cost);
-            // Gives the paid coins to the shop owner
-            Balances.addPlayerBalance(owner, cost);
+            // Gives the paid coins to the shop owner or owners
+            if (owner2.isEmpty()) {
+                Balances.addPlayerBalance(owner, cost);
+            }else  {
+                Balances.addPlayerBalance(owner, cost / 2);
+                Balances.addPlayerBalance(owner2, cost / 2);
+            }
+
             // Removes the bought item from the open shop and the shop chest
             player.getOpenInventory().getTopInventory().remove(boughtItem);
             chest.getBlockInventory().removeItem(boughtItem);

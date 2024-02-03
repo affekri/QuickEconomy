@@ -14,6 +14,7 @@ import java.util.List;
 public class ShopInventory implements InventoryHolder {
 
     private static String shopOwner;
+    private static String shopOwner2;
     private static float shopCost;
     private static  Chest shopChest;
     private static boolean singleShopItem;
@@ -22,7 +23,7 @@ public class ShopInventory implements InventoryHolder {
     private Player target;
 
 
-    public ShopInventory(Player player, Chest chest, float cost, String owner, boolean singleItem) {
+    public ShopInventory(Player player, Chest chest, float cost, String owner, boolean singleItem, String owner2) {
         this.target = player;
         // Check if shop is empty
         if (chest.getBlockInventory().isEmpty()) {
@@ -39,6 +40,7 @@ public class ShopInventory implements InventoryHolder {
         shopCost = cost;
         shopChest = chest;
         singleShopItem = singleItem;
+        shopOwner2 = owner2;
 
         // Sorts the chest inventory
         ItemStack[] chestContent = chest.getBlockInventory().getContents();
@@ -78,5 +80,10 @@ public class ShopInventory implements InventoryHolder {
     public static String getShopOwner() {
         return shopOwner;
     }
+
+    public static String getShopOwner2() {
+        return shopOwner2;
+    }
+
     public static boolean isSingleItem() {return singleShopItem;}
 }

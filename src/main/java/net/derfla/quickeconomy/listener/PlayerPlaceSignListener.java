@@ -33,13 +33,32 @@ public class PlayerPlaceSignListener implements Listener {
             sign.update();
             player.sendMessage("§eBank created!");
             return;
-        } else if (lines[0].equals("[SHOP]")) {
+        } else if (lines[0].equalsIgnoreCase("[SHOP]")) {
             if (blockType.equals(Material.OAK_SIGN)) return;
             if (FindChest.get(sign) == null) return;
             Chest chest = FindChest.get(sign);
-            if (!TypeChecker.isFloat(lines[1])) return;
-            float cost = Float.parseFloat(lines[1]);
-            if (cost < 0) return;
+            if (chest == null) return;
+            if (!lines[1].contains("/")) {
+                player.sendMessage("§cIncorrect input! The second line should look something like 10.5/Item");
+                event.setCancelled(true);
+                return;
+            }
+            String[] splitLine1 = lines[1].split("/");
+            if (!TypeChecker.isFloat(splitLine1[0])) {
+                player.sendMessage("§cIncorrect input! The second line should look something like 10.5/Item");
+                event.setCancelled(true);
+                return;
+            }
+            float cost = Float.parseFloat(splitLine1[0]);
+            if (cost < 0) {
+                player.sendMessage("§cThe cost must be above 0!");
+                event.setCancelled(true);
+                return;
+            }
+            String shopType;
+            if (splitLine1[1].equalsIgnoreCase("item")) {
+                shopType = "Item";
+            } else shopType = "Stack";
 
             // Check if double chest
             if (FindChest.isDouble(chest)) {
@@ -59,18 +78,21 @@ public class PlayerPlaceSignListener implements Listener {
                 return;
             }
 
+
             // Lock chest to player
             BlockOwner.setPlayerOwned(chest, player.getName(), true);
 
-            if (lines[2].equalsIgnoreCase("item") || lines[3].equalsIgnoreCase("item")) {
-                event.setLine(3, "§fItem");
-            } else event.setLine(3, "§fStack");
-
             event.setLine(0, "§a[SHOP]");
-            event.setLine(1, "§f" + cost);
+            event.setLine(1, "§f" + cost + "/" + shopType);
             event.setLine(2, "§f" + player.getName());
+            if (!lines[3].isEmpty()){
+                event.setLine(3, "§f" + lines[3]);
+                sign.update();
+                player.sendMessage("§eShop created! Half of the income from this shop will go to player: " + lines[3]);
+                return;
+            }
             sign.update();
-            player.sendMessage("Shop created!");
+            player.sendMessage("§eShop created!");
             return;
         }
     }

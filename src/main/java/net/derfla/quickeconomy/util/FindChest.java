@@ -41,6 +41,13 @@ public class FindChest {
         if (!block.getType().equals(Material.CHEST)) return null;
         return (Chest) block.getState();
     }
+    public static boolean topLocked(Block block) {
+        Block topBlock = block.getRelative(0, 1, 0);
+        if (topBlock == null) return false;
+        if (!topBlock.getType().equals(Material.CHEST)) return false;
+        if (!(topBlock.getState() instanceof Chest)) return false;
+        return BlockOwner.isLocked((Chest) topBlock.getState());
+    }
 
     public static boolean isDouble (Chest chest) {
         Pattern pattern = Pattern.compile("type=([a-z]+)");

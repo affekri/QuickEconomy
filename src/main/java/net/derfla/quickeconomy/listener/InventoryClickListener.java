@@ -66,13 +66,11 @@ public class InventoryClickListener implements Listener {
             Balances.subPlayerBalance(player.getName(), cost);
             // Gives the paid coins to the shop owner
             Balances.addPlayerBalance(owner, cost);
-            // Removes the bought item from the shop chest
+            // Removes the bought item from the open shop and the shop chest
+            player.getOpenInventory().getTopInventory().remove(boughtItem);
             chest.getBlockInventory().removeItem(boughtItem);
             // Adds the bought item to the player inventory
             player.getInventory().addItem(boughtItem);
-            // Creates a new shop instance to update without the bought item
-            player.closeInventory();
-            new ShopInventory(player, chest, cost, owner, singleItem);
         }
     }
 }

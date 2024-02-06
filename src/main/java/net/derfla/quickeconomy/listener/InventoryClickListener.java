@@ -72,9 +72,7 @@ public class InventoryClickListener implements Listener {
                 Balances.addPlayerBalance(owner, cost / 2);
                 Balances.addPlayerBalance(owner2, cost / 2);
             }
-
-            // Removes the bought item from the open shop and the shop chest
-            player.getOpenInventory().getTopInventory().remove(boughtItem);
+            player.getOpenInventory().getTopInventory().removeItem(boughtItem);
             chest.getBlockInventory().removeItem(boughtItem);
             // Adds the bought item to the player inventory
             player.getInventory().addItem(boughtItem);

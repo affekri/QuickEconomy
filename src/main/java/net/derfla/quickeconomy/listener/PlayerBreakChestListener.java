@@ -15,7 +15,7 @@ public class PlayerBreakChestListener implements Listener {
         if (!event.getBlock().getType().equals(Material.CHEST)) return;
         Chest chest = (Chest) event.getBlock().getState();
         if (BlockOwner.isLockedForPlayer(chest, event.getPlayer().getName())) {
-            event.getPlayer().sendMessage("§cThis chest is locked!");
+            event.getPlayer().sendMessage("§cYou are not allowed to remove this chest!");
             event.setCancelled(true);
             return;
         }

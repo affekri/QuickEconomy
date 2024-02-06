@@ -1,8 +1,10 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.util.Balances;
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.FindChest;
 import net.derfla.quickeconomy.util.TypeChecker;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
@@ -86,10 +88,18 @@ public class PlayerPlaceSignListener implements Listener {
             event.setLine(1, "§f" + cost + "/" + shopType);
             event.setLine(2, "§f" + player.getName());
             if (!lines[3].isEmpty()){
-                event.setLine(3, "§f" + lines[3]);
-                sign.update();
-                player.sendMessage("§eShop created! Half of the income from this shop will go to player: " + lines[3]);
-                return;
+                if (Balances.getPlayerBalance(lines[3]) == 0.0f && Bukkit.getPlayer(lines[3]) == null) {
+                    event.setLine(3, "");
+                    player.sendMessage("§cYou tried to add a player that does not seem to exist on this server!");
+                } else if (lines[3].equals(player.getName())) {
+                    event.setLine(3, "");
+                    player.sendMessage("§cYou tried to add yourself as the second player!");
+                } else {
+                    event.setLine(3, "§f" + lines[3]);
+                    sign.update();
+                    player.sendMessage("§eShop created! Half of the income from this shop will go to the player: " + lines[3]);
+                    return;
+                }
             }
             sign.update();
             player.sendMessage("§eShop created!");

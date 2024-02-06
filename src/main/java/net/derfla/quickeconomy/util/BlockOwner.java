@@ -31,9 +31,10 @@ public class BlockOwner {
             chest.update();
             plugin.getLogger().info("Locked chest to: " + player);
         }else {
+            String owner = chest.getPersistentDataContainer().get(lockedKey, PersistentDataType.STRING);
             chest.getPersistentDataContainer().remove(lockedKey);
             chest.update();
-            plugin.getLogger().info("Unlocked chest from: " + player);
+            plugin.getLogger().info(player + " unlocked a chest from: " + owner);
         }
 
     }

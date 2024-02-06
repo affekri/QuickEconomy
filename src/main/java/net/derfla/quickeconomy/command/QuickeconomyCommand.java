@@ -14,14 +14,14 @@ public class QuickeconomyCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         String helpMessage = "Use /bal or /balance to see your balance. Use /bal send, followed by an amount and another player, to send coins to that player. To create a shop place a sign on a chest. On the first line write [SHOP]. On the second line write the cost for the the items, such as 10 or 5.5. To deposit or withdraw coins, visit a bank!";
         String helpMessageOp = "As you are a server operator you have some more options. You can use /bal set:add:subtract to change the balance of any player. You can also create a bank, simply place down a sign and write [BANK] on the first line.";
-        if (plugin.getConfig().contains("helpMessage") && plugin.getConfig().getString("helpMessage") != null) {
-            helpMessage = plugin.getConfig().getString("helpMessage");
+        if (plugin.getConfig().contains("strings.helpMessage") && plugin.getConfig().getString("strings.helpMessage") != null) {
+            helpMessage = plugin.getConfig().getString("strings.helpMessage");
         }else plugin.getLogger().warning("Could not find string helpMessage in config.yml");
 
         sender.sendMessage("§e" + helpMessage);
         if (!sender.isOp()) return true;
-        if (plugin.getConfig().contains("helpMessageOp") && plugin.getConfig().getString("helpMessageOp") != null) {
-            helpMessageOp = plugin.getConfig().getString("helpMessageOp");
+        if (plugin.getConfig().contains("strings.helpMessageOp") && plugin.getConfig().getString("strings.helpMessageOp") != null) {
+            helpMessageOp = plugin.getConfig().getString("strings.helpMessageOp");
         } else plugin.getLogger().warning("Could not find string helpMessageOp in config.yml");
         sender.sendMessage("§e" + helpMessageOp);
         return true;

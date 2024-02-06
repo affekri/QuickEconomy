@@ -19,8 +19,23 @@ public class BalanceCommand implements CommandExecutor {
                 return true;
             }
             Player player = ((Player) sender).getPlayer();
-
-            player.sendMessage("Your balance is: " + Balances.getPlayerBalance(player.getName()));
+            player.sendMessage("§eYour balance is: " + Balances.getPlayerBalance(player.getName()));
+            return true;
+        }
+        if (strings.length == 1) {
+            if (sender instanceof  Player && !(sender.isOp())) {
+                sender.sendMessage("§cIncorrect arguments! Use /bal send.");
+                return true;
+            }
+            float balance = Balances.getPlayerBalance(strings[0]);
+            if (balance == 0.0f) {
+                sender.sendMessage("§e" + strings[0] + " does not seem to have an account!");
+                return true;
+            }
+            sender.sendMessage( "§e" + strings[0] + "'s balance: " + balance);
+            return true;
+        }
+        if (strings[1] == null) {
             return true;
         }
 

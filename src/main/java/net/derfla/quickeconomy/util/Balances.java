@@ -37,7 +37,6 @@ public class Balances {
             return;
         }
         file.set("players." + playerName + ".balance", money);
-        plugin.getLogger().info("Set balance of " + playerName + " to " + money);
         BalanceFile.save();
     }
 

@@ -1,7 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
-import org.bukkit.Bukkit;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.minecart.HopperMinecart;
 import org.bukkit.event.EventHandler;
@@ -23,6 +22,5 @@ public class HopperMoveItemEvent implements Listener {
         event.setCancelled(true);
         HopperMinecart minecart = (HopperMinecart) event.getInitiator().getHolder();
         minecart.setEnabled(false);
-        minecart.setDamage(41);
     }
 }

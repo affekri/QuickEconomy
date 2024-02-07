@@ -8,6 +8,7 @@ import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
@@ -21,7 +22,7 @@ public class InventoryClickListener implements Listener {
         if (event.getCurrentItem().getType().equals(Material.AIR)) return;
 
         InventoryType inventoryType = event.getClickedInventory().getType();
-
+        ClickType clickType = event.getClick();
 
         // Check if the inventory is an instance from this plugin
         // Check if it is the BankInventory
@@ -29,7 +30,7 @@ public class InventoryClickListener implements Listener {
             event.setCancelled(true);
             boolean bankInventory = false;
             if (inventoryType == InventoryType.CHEST) bankInventory = true;
-            Boolean cancel = ((BankInventory) event.getInventory().getHolder()).trigger(event.getCurrentItem(), bankInventory);
+            Boolean cancel = ((BankInventory) event.getInventory().getHolder()).trigger(event.getCurrentItem(), bankInventory, clickType);
             return;
 
         // Check if it is the ShopInventory

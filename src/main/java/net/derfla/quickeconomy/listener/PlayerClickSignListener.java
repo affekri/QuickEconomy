@@ -4,14 +4,19 @@ import net.derfla.quickeconomy.util.FindChest;
 import net.derfla.quickeconomy.util.ShopInventory;
 import net.derfla.quickeconomy.util.BankInventory;
 import net.derfla.quickeconomy.util.TypeChecker;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.Style;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
+import org.bukkit.block.sign.Side;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+
+import java.util.List;
 
 public class PlayerClickSignListener implements Listener {
 
@@ -26,13 +31,15 @@ public class PlayerClickSignListener implements Listener {
         if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) return;
 
         Sign sign = (Sign) event.getClickedBlock().getState();
-        String[] lines = sign.getLines();
+        List<Component> listLines = sign.getSide(Side.FRONT).lines();
+        Component bankHeader = PlayerPlaceSignListener.getBankHeaderComponent();
+        Component shopHeader = PlayerPlaceSignListener.getShopHeaderComponent();
+        Style bodyStyle = PlayerPlaceSignListener.getBodyStyle();
 
-
-        if (lines[0].equals("§6[BANK]")) {
+        if (listLines.get(0).equals(bankHeader)) {
             event.setCancelled(true);
             new BankInventory(player);
-        } else if (lines[0].equals("§a[SHOP]")) {
+        } else if (listLines.get(0).equals(shopHeader)) {
             event.setCancelled(true);
             if (FindChest.get(sign) == null) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
@@ -40,12 +47,12 @@ public class PlayerClickSignListener implements Listener {
             }
             Chest chest = FindChest.get(sign);
             if (chest == null) return;
-            String string1 = lines[1].replace("§f", "");
-            if (!string1.contains("/")) {
+            String line1 = TypeChecker.getRawString(listLines.get(1));
+            if (!line1.contains("/")) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
                 return;
             }
-            String[] splitLine1 = string1.split("/");
+            String[] splitLine1 = line1.split("/");
             if (!TypeChecker.isFloat(splitLine1[0])) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
                 return;
@@ -55,16 +62,16 @@ public class PlayerClickSignListener implements Listener {
             if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";
             } else shopType = "Stack";
-            String owner2;
-            if (lines[3].contains("§f")){
-                owner2 = lines[3].replace("§f", "");
-            } else owner2 = "";
+            String seller2;
+            if (listLines.get(3).style().equals(bodyStyle)){
+                seller2 = TypeChecker.getRawString(listLines.get(3));
+            } else seller2 = "";
 
 
-            String seller = lines[2].replace("§f", "");
+            String seller = TypeChecker.getRawString(listLines.get(3));
             boolean singleItem = shopType.equalsIgnoreCase("item");
 
-            new ShopInventory(player, chest, cost, seller, singleItem, owner2);
+            new ShopInventory(player, chest, cost, seller, singleItem, seller2);
         }
     }
 }

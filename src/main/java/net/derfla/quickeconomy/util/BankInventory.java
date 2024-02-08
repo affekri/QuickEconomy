@@ -84,6 +84,10 @@ public class BankInventory implements InventoryHolder {
             switch (itemStack.getType()) {
                 case DIAMOND:
                     // Withdraw logic
+                    if (target.getInventory().firstEmpty() == -1) {
+                        target.sendMessage("§cYour inventory is full! You can't withdraw any more!");
+                        return false;
+                    }
                     int diamondAmount;
                     if (clickType.isLeftClick()) diamondAmount = 64;
                     else diamondAmount = 1;

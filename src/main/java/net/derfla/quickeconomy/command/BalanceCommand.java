@@ -4,12 +4,19 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import net.derfla.quickeconomy.util.Balances;
 import net.derfla.quickeconomy.util.TypeChecker;
+import org.jetbrains.annotations.Nullable;
 
-public class BalanceCommand implements CommandExecutor {
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class BalanceCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
@@ -145,5 +152,31 @@ public class BalanceCommand implements CommandExecutor {
                 break;
         }
         return true;
+    }
+
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
+        if (strings.length == 1) {
+            if (commandSender.isOp() || !(commandSender instanceof Player)) {
+                List<String> players =  Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+                List<String> subCommands = Arrays.asList("set", "add", "subtract", "send");
+                List<String> combinedList = new ArrayList<>();
+                combinedList.addAll(subCommands);
+                combinedList.addAll(players);
+                return combinedList;
+            } else return Arrays.asList("send");
+        }
+        if (strings.length == 2) {
+            String balance;
+            if (commandSender instanceof Player) {
+                balance = String.valueOf(Balances.getPlayerBalance(commandSender.getName()));
+            } else balance = "1001";
+            return Arrays.asList("10", "100", "1000", balance);
+        }
+        if (strings.length == 3) {
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+        }
+        return null;
     }
 }

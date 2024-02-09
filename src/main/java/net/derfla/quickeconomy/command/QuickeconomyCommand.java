@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.command;
 
+import net.derfla.quickeconomy.Main;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -9,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 
 public class QuickeconomyCommand implements CommandExecutor {
 
-    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
+    static Plugin plugin = Main.getInstance();
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         String helpMessage = "Use /bal or /balance to see your balance. Use /bal send, followed by an amount and another player, to send coins to that player. To create a shop place a sign on a chest. On the first line write [SHOP]. On the second line write the cost for the the items, such as 10 or 5.5, followed by a / and then what kind of shop it is. To deposit or withdraw coins, visit a bank!";

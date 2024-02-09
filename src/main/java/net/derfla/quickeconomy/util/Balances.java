@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.util;
 
 
+import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -8,7 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 public class Balances {
 
-    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
+    static Plugin plugin = Main.getInstance();
 
     public static float getPlayerBalance(String playerName) {
         FileConfiguration file = BalanceFile.get();

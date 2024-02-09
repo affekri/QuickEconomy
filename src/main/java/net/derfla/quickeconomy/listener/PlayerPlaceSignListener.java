@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.Balances;
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.FindChest;
@@ -20,7 +21,7 @@ import org.bukkit.plugin.Plugin;
 
 public class PlayerPlaceSignListener implements Listener {
 
-    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
+    static Plugin plugin = Main.getInstance();
     private static final Style bankHeaderStyle = Style.style(NamedTextColor.GOLD, TextDecoration.BOLD);
     private static final Component bankHeader = Component.text("[BANK]").style(bankHeaderStyle);
     private static final Style shopHeaderStyle = Style.style(NamedTextColor.AQUA, TextDecoration.BOLD);

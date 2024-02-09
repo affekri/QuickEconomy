@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.util;
 
+import net.derfla.quickeconomy.Main;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.Style;
@@ -23,7 +24,7 @@ public class BankInventory implements InventoryHolder {
     private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Bank");
     private Player target;
 
-    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
+    static Plugin plugin = Main.getInstance();
 
 
     public BankInventory(Player player) {

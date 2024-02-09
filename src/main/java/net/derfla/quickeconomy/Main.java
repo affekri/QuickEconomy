@@ -45,4 +45,8 @@ public final class Main extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
     }
+
+    public static Main getInstance() {
+        return getPlugin(Main.class);
+    }
 }

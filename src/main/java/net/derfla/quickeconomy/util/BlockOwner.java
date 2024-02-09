@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.util;
 
+import net.derfla.quickeconomy.Main;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Chest;
@@ -8,7 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 public class BlockOwner {
 
-    static Plugin plugin = Bukkit.getPluginManager().getPlugin("QuickEconomy");
+    static Plugin plugin = Main.getInstance();
     public static boolean isLockedForPlayer (Chest chest, String player) {
         NamespacedKey lockedKey = new NamespacedKey(plugin, "playerLocked");
         if (!chest.getPersistentDataContainer().has(lockedKey)) return false;

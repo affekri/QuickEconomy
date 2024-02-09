@@ -49,10 +49,20 @@ public class PlayerPlaceSignListener implements Listener {
             player.sendMessage("§eBank created!");
             return;
         } else if (event.line(0).equals(Component.text("[SHOP]"))) {
-            if (blockType.equals(Material.OAK_SIGN)) return;
-            if (FindChest.get(sign) == null) return;
+            if (blockType.equals(Material.OAK_SIGN)) {
+                player.sendMessage("Wrong type of sign for the shop!");
+                return;
+            }
+            if (FindChest.get(sign) == null) {
+                player.sendMessage(sign.getBlock().toString());
+                player.sendMessage("§cDid not find any chest for this shop!");
+                return;
+            }
             Chest chest = FindChest.get(sign);
-            if (chest == null) return;
+            if (chest == null) {
+                player.sendMessage("§cDid not find any chest for this shop!");
+                return;
+            }
             // Check if double chest
             if (FindChest.isDouble(chest)) {
                 player.sendMessage("§cYou can only use single chests for shops!");
@@ -94,8 +104,6 @@ public class PlayerPlaceSignListener implements Listener {
             if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";
             } else shopType = "Stack";
-            // Lock chest to player
-            BlockOwner.setPlayerOwned(chest, player.getName(), true);
             event.line(0, shopHeader);
             event.line(1, Component.text(cost + "/" + shopType).style(bodyStyle));
             event.line(2, Component.text(player.getName()).style(bodyStyle));
@@ -111,9 +119,13 @@ public class PlayerPlaceSignListener implements Listener {
                     event.line(3, Component.text(line3).style(bodyStyle));
                     sign.update();
                     player.sendMessage("§eShop created! Half of the income from this shop will go to the player: " + line3);
+                    // Lock chest to players
+                    BlockOwner.setPlayerLocked(chest, player.getName(), line3);
                     return;
                 }
             }
+            // Lock chest to player
+            BlockOwner.setPlayerLocked(chest, player.getName(), "");
             sign.update();
             player.sendMessage("§eShop created!");
             return;

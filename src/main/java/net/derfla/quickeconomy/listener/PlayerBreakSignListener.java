@@ -26,20 +26,25 @@ public class PlayerBreakSignListener implements Listener {
         Sign sign = (Sign) event.getBlock().getState();
         List<Component> listLines = sign.getSide(Side.FRONT).lines();
         Component bankHeader = PlayerPlaceSignListener.getBankHeaderComponent();
-        Component shopHeader = PlayerPlaceSignListener.getBankHeaderComponent();
+        Component shopHeader = PlayerPlaceSignListener.getShopHeaderComponent();
 
-
-        if (!(listLines.get(0).equals(bankHeader)) || !(listLines.get(0).equals(shopHeader))) {
-            return;
+        if (!listLines.get(0).equals(bankHeader)) {
+            if (!listLines.get(0).equals(shopHeader)) return;
         }
+
         Player player = event.getPlayer();
-        if (player.isOp() || TypeChecker.getRawString(listLines.get(2)).equals(player.getName())){
-            if (FindChest.get(sign) == null) return;
-            Chest chest = FindChest.get(sign);
-            BlockOwner.setPlayerOwned(chest, player.getName(), false);
-            return;
+        if (listLines.get(0).equals(bankHeader)) {
+            if (player.isOp()) return;
         }
-        event.getPlayer().sendMessage("§cYou are not allowed to remove this sign!");
+        if (listLines.get(0).equals(shopHeader)) {
+            if (player.isOp() || TypeChecker.getRawString(listLines.get(2)).equals(player.getName())){
+                if (FindChest.get(sign) == null) return;
+                Chest chest = FindChest.get(sign);
+                BlockOwner.unlockFromPlayer(chest, player.getName());
+                return;
+            }
+        }
+        player.sendMessage("§cYou are not allowed to remove this sign!");
         event.setCancelled(true);
     }
 }

@@ -130,6 +130,14 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage("§cPlease use a positive number!");
                     break;
                 }
+                if (strings[2].equals(sender.getName())) {
+                    sender.sendMessage("§cYou can't send coins to yourself!");
+                    break;
+                }
+                if (Bukkit.getServer().getPlayer(strings[2]) == null || Balances.getPlayerBalance(strings[2]) == 0.0f) {
+                    sender.sendMessage( "§cPlayer: "+ strings[2] + " does not seem to exist on this server!");
+                    break;
+                }
                 Player player = ((Player) sender).getPlayer();
                 if (Balances.getPlayerBalance(player.getName()) < money) {
                     player.sendMessage("§cYou do not have enough balance!");

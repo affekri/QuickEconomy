@@ -34,12 +34,17 @@ public class PlayerClickSignListener implements Listener {
         List<Component> listLines = sign.getSide(Side.FRONT).lines();
         Component bankHeader = PlayerPlaceSignListener.getBankHeaderComponent();
         Component shopHeader = PlayerPlaceSignListener.getShopHeaderComponent();
-        Style bodyStyle = PlayerPlaceSignListener.getBodyStyle();
 
         if (listLines.get(0).equals(bankHeader)) {
             event.setCancelled(true);
             new BankInventory(player);
         } else if (listLines.get(0).equals(shopHeader)) {
+            String seller = TypeChecker.getRawString(listLines.get(2));
+            String seller2 = TypeChecker.getRawString(listLines.get(3));
+            // Allows the sellers to edit the shop
+            if (seller.equals(player.getName()) || seller2.equals(player.getName())) {
+                return;
+            }
             event.setCancelled(true);
             if (FindChest.get(sign) == null) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
@@ -62,15 +67,7 @@ public class PlayerClickSignListener implements Listener {
             if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";
             } else shopType = "Stack";
-            String seller2;
-            if (listLines.get(3).style().equals(bodyStyle)){
-                seller2 = TypeChecker.getRawString(listLines.get(3));
-            } else seller2 = "";
-
-
-            String seller = TypeChecker.getRawString(listLines.get(3));
             boolean singleItem = shopType.equalsIgnoreCase("item");
-
             new ShopInventory(player, chest, cost, seller, singleItem, seller2);
         }
     }

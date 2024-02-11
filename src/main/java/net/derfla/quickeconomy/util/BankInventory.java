@@ -93,7 +93,6 @@ public class BankInventory implements InventoryHolder {
                     if (clickType.isLeftClick()) diamondAmount = 64;
                     else diamondAmount = 1;
                     if (Balances.getPlayerBalance(target.getName()) < exchangeRate * diamondAmount){
-                        target.closeInventory();
                         target.sendMessage("§cYou do not have enough coins!");
                         return true;
                     }

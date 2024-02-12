@@ -39,6 +39,9 @@ public final class Main extends JavaPlugin {
         BalanceFile.setup();
         BalanceFile.get().options().copyDefaults(true);
         BalanceFile.save();
+
+        int pluginID = 20985;
+        Metrics metrics = new Metrics(this, pluginID);
     }
 
     @Override

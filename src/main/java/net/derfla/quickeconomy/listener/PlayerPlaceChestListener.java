@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
+import net.derfla.quickeconomy.util.FindChest;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.event.EventHandler;
@@ -14,11 +15,17 @@ public class PlayerPlaceChestListener implements Listener {
         // Check if making a shop chest to a double
         if (!(event.getBlockPlaced().getState() instanceof Chest)) return;
         if (!event.getBlockPlaced().getType().equals(Material.CHEST)) return;
-        if (!(event.getBlockAgainst().getState() instanceof Chest)) return;
-        if (!event.getBlockAgainst().getType().equals(Material.CHEST)) return;
-        Chest chest = (Chest) event.getBlockAgainst().getState();
-        if (!BlockOwner.isLocked(chest)) return;
-        event.getPlayer().sendMessage("§cThis is a shop chest. You can not make it into a double chest!");
-        event.setCancelled(true);
+        Chest chest;
+        if (event.getBlockAgainst().getState() instanceof Chest) {
+            chest = (Chest) event.getBlockAgainst().getState();
+        } else if (FindChest.get((Chest) event.getBlockPlaced().getState()) != null) {
+            chest = FindChest.get((Chest) event.getBlockPlaced().getState());
+        } else return;
+        if (chest == null) return;
+        if (BlockOwner.isShop(chest)) {
+            event.getPlayer().sendMessage("§cThis is a shop chest. You can not make it into a double chest!");
+            event.setCancelled(true);
+            return;
+        }
     }
 }

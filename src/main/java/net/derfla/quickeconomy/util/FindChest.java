@@ -57,4 +57,59 @@ public class FindChest {
         if (type.equals("single")) return false;
         return true;
     }
+
+    public static Chest get(Chest chest) {
+        Pattern pattern = Pattern.compile("type=([a-z]+)");
+        Matcher matcher = pattern.matcher(chest.getBlock().toString());
+        if (!matcher.find()) return null;
+        String type = matcher.group(1);
+        boolean isRight;
+        if (type.equals("right")) {
+            isRight = true;
+        } else if (type.equals("left")) {
+            isRight = false;
+        } else return null;
+
+        Pattern pattern2 = Pattern.compile("facing=([a-z]+)");
+        Matcher matcher2 = pattern2.matcher(chest.getBlock().toString());
+        if (!matcher2.find()) return null;
+        String facing = matcher2.group(1);
+        Block block;
+        switch (facing) {
+            case "north":
+                if (isRight) {
+                    block = chest.getBlock().getRelative(-1, 0, 0);
+                    break;
+                }
+                block = chest.getBlock().getRelative(1, 0, 0);
+                break;
+            case "west":
+                if (isRight) {
+                    block = chest.getBlock().getRelative(0, 0, 1);
+                    break;
+                }
+                block = chest.getBlock().getRelative(0, 0, -1);
+                break;
+            case "south":
+                if (isRight) {
+                    block = chest.getBlock().getRelative(1, 0, 0);
+                    break;
+                }
+                block = chest.getBlock().getRelative(-1, 0, 0);
+                break;
+            case "east":
+                if (isRight){
+                    block = chest.getBlock().getRelative(0, 0, -1);
+                    break;
+                }
+                block = chest.getBlock().getRelative(0, 0, 1);
+                break;
+            default:
+                block = null;
+                break;
+        }
+        if (block == null) return null;
+        if (!(block.getState() instanceof Chest)) return null;
+        return (Chest) block.getState();
+    }
 }

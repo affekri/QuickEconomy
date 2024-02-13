@@ -25,5 +25,13 @@ public class PlayerOpenChestListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (BlockOwner.isShopOpen(chest)) {
+            player.sendMessage("§eSomeone is currently using your shop. Please wait a moment!");
+            event.setCancelled(true);
+            return;
+        }
+        if (BlockOwner.isShop(chest)) {
+            BlockOwner.setShopOpen(chest, true);
+        }
     }
 }

@@ -10,6 +10,7 @@ public class BlockOwner {
 
     static Plugin plugin = Main.getInstance();
     static NamespacedKey lockedKey = new NamespacedKey(plugin, "playerLocked");
+    static NamespacedKey shopOpenKey = new NamespacedKey(plugin, "shopOpen");
     public static boolean isLockedForPlayer (Chest chest, String player) {
         if (!chest.getPersistentDataContainer().has(lockedKey)) return false;
         if (chest.getPersistentDataContainer().get(lockedKey, PersistentDataType.STRING) == null) return false;
@@ -54,5 +55,18 @@ public class BlockOwner {
         }
         if (nbt.contains(" ")) nbt = nbt.replace(" ", " & ");
         plugin.getLogger().info(player + " unlocked a chest from: " + nbt);
+    }
+
+    public static void setShopOpen(Chest chest, boolean shopOpen) {
+        chest.getPersistentDataContainer().set(shopOpenKey, PersistentDataType.BOOLEAN, shopOpen);
+        chest.update();
+    }
+
+    public static boolean isShopOpen(Chest chest) {
+        if (!chest.getPersistentDataContainer().has(shopOpenKey, PersistentDataType.BOOLEAN)) return false;
+        return chest.getPersistentDataContainer().get(shopOpenKey, PersistentDataType.BOOLEAN);
+    }
+    public static boolean isShop(Chest chest) {
+        return chest.getPersistentDataContainer().has(shopOpenKey, PersistentDataType.BOOLEAN);
     }
 }

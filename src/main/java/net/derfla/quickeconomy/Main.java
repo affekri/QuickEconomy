@@ -31,6 +31,7 @@ public final class Main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceChestListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceHopperListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new HopperMoveItemEvent(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerCloseInventoryListener(), this);
 
         // Config file
         getConfig().options().copyDefaults(true);

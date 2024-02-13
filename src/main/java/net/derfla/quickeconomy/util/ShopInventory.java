@@ -51,10 +51,11 @@ public class ShopInventory implements InventoryHolder {
         ItemStack[] filteredChestContent = new ItemStack[chestContent.length];
         newChestContent.toArray(filteredChestContent);
         chest.getBlockInventory().setContents(filteredChestContent);
+        chest.update();
 
         inventory.setContents(filteredChestContent);
 
-
+        BlockOwner.setShopOpen(chest, true);
         player.openInventory(inventory);
     }
 

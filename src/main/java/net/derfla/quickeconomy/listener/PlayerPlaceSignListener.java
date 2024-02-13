@@ -56,6 +56,7 @@ public class PlayerPlaceSignListener implements Listener {
             player.sendMessage("§eBank created!");
             return;
         } else if (event.line(0).equals(Component.text("[SHOP]")) || alreadyShop) {
+            if (event.lines().equals(preSign)) return;
             if (blockType.equals(Material.OAK_SIGN)) {
                 player.sendMessage("Wrong type of sign for the shop!");
                 return;
@@ -88,6 +89,7 @@ public class PlayerPlaceSignListener implements Listener {
                     event.setCancelled(true);
                     return;
                 }
+                BlockOwner.setShopOpen(chest, false);
             }
             if (event.line(1) == null) return;
             String line1 = TypeChecker.getRawString(event.line(1));

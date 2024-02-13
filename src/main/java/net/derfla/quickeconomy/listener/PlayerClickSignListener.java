@@ -1,9 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.util.FindChest;
-import net.derfla.quickeconomy.util.ShopInventory;
-import net.derfla.quickeconomy.util.BankInventory;
-import net.derfla.quickeconomy.util.TypeChecker;
+import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.Style;
 import org.bukkit.Material;
@@ -52,6 +49,10 @@ public class PlayerClickSignListener implements Listener {
             }
             Chest chest = FindChest.get(sign);
             if (chest == null) return;
+            if (BlockOwner.isShopOpen(chest)) {
+                player.sendMessage("§eThis shop is currently being restocked. Please wait a moment!");
+                return;
+            }
             String line1 = TypeChecker.getRawString(listLines.get(1));
             if (!line1.contains("/")) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");

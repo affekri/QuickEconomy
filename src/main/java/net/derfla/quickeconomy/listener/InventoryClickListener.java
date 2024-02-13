@@ -64,6 +64,11 @@ public class InventoryClickListener implements Listener {
             } else {
                 boughtItem = event.getCurrentItem();
             }
+            // Cancels the purchase if it is diamonds see #21
+            if (boughtItem.getType().equals(Material.DIAMOND) || boughtItem.getType().equals(Material.DIAMOND_BLOCK)) {
+                player.sendMessage("§cYou ca not buy diamonds from shops!");
+                return;
+            }
             // Removes the cost from the buying player
             Balances.subPlayerBalance(player.getName(), cost);
             // Gives the paid coins to the shop owner or owners

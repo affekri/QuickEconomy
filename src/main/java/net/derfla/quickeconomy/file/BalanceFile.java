@@ -1,8 +1,11 @@
 package net.derfla.quickeconomy.file;
 
+import net.derfla.quickeconomy.Main;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -10,19 +13,20 @@ public class BalanceFile {
 
     private static File file;
     private static FileConfiguration customFile;
+    static Plugin plugin = Main.getInstance();
 
     public static void setup(){
         // Setup logic, gets called when plugin is loaded
-        file = new File(Bukkit.getServer().getPluginManager().getPlugin("QuickEconomy").getDataFolder(), "balance.yml");
+        file = new File(plugin.getDataFolder(), "balance.yml");
 
         if(!file.exists()){
             try {
                 file.createNewFile();
-                Bukkit.getLogger().info("Created new file: " + file.getName());
+                plugin.getLogger().info("Created new file: " + file.getName());
             } catch (IOException e) {
                 // Just sends out a warning
                 e.printStackTrace();
-                Bukkit.getLogger().warning("Couldn't create file: " + file.getName());
+                plugin.getLogger().warning("Couldn't create file: " + file.getName());
             }
         }
         customFile = YamlConfiguration.loadConfiguration(file);
@@ -39,7 +43,7 @@ public class BalanceFile {
             customFile.save(file);
         } catch (IOException e) {
             // Just sends out a warning
-            Bukkit.getLogger().warning("Couldn't save file: " + file.getName());
+            plugin.getLogger().warning("Couldn't save file: " + file.getName());
         }
     }
 

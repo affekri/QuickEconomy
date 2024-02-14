@@ -117,7 +117,9 @@ public class PlayerPlaceSignListener implements Listener {
                 return;
             }
             String shopType;
-            if (splitLine1[1].equalsIgnoreCase("item")) {
+            if (splitLine1.length != 2){
+                shopType = "Stack";
+            } else if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";
             } else shopType = "Stack";
             event.line(0, shopHeader);

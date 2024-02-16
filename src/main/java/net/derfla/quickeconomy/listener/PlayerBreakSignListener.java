@@ -19,8 +19,7 @@ public class PlayerBreakSignListener implements Listener {
 
     @EventHandler
     public void onPlayerBreakSign(BlockBreakEvent event) {
-        Material blockType = event.getBlock().getType();
-        if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) {
+        if (!(event.getBlock().getState() instanceof Sign)) {
             return;
         }
         Sign sign = (Sign) event.getBlock().getState();

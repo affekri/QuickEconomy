@@ -24,8 +24,6 @@ public class PlayerClickSignListener implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (event.getClickedBlock() == null) return;
         if (!(event.getClickedBlock().getState() instanceof Sign)) return;
-        Material blockType = event.getClickedBlock().getType();
-        if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) return;
 
         Sign sign = (Sign) event.getClickedBlock().getState();
         List<Component> listLines = sign.getSide(Side.FRONT).lines();

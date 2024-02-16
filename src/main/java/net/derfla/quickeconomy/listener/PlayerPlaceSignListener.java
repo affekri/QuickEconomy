@@ -35,7 +35,10 @@ public class PlayerPlaceSignListener implements Listener {
     @EventHandler
     public void onPlayerPlaceSign(SignChangeEvent event) {
         Material blockType = event.getBlock().getType();
-        if (!(blockType == Material.OAK_SIGN || blockType == Material.OAK_WALL_SIGN)) {
+        if (!(event.getBlock().getState() instanceof Sign)) {
+            return;
+        }
+        if (event.getBlock().getType().toString().contains("HANGING")) {
             return;
         }
         if (event.isCancelled()) {
@@ -57,7 +60,7 @@ public class PlayerPlaceSignListener implements Listener {
             return;
         } else if (event.line(0).equals(Component.text("[SHOP]")) || alreadyShop) {
             if (event.lines().equals(preSign)) return;
-            if (blockType.equals(Material.OAK_SIGN)) {
+            if (!event.getBlock().getType().toString().contains("WALL")) {
                 player.sendMessage("Wrong type of sign for the shop!");
                 return;
             }

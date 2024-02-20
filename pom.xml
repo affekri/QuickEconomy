@@ -6,7 +6,7 @@
 
     <groupId>net.derfla</groupId>
     <artifactId>QuickEconomy</artifactId>
-    <version>1.0-SNAPSHOT-5</version>
+    <version>1.0</version>
     <packaging>jar</packaging>
 
     <name>QuickEconomy</name>

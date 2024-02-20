@@ -1,6 +1,7 @@
 # QuickEconomy
 
 An economy plugin for small Minecraft servers running PaperMC.  
+![QuickEconomy Stats](https://bstats.org/signatures/bukkit/QuickEconomy.svg)
 
 ## Commands
 

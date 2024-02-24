@@ -33,10 +33,10 @@ public class PlayerBreakSignListener implements Listener {
 
         Player player = event.getPlayer();
         if (listLines.get(0).equals(bankHeader)) {
-            if (player.isOp()) return;
+            if (player.hasPermission("quickeconomy.bank.destroy")) return;
         }
         if (listLines.get(0).equals(shopHeader)) {
-            if (player.isOp() || TypeChecker.getRawString(listLines.get(2)).equals(player.getName())){
+            if (player.hasPermission("quickeconomy.shop.destroyall") || TypeChecker.getRawString(listLines.get(2)).equals(player.getName())){
                 if (FindChest.get(sign) == null) return;
                 Chest chest = FindChest.get(sign);
                 BlockOwner.unlockFromPlayer(chest, player.getName());

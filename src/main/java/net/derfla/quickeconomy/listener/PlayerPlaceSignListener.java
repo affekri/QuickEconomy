@@ -51,7 +51,7 @@ public class PlayerPlaceSignListener implements Listener {
         if (preSign.get(0).equals(shopHeader)) alreadyShop = true;
 
         if (event.line(0).equals(Component.text("[BANK]"))) {
-            if (!player.isOp()) return;
+            if (!player.hasPermission("quickeconomy.bank.create")) return;
             event.line(0, bankHeader);
             event.line(1, Component.text("Deposit items").style(bodyStyle));
             event.line(2, Component.text("for coins!").style(bodyStyle));
@@ -60,6 +60,7 @@ public class PlayerPlaceSignListener implements Listener {
             return;
         } else if (event.line(0).equals(Component.text("[SHOP]")) || alreadyShop) {
             if (event.lines().equals(preSign)) return;
+            if (!player.hasPermission("quickeconomy.shop.create")) return;
             if (!event.getBlock().getType().toString().contains("WALL")) {
                 player.sendMessage("Wrong type of sign for the shop!");
                 return;

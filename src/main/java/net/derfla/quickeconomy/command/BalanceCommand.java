@@ -13,8 +13,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class BalanceCommand implements CommandExecutor, TabCompleter {
 
@@ -30,7 +32,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (strings.length == 1) {
-            if (sender instanceof  Player && !(sender.isOp())) {
+            if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.seeall"))) {
                 sender.sendMessage("§cIncorrect arguments! Use /bal send.");
                 return true;
             }
@@ -56,8 +58,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
 
         switch (strings[0].toLowerCase()) {
             case "set":
-                if (sender instanceof  Player && !(sender.isOp())) {
-                    sender.sendMessage("§cYou need to be an server operator to use this command!");
+                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
+                    sender.sendMessage("§cYou are not allowed to use this command!");
                     break;
                 }
 
@@ -79,8 +81,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
 
 
             case "add":
-                if (sender instanceof  Player && !(sender.isOp())) {
-                    sender.sendMessage("§cYou need to be an server operator to use this command!");
+                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
+                    sender.sendMessage("§cYou are not allowed to use this command!");
                     break;
                 }
                 if (strings.length == 2) {
@@ -99,8 +101,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 break;
 
             case "subtract":
-                if (sender instanceof  Player && !(sender.isOp())) {
-                    sender.sendMessage("§cYou need to be an server operator to use this command!");
+                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
+                    sender.sendMessage("§cYou are not allowed to use this command!");
                     break;
                 }
                 if (strings.length == 2) {
@@ -164,26 +166,35 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
 
 
     @Override
-    public @Nullable List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if (strings.length == 1) {
-            if (commandSender.isOp() || !(commandSender instanceof Player)) {
+            List<String> returnList = new ArrayList<>(Collections.singletonList("send"));
+            if (sender.hasPermission("quickeconomy.balance.seeall") || !(sender instanceof Player)) {
                 List<String> players =  Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
-                List<String> subCommands = Arrays.asList("set", "add", "subtract", "send");
-                List<String> combinedList = new ArrayList<>();
-                combinedList.addAll(subCommands);
-                combinedList.addAll(players);
-                return combinedList;
-            } else return Arrays.asList("send");
+                returnList.addAll(players);
+            }
+            if (sender.hasPermission("quickeconomy.balance.modifyall") || ! (sender instanceof Player)) {
+                List<String> subCommands = Arrays.asList("set", "add", "subtract");
+                returnList.addAll(subCommands);
+            }
+            return returnList.stream()
+                    .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[0]))
+                    .collect(Collectors.toList());
         }
         if (strings.length == 2) {
             String balance;
-            if (commandSender instanceof Player) {
-                balance = String.valueOf(Balances.getPlayerBalance(commandSender.getName()));
+            if (sender instanceof Player) {
+                balance = String.valueOf(Balances.getPlayerBalance(sender.getName()));
             } else balance = "1001";
-            return Arrays.asList("10", "100", "1000", balance);
+            return Stream.of("10", "100", "1000", balance)
+                    .filter(amount -> amount.startsWith(strings[1]))
+                    .collect(Collectors.toList());
         }
         if (strings.length == 3) {
-            return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(player -> player.toLowerCase().startsWith(strings[2]))
+                    .collect(Collectors.toList());
         }
         return null;
     }

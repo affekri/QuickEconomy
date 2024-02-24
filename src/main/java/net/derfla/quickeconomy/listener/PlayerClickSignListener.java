@@ -32,6 +32,7 @@ public class PlayerClickSignListener implements Listener {
 
         if (listLines.get(0).equals(bankHeader)) {
             event.setCancelled(true);
+            if (!player.hasPermission("quickeconomy.bank")) return;
             new BankInventory(player);
         } else if (listLines.get(0).equals(shopHeader)) {
             String seller = TypeChecker.getRawString(listLines.get(2));
@@ -41,6 +42,7 @@ public class PlayerClickSignListener implements Listener {
                 return;
             }
             event.setCancelled(true);
+            if (!player.hasPermission("quickeconomy.shop")) return;
             if (FindChest.get(sign) == null) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
                 return;

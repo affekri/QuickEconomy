@@ -37,11 +37,12 @@ public class PlayerClickSignListener implements Listener {
         } else if (listLines.get(0).equals(shopHeader)) {
             String seller = TypeChecker.getRawString(listLines.get(2));
             String seller2 = TypeChecker.getRawString(listLines.get(3));
-            // Allows the sellers to edit the shop
+            event.setCancelled(true);
+            // Makes owners unable to open their own shop
             if (seller.equals(player.getName()) || seller2.equals(player.getName())) {
+                player.sendMessage("§cYou can not open your own shop!");
                 return;
             }
-            event.setCancelled(true);
             if (!player.hasPermission("quickeconomy.shop")) return;
             if (FindChest.get(sign) == null) {
                 player.sendMessage("§eThis shop seems to be broken, please alert the owner!");

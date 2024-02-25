@@ -30,11 +30,9 @@ public class PlayerPlaceSignListener implements Listener {
     private static final Style shopHeaderStyle = Style.style(NamedTextColor.AQUA, TextDecoration.BOLD);
     private static final Component shopHeader = Component.text("[SHOP]").style(shopHeaderStyle);
     private static final Style bodyStyle = Style.style(NamedTextColor.WHITE);
-    private boolean alreadyShop = false;
 
     @EventHandler
     public void onPlayerPlaceSign(SignChangeEvent event) {
-        Material blockType = event.getBlock().getType();
         if (!(event.getBlock().getState() instanceof Sign)) {
             return;
         }
@@ -48,7 +46,7 @@ public class PlayerPlaceSignListener implements Listener {
         List<Component> preSign = sign.getSide(Side.FRONT).lines();
         Player player = event.getPlayer();
 
-        if (preSign.get(0).equals(shopHeader)) alreadyShop = true;
+        if (!event.line(0).equals(Component.text("[BANK]")) && !event.line(0).equals(Component.text("[SHOP]"))) return;
 
         if (event.line(0).equals(Component.text("[BANK]"))) {
             if (!player.hasPermission("quickeconomy.bank.create")) return;
@@ -58,7 +56,7 @@ public class PlayerPlaceSignListener implements Listener {
             sign.update();
             player.sendMessage("§eBank created!");
             return;
-        } else if (event.line(0).equals(Component.text("[SHOP]")) || alreadyShop) {
+        } else if (event.line(0).equals(Component.text("[SHOP]"))) {
             if (event.lines().equals(preSign)) return;
             if (!player.hasPermission("quickeconomy.shop.create")) return;
             if (!event.getBlock().getType().toString().contains("WALL")) {
@@ -66,7 +64,6 @@ public class PlayerPlaceSignListener implements Listener {
                 return;
             }
             if (FindChest.get(sign) == null) {
-                player.sendMessage(sign.getBlock().toString());
                 player.sendMessage("§cDid not find any chest for this shop!");
                 return;
             }
@@ -81,45 +78,42 @@ public class PlayerPlaceSignListener implements Listener {
                 player.sendMessage("§cYou can only use single chests for shops!");
                 return;
             }
-            if (!alreadyShop) {
-                // Check if chest is locked
-                if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
-                    player.sendMessage("§cThis chest is locked to another player!");
-                    event.setCancelled(true);
-                    return;
-                }
-                if (BlockOwner.isLocked(chest)) {
-                    player.sendMessage("§cYou already have a shop on this chest!");
-                    event.setCancelled(true);
-                    return;
-                }
-                BlockOwner.setShopOpen(chest, false);
+
+            // Check if chest is locked
+            if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
+                player.sendMessage("§cThis chest is locked to another player!");
+                event.setCancelled(true);
+                return;
             }
+            if (BlockOwner.isLocked(chest)) {
+                player.sendMessage("§cYou already have a shop on this chest!");
+                event.setCancelled(true);
+                return;
+            }
+            BlockOwner.setShopOpen(chest, false);
+
             if (event.line(1) == null) return;
             String line1 = TypeChecker.getRawString(event.line(1));
             String line1Error = "§cIncorrect input! The second line should look something like 10.5/Item";
-            if (line1 == null || line1.equals("")) {
-                if (alreadyShop) event.setCancelled(true);
+            if (line1 == null || line1.isEmpty()) {
                 player.sendMessage(line1Error);
                 return;
             }
             if (!line1.contains("/")) {
-                if (alreadyShop) event.setCancelled(true);
                 player.sendMessage(line1Error);
                 return;
             }
             String[] splitLine1 = line1.split("/");
             if (!TypeChecker.isFloat(splitLine1[0])) {
-                if (alreadyShop) event.setCancelled(true);
                 player.sendMessage(line1Error);
                 return;
             }
-            float cost = Float.parseFloat(splitLine1[0]);
+            float cost = TypeChecker.formatFloat(Float.parseFloat(splitLine1[0]));
             if (cost <= 0.0f) {
-                if (alreadyShop) event.setCancelled(true);
                 player.sendMessage("§cThe cost must be above 0!");
                 return;
             }
+
             String shopType;
             if (splitLine1.length != 2){
                 shopType = "Stack";

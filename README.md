@@ -42,4 +42,16 @@ item at a time. In a stack shop, you buy however many items there is in the slot
 The second line could look like "10.5/Item" or "20/Stack".  
 The fourth line is optional, here you can add another player,  
 if you wish to share the income with them.
-  
+
+## Permissions  
+
+`quickeconomy.balance` Allows the player to use the balance command and see their own balance. Default `true`  
+`quickeconomy.balance.seeall`Allows the player to see all players balances. Default `false`  
+`quickeconomy.balance.modifyall` Allows the player to modify all player balances. Default `false`  
+`quickeconomy.help` Allows the player to use the quickeconomy command and get a help message. Default `true`  
+`quickeconomy.shop` Allows the player to use shops. Default `true`  
+`quickeconomy.shop.create` Allows the player to create shops. Default `true`  
+`quickeconomy.shop.destroyall` Allows the player to remove all shops, not exclusively theirs. Default `false`  
+`quickeconomy.bank` Allows the player to use banks. Default `true`  
+`quickeconomy.bank.create` Allows the player to create banks. Default `false`  
+`quickeconomy.bank.destroy` Allows the player to destroy banks. Default `false`  

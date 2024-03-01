@@ -50,6 +50,12 @@ public class InventoryClickListener implements Listener {
             if (!buy) return;
             // Sets player variable
             Player player = (Player) event.getWhoClicked();
+
+            if (player.getInventory().firstEmpty() == -1) {
+                player.sendMessage(Component.translatable("shop.inventory.full", Styles.ERRORSTYLE));
+                player.closeInventory();
+                return;
+            }
             // Sets cost variable
             float cost = ShopInventory.getShopCost();
             // Sets owner variables

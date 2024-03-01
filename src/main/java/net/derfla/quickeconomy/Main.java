@@ -4,10 +4,7 @@ import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.translation.GlobalTranslator;
-import net.kyori.adventure.translation.TranslationRegistry;
-import net.kyori.adventure.util.UTF8ResourceBundleControl;
+import net.derfla.quickeconomy.util.Translation;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -39,6 +36,7 @@ public final class Main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceHopperListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new HopperMoveItemEvent(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerCloseInventoryListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerChangeSettingsListener(), this);
 
         // Config file
         getConfig().options().copyDefaults(true);
@@ -50,12 +48,6 @@ public final class Main extends JavaPlugin {
 
         int pluginID = 20985;
         Metrics metrics = new Metrics(this, pluginID);
-
-        TranslationRegistry registry = TranslationRegistry.create(Key.key("namespace:value"));
-
-        ResourceBundle bundle = ResourceBundle.getBundle("translations.Bundle", Locale.US, UTF8ResourceBundleControl.get());
-        registry.registerAll(Locale.US, bundle, true);
-        GlobalTranslator.translator().addSource(registry);
     }
 
     @Override

@@ -2,6 +2,7 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.FindChest;
+import net.derfla.quickeconomy.util.Styles;
 import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
@@ -43,7 +44,7 @@ public class PlayerBreakSignListener implements Listener {
                 return;
             }
         }
-        player.sendMessage("§cYou are not allowed to remove this sign!");
+        player.sendMessage(Component.translatable("shop.breaksign.canceled", Styles.ERRORSTYLE));
         event.setCancelled(true);
     }
 }

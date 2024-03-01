@@ -1,6 +1,8 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.FindChest;
+import net.derfla.quickeconomy.util.Styles;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Hopper;
 import org.bukkit.event.EventHandler;
@@ -15,7 +17,7 @@ public class PlayerPlaceHopperListener implements Listener {
         if (!event.getBlockPlaced().getType().equals(Material.HOPPER)) return;
         if (!(event.getBlockPlaced().getState() instanceof Hopper)) return;
         if (!FindChest.topLocked(event.getBlockPlaced())) return;
-        event.getPlayer().sendMessage("§cYou can't place hoppers under shops!");
+        event.getPlayer().sendMessage(Component.translatable("shop.locked.hopper", Styles.ERRORSTYLE));
         event.setCancelled(true);
     }
 }

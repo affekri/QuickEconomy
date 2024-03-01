@@ -2,6 +2,8 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.FindChest;
+import net.derfla.quickeconomy.util.Styles;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.event.EventHandler;
@@ -23,7 +25,7 @@ public class PlayerPlaceChestListener implements Listener {
         } else return;
         if (chest == null) return;
         if (BlockOwner.isShop(chest)) {
-            event.getPlayer().sendMessage("§cThis is a shop chest. You can not make it into a double chest!");
+            event.getPlayer().sendMessage(Component.translatable("shop.double", Styles.ERRORSTYLE));
             event.setCancelled(true);
             return;
         }

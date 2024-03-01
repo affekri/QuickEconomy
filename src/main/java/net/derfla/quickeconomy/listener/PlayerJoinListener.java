@@ -2,6 +2,8 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.util.Balances;
+import net.derfla.quickeconomy.util.Styles;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -26,7 +28,7 @@ public class PlayerJoinListener implements Listener {
         if (change == 0.0f) {
             return;
         }
-        player.sendMessage("§eWelcome back! While you were away you received " + change + " coins!");
+        player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
         Balances.setPlayerBalanceChange(player.getName(), 0.0f);
     }
 }

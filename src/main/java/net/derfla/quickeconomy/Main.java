@@ -4,8 +4,15 @@ import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.translation.GlobalTranslator;
+import net.kyori.adventure.translation.TranslationRegistry;
+import net.kyori.adventure.util.UTF8ResourceBundleControl;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 
 public final class Main extends JavaPlugin {
@@ -43,6 +50,12 @@ public final class Main extends JavaPlugin {
 
         int pluginID = 20985;
         Metrics metrics = new Metrics(this, pluginID);
+
+        TranslationRegistry registry = TranslationRegistry.create(Key.key("namespace:value"));
+
+        ResourceBundle bundle = ResourceBundle.getBundle("translations.Bundle", Locale.US, UTF8ResourceBundleControl.get());
+        registry.registerAll(Locale.US, bundle, true);
+        GlobalTranslator.translator().addSource(registry);
     }
 
     @Override
@@ -53,4 +66,5 @@ public final class Main extends JavaPlugin {
     public static Main getInstance() {
         return getPlugin(Main.class);
     }
+
 }

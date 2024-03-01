@@ -1,5 +1,9 @@
 package net.derfla.quickeconomy.command;
 
+import net.derfla.quickeconomy.util.Styles;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -28,20 +32,20 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             Player player = ((Player) sender).getPlayer();
-            player.sendMessage("§eYour balance is: " + Balances.getPlayerBalance(player.getName()));
+            player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(player.getName()))).style(Styles.INFOSTYLE));
             return true;
         }
         if (strings.length == 1) {
             if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.seeall"))) {
-                sender.sendMessage("§cIncorrect arguments! Use /bal send.");
+                sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                 return true;
             }
             float balance = Balances.getPlayerBalance(strings[0]);
             if (balance == 0.0f) {
-                sender.sendMessage("§e" + strings[0] + " does not seem to have an account!");
+                sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[0])).style(Styles.ERRORSTYLE));
                 return true;
             }
-            sender.sendMessage( "§e" + strings[0] + "'s balance: " + balance);
+            sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[0]), Component.text(balance)).style(Styles.INFOSTYLE));
             return true;
         }
         if (strings[1] == null) {
@@ -49,7 +53,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         }
 
         if (!(TypeChecker.isFloat(strings[1]))){
-            sender.sendMessage("§cPlease provide a number!");
+            sender.sendMessage(Component.translatable("provide.number", Styles.ERRORSTYLE));
             return true;
         }
         float money = Float.parseFloat(strings[1]);
@@ -59,106 +63,107 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         switch (strings[0].toLowerCase()) {
             case "set":
                 if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage("§cYou are not allowed to use this command!");
+                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
 
 
                 if (strings.length == 2) {
                     if (!(sender instanceof Player)) {
-                        sender.sendMessage("§cPlease provide a player!");
+                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                         break;
                     }
                     Player player = ((Player) sender).getPlayer();
 
                     Balances.setPlayerBalance(player.getName(), money);
-                    player.sendMessage("§eMoney set!");
+                    player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
                     break;
                 }
                 Balances.setPlayerBalance(strings[2], money);
-                sender.sendMessage("§eSet balance of " + strings[2] + " to " + money);
+                sender.sendMessage(Component.translatable("balcommand.set", Component.text(strings[2]), Component.text(money)).style(Styles.INFOSTYLE));
                 break;
 
 
             case "add":
                 if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage("§cYou are not allowed to use this command!");
+                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
                 if (strings.length == 2) {
                     if (!(sender instanceof Player)) {
-                        sender.sendMessage("Please provide a player!");
+                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                         break;
                     }
                     Player player = ((Player) sender).getPlayer();
 
                     Balances.addPlayerBalance(player.getName(), money);
-                    player.sendMessage("§eAdded " + money + " to your balance!");
+                    player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
                 Balances.addPlayerBalance(strings[2], money);
-                sender.sendMessage("§eAdded " + money + " to " + strings[2] + "'s balance!");
+                sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
             case "subtract":
                 if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage("§cYou are not allowed to use this command!");
+                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
                 if (strings.length == 2) {
                     if (!(sender instanceof Player)) {
-                        sender.sendMessage("§cPlease provide a player!");
+                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                         break;
                     }
                     Player player = ((Player) sender).getPlayer();
                     Balances.subPlayerBalance(player.getName(), money);
-                    player.sendMessage("§eSubtracted " + money + " from your balance!");
+                    player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
                 Balances.subPlayerBalance(strings[2], money);
-                sender.sendMessage("§eSubtracted " + money + " from " + strings[2] + "'s balance!");
+                sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
             case "send":
                 if (!(sender instanceof Player)) {
-                    sender.sendMessage("§cYou can only send coins as a player!");
+                    sender.sendMessage(Component.translatable("balcommand.send.notplayer", Styles.ERRORSTYLE));
                     break;
                 }
                 if (strings.length == 2) {
-                    sender.sendMessage("§cPlease provide a player!");
+                    sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                     break;
                 }
                 if (money < 0) {
-                    sender.sendMessage("§cPlease use a positive number!");
+                    sender.sendMessage(Component.translatable("balcommand.send.negative", Styles.ERRORSTYLE));
                     break;
                 }
                 if (strings[2].equals(sender.getName())) {
-                    sender.sendMessage("§cYou can't send coins to yourself!");
+                    sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
                     break;
                 }
                 if (Bukkit.getServer().getPlayer(strings[2]) == null || Balances.getPlayerBalance(strings[2]) == 0.0f) {
-                    sender.sendMessage( "§cPlayer: "+ strings[2] + " does not seem to exist on this server!");
+                    sender.sendMessage( Component.translatable("player.notexists", Component.text(strings[2])));
                     break;
                 }
                 Player player = ((Player) sender).getPlayer();
                 if (Balances.getPlayerBalance(player.getName()) < money) {
-                    player.sendMessage("§cYou do not have enough balance!");
+                    player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
                 Balances.subPlayerBalance(player.getName(), money);
                 Balances.addPlayerBalance(strings[2], money);
-                player.sendMessage("§eSent " + money + " coins to " + strings[2] + "!");
+
+                player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {
                     // Alerts the receiving player if it's online
                     Player targetPlayer = Bukkit.getPlayer(strings[2]);
-                    targetPlayer.sendMessage("§eYou just received " + money + " coins from " + player.getName() + "!");
+                    targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                     break;
                 }
 
                 break;
 
             default:
-                sender.sendMessage("§cInvalid arguments!");
+                sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                 break;
         }
         return true;

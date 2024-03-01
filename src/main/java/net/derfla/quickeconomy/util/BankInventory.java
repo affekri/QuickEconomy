@@ -86,14 +86,14 @@ public class BankInventory implements InventoryHolder {
                 case DIAMOND:
                     // Withdraw logic
                     if (target.getInventory().firstEmpty() == -1) {
-                        target.sendMessage("§cYour inventory is full! You can't withdraw any more!");
+                        target.sendMessage(Component.translatable("bank.inventory.full", Styles.ERRORSTYLE));
                         return false;
                     }
                     int diamondAmount;
                     if (clickType.isLeftClick()) diamondAmount = 64;
                     else diamondAmount = 1;
                     if (Balances.getPlayerBalance(target.getName()) < exchangeRate * diamondAmount){
-                        target.sendMessage("§cYou do not have enough coins!");
+                        target.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                         return true;
                     }
                     Balances.subPlayerBalance(target.getName(), exchangeRate * diamondAmount);
@@ -101,12 +101,12 @@ public class BankInventory implements InventoryHolder {
                     return true;
                 case GOLD_INGOT:
                     // Deposit logic
-                    target.sendMessage("§fClick diamonds in your inventory to deposit!");
+                    target.sendMessage(Component.translatable("bank.inventory.deposit", Styles.INFOSTYLE));
                     return true;
                 case GOLD_BLOCK:
                     // Check balance logic
                     target.closeInventory();
-                    target.sendMessage("§eYour balance is " + Balances.getPlayerBalance(target.getName()) + " coins!");
+                    target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(target.getName()))).style(Styles.INFOSTYLE));
                     return true;
             }
         }

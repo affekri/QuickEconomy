@@ -3,6 +3,10 @@ package net.derfla.quickeconomy.listener;
 import net.derfla.quickeconomy.util.ShopInventory;
 import net.derfla.quickeconomy.util.Balances;
 import net.derfla.quickeconomy.util.BankInventory;
+import net.derfla.quickeconomy.util.Styles;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
@@ -14,6 +18,8 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 
 public class InventoryClickListener implements Listener {
+
+    Style errorStyle = Styles.ERRORSTYLE;
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
@@ -55,7 +61,7 @@ public class InventoryClickListener implements Listener {
             boolean singleItem = ShopInventory.isSingleItem();
             // Checks if the player have enough coins
             if (cost > Balances.getPlayerBalance(player.getName())) {
-                player.sendMessage("§cYou can not afford this!");
+                player.sendMessage(Component.translatable("balance.notenough", errorStyle));
                 return;
             }
             ItemStack boughtItem;
@@ -66,7 +72,7 @@ public class InventoryClickListener implements Listener {
             }
             // Cancels the purchase if it is diamonds see #21
             if (boughtItem.getType().equals(Material.DIAMOND) || boughtItem.getType().equals(Material.DIAMOND_BLOCK)) {
-                player.sendMessage("§cYou ca not buy diamonds from shops!");
+                player.sendMessage(Component.translatable("shop.buy.diamond", errorStyle));
                 return;
             }
             // Removes the cost from the buying player

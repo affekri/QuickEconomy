@@ -1,16 +1,9 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.util.Balances;
-import net.derfla.quickeconomy.util.BlockOwner;
-import net.derfla.quickeconomy.util.FindChest;
-import net.derfla.quickeconomy.util.TypeChecker;
+import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.Style;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.block.sign.Side;
@@ -25,11 +18,8 @@ import java.util.List;
 public class PlayerPlaceSignListener implements Listener {
 
     static Plugin plugin = Main.getInstance();
-    private static final Style bankHeaderStyle = Style.style(NamedTextColor.GOLD, TextDecoration.BOLD);
-    private static final Component bankHeader = Component.text("[BANK]").style(bankHeaderStyle);
-    private static final Style shopHeaderStyle = Style.style(NamedTextColor.AQUA, TextDecoration.BOLD);
-    private static final Component shopHeader = Component.text("[SHOP]").style(shopHeaderStyle);
-    private static final Style bodyStyle = Style.style(NamedTextColor.WHITE);
+    private static final Component bankHeader = Component.text("[BANK]").style(Styles.BANKHEADER);
+    private static final Component shopHeader = Component.text("[SHOP]").style(Styles.SHOPHEADER);
 
     @EventHandler
     public void onPlayerPlaceSign(SignChangeEvent event) {
@@ -51,42 +41,39 @@ public class PlayerPlaceSignListener implements Listener {
         if (event.line(0).equals(Component.text("[BANK]"))) {
             if (!player.hasPermission("quickeconomy.bank.create")) return;
             event.line(0, bankHeader);
-            event.line(1, Component.text("Deposit items").style(bodyStyle));
-            event.line(2, Component.text("for coins!").style(bodyStyle));
+            event.line(1, Component.text("Deposit items").style(Styles.BODY));
+            event.line(2, Component.text("for coins!").style(Styles.BODY));
             sign.update();
-            player.sendMessage("§eBank created!");
+            player.sendMessage(Component.translatable("bank.created", Styles.INFOSTYLE));
             return;
         } else if (event.line(0).equals(Component.text("[SHOP]"))) {
             if (event.lines().equals(preSign)) return;
             if (!player.hasPermission("quickeconomy.shop.create")) return;
-            if (!event.getBlock().getType().toString().contains("WALL")) {
-                player.sendMessage("Wrong type of sign for the shop!");
-                return;
-            }
+            if (!event.getBlock().getType().toString().contains("WALL")) return;
             if (FindChest.get(sign) == null) {
-                player.sendMessage("§cDid not find any chest for this shop!");
+                player.sendMessage(Component.translatable("shop.nochest", Styles.ERRORSTYLE));
                 return;
             }
 
             Chest chest = FindChest.get(sign);
             if (chest == null) {
-                player.sendMessage("§cDid not find any chest for this shop!");
+                player.sendMessage(Component.translatable("shop.chest.null", Styles.ERRORSTYLE));
                 return;
             }
             // Check if double chest
             if (FindChest.isDouble(chest)) {
-                player.sendMessage("§cYou can only use single chests for shops!");
+                player.sendMessage(Component.translatable("shop.chest.notsingle", Styles.ERRORSTYLE));
                 return;
             }
 
             // Check if chest is locked
             if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
-                player.sendMessage("§cThis chest is locked to another player!");
+                player.sendMessage(Component.translatable("shop.locked.chest", Styles.ERRORSTYLE));
                 event.setCancelled(true);
                 return;
             }
             if (BlockOwner.isLocked(chest)) {
-                player.sendMessage("§cYou already have a shop on this chest!");
+                player.sendMessage(Component.translatable("shop.chest.alreadyshop", Styles.ERRORSTYLE));
                 event.setCancelled(true);
                 return;
             }
@@ -94,23 +81,22 @@ public class PlayerPlaceSignListener implements Listener {
 
             if (event.line(1) == null) return;
             String line1 = TypeChecker.getRawString(event.line(1));
-            String line1Error = "§cIncorrect input! The second line should look something like 10.5/Item";
             if (line1 == null || line1.isEmpty()) {
-                player.sendMessage(line1Error);
+                player.sendMessage(Component.translatable("shop.sign.line1error", Styles.ERRORSTYLE));
                 return;
             }
             if (!line1.contains("/")) {
-                player.sendMessage(line1Error);
+                player.sendMessage(Component.translatable("shop.sign.line1error", Styles.ERRORSTYLE));
                 return;
             }
             String[] splitLine1 = line1.split("/");
             if (!TypeChecker.isFloat(splitLine1[0])) {
-                player.sendMessage(line1Error);
+                player.sendMessage(Component.translatable("shop.sign.line1error", Styles.ERRORSTYLE));
                 return;
             }
             float cost = TypeChecker.formatFloat(Float.parseFloat(splitLine1[0]));
             if (cost <= 0.0f) {
-                player.sendMessage("§cThe cost must be above 0!");
+                player.sendMessage(Component.translatable("shop.sign.costtolow", Styles.ERRORSTYLE));
                 return;
             }
 
@@ -121,20 +107,20 @@ public class PlayerPlaceSignListener implements Listener {
                 shopType = "Item";
             } else shopType = "Stack";
             event.line(0, shopHeader);
-            event.line(1, Component.text(cost + "/" + shopType).style(bodyStyle));
-            event.line(2, Component.text(player.getName()).style(bodyStyle));
+            event.line(1, Component.text(cost + "/" + shopType).style(Styles.BODY));
+            event.line(2, Component.text(player.getName()).style(Styles.BODY));
             String line3 = TypeChecker.getRawString(event.line(3));
             if (!line3.isEmpty()) {
                 if (Balances.getPlayerBalance(line3) == 0.0f && Bukkit.getPlayer(line3) == null) {
                     event.line(3, Component.empty());
-                    player.sendMessage("§cYou tried to add a player that does not seem to exist on this server!");
+                    player.sendMessage(Component.translatable("player.notexists", Styles.ERRORSTYLE));
                 } else if (line3.equals(player.getName())) {
                     event.line(3, Component.empty());
-                    player.sendMessage("§cYou tried to add yourself as the second player!");
+                    player.sendMessage(Component.translatable("shop.sign.self.second", Styles.ERRORSTYLE));
                 } else {
-                    event.line(3, Component.text(line3).style(bodyStyle));
+                    event.line(3, Component.text(line3).style(Styles.BODY));
                     sign.update();
-                    player.sendMessage("§eShop created! Half of the income from this shop will go to the player: " + line3);
+                    player.sendMessage(Component.translatable("shop.created.split", Component.text(line3)).style(Styles.INFOSTYLE));
                     // Lock chest to players
                     BlockOwner.setPlayerLocked(chest, player.getName(), line3);
                     return;
@@ -143,7 +129,7 @@ public class PlayerPlaceSignListener implements Listener {
             // Lock chest to player
             BlockOwner.setPlayerLocked(chest, player.getName(), "");
             sign.update();
-            player.sendMessage("§eShop created!");
+            player.sendMessage(Component.translatable("shop.created", Styles.INFOSTYLE));
             return;
         }
     }
@@ -153,8 +139,5 @@ public class PlayerPlaceSignListener implements Listener {
     }
     public static Component getShopHeaderComponent(){
         return shopHeader;
-    }
-    public static Style getBodyStyle(){
-        return bodyStyle;
     }
 }

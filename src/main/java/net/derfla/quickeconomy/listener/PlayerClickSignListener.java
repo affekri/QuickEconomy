@@ -40,28 +40,28 @@ public class PlayerClickSignListener implements Listener {
             event.setCancelled(true);
             // Makes owners unable to open their own shop
             if (seller.equals(player.getName()) || seller2.equals(player.getName())) {
-                player.sendMessage("§cYou can not open your own shop!");
+                player.sendMessage(Component.translatable("shop.open.own", Styles.ERRORSTYLE));
                 return;
             }
             if (!player.hasPermission("quickeconomy.shop")) return;
             if (FindChest.get(sign) == null) {
-                player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
+                player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
             Chest chest = FindChest.get(sign);
             if (chest == null) return;
             if (BlockOwner.isShopOpen(chest)) {
-                player.sendMessage("§eThis shop is currently being restocked. Please wait a moment!");
+                player.sendMessage(Component.translatable("shop.locked.shopper", Styles.INFOSTYLE));
                 return;
             }
             String line1 = TypeChecker.getRawString(listLines.get(1));
             if (!line1.contains("/")) {
-                player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
+                player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
             String[] splitLine1 = line1.split("/");
             if (!TypeChecker.isFloat(splitLine1[0])) {
-                player.sendMessage("§eThis shop seems to be broken, please alert the owner!");
+                player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
             float cost = Float.parseFloat(splitLine1[0]);

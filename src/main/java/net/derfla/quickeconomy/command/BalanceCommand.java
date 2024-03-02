@@ -2,8 +2,6 @@ package net.derfla.quickeconomy.command;
 
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.Style;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -40,12 +38,16 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                 return true;
             }
-            float balance = Balances.getPlayerBalance(strings[0]);
+            String checkPlayer;
+            if (Bukkit.getServer().getPlayerExact(strings[0]) != null) {
+                checkPlayer = Bukkit.getServer().getPlayerExact(strings[0]).getName();
+            } else checkPlayer = strings[0];
+            float balance = Balances.getPlayerBalance(checkPlayer);
             if (balance == 0.0f) {
                 sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[0])).style(Styles.ERRORSTYLE));
                 return true;
             }
-            sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[0]), Component.text(balance)).style(Styles.INFOSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(checkPlayer), Component.text(balance)).style(Styles.INFOSTYLE));
             return true;
         }
         if (strings[1] == null) {
@@ -57,8 +59,6 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         float money = Float.parseFloat(strings[1]);
-
-
 
         switch (strings[0].toLowerCase()) {
             case "set":

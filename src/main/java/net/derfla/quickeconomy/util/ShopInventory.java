@@ -20,7 +20,7 @@ public class ShopInventory implements InventoryHolder {
     private static  Chest shopChest;
     private static boolean singleShopItem;
 
-    private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Bank"));
+    private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Shop"));
     final Player target;
 
 

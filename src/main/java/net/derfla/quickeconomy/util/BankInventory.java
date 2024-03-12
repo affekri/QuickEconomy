@@ -21,8 +21,8 @@ import java.util.List;
 
 public class BankInventory implements InventoryHolder {
 
-    private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Bank");
-    private Player target;
+    private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Bank"));
+    private final Player target;
 
     static Plugin plugin = Main.getInstance();
 

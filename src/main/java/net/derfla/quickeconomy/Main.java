@@ -1,15 +1,12 @@
 package net.derfla.quickeconomy;
 
 import net.derfla.quickeconomy.command.BalanceCommand;
+import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
-import net.derfla.quickeconomy.util.Translation;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import java.util.Locale;
-import java.util.ResourceBundle;
 
 
 public final class Main extends JavaPlugin {
@@ -23,6 +20,7 @@ public final class Main extends JavaPlugin {
         getCommand("balance").setExecutor(new BalanceCommand());
         getCommand("bal").setExecutor(new BalanceCommand());
         getCommand("quickeconomy").setExecutor(new QuickeconomyCommand());
+        getCommand("bank").setExecutor(new BankCommand());
 
         // Register events
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceSignListener(), this);

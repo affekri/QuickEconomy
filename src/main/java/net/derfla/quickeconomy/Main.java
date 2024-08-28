@@ -112,8 +112,7 @@ public final class Main extends JavaPlugin {
 
     public void createTable() {
         try (Statement statement = connection.createStatement()) {
-            String sql = "CREATE TABLE IF NOT EXISTS economy ("
-                    + "CREATE table PlayerAccounts ("
+            String sql = "CREATE table IF NOT EXISTS PlayerAccounts ("
                     + "  AccountID int NOT NULL AUTO_INCREMENT,"
                     + "  UUID char(32) NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
@@ -123,7 +122,7 @@ public final class Main extends JavaPlugin {
                     + "  FOREIGN KEY (LastTransact) REFERENCES Transactions(TransactionID)"
                     + ")"
                     + ""
-                    + "CREATE table Transactions ("
+                    + "CREATE table IF NOT EXISTS Transactions ("
                     + "  TransactionID int NOT NULL AUTO_INCREMENT,"
                     + "  TransactionDate date NOT NULL,"
                     + "  TransactionTime timestamp NOT NULL,"
@@ -137,7 +136,7 @@ public final class Main extends JavaPlugin {
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(AccountID)"
                     + ")"
                     + ""
-                    + "CREATE table FailedTransactions ("
+                    + "CREATE table IF NOT EXISTS FailedTransactions ("
                     + "  FailedID int NOT NULL AUTO_INCREMENT,"
                     + "  FailedDate date NOT NULL,"
                     + "  FailedTime timestamp NOT NULL,"
@@ -152,7 +151,7 @@ public final class Main extends JavaPlugin {
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(AccountID)"
                     + ")"
                     + ""
-                    + "CREATE table Autogiros ("
+                    + "CREATE table IF NOT EXISTS Autogiros ("
                     + "  AutogiroID int NOT NULL AUTO_INCREMENT,"
                     + "  Active int NOT NULL DEFAULT 1,"
                     + "  CreationDate date,"

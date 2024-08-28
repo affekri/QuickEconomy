@@ -156,7 +156,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 if (Bukkit.getPlayer(strings[2]) != null) {
                     // Alerts the receiving player if it's online
                     Player targetPlayer = Bukkit.getPlayer(strings[2]);
-                    targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
+                    targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
                     break;
                 }
 

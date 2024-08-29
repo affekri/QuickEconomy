@@ -15,13 +15,13 @@ import org.bukkit.event.player.PlayerJoinEvent;
 public class PlayerJoinListener implements Listener {
 
     @EventHandler
-    public void onPlayerJoin (PlayerJoinEvent event) {
+    public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        Translation.init(player);
-        FileConfiguration file = BalanceFile.get();
-        if (file == null) {
-            Bukkit.getLogger().warning("balances.yml not found!");
-            return;
+        
+        // Check if this is the player's first join
+        if (!player.hasPlayedBefore()) {
+            Main.getInstance().addAccount(player.getUniqueId().toString(), player.getName());
+            // You might want to add a welcome message or initial balance here
         }
         if (!(file.contains("players." + player.getName() + ".change"))) {
             return;

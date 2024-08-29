@@ -110,6 +110,29 @@ public final class Main extends JavaPlugin {
         return connection;
     }
 
+    public void addAccount(String uuid, String playerName) {
+        String sql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) " +
+                     "VALUES (?, CURRENT_DATE, ?, 0) " +
+                     "ON DUPLICATE KEY UPDATE PlayerName = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, uuid);
+            pstmt.setString(2, playerName);
+            pstmt.setString(3, uuid);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            
+            if (rowsAffected > 0) {
+                getLogger().info(rowsAffected == 1 ? "New player account added successfully for " + playerName :
+                                                     "Player account updated for " + playerName);
+            } else {
+                getLogger().info("No changes made for player account: " + playerName);
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Error adding/updating player account: " + e.getMessage());
+        }
+    }
+
     public void createTable() {
         try (Statement statement = connection.createStatement()) {
             String sql = "CREATE table IF NOT EXISTS PlayerAccounts ("

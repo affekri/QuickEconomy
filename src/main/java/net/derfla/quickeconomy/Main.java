@@ -169,4 +169,70 @@ public final class Main extends JavaPlugin {
             getLogger().severe("Error creating tables: " + e.getMessage());
         }
     }
+
+    public void executeTransaction(String transactType, String induce, String source, String destination, int amount, String transactionMessage) {
+        String insertTransactionSQL = "INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String updateSourceSQL = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ? AND Balance >= ?";
+        String updateDestinationSQL = "UPDATE PlayerAccounts SET Balance = Balance + ? WHERE UUID = ?";
+        String insertFailedTransactionSQL = "INSERT INTO FailedTransactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, Reason) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement insertTransaction = conn.prepareStatement(insertTransactionSQL);
+             PreparedStatement updateSource = conn.prepareStatement(updateSourceSQL);
+             PreparedStatement updateDestination = conn.prepareStatement(updateDestinationSQL);
+             PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
+
+            conn.setAutoCommit(false);
+
+            // Insert transaction
+            insertTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
+            insertTransaction.setString(2, transactType);
+            insertTransaction.setString(3, induce);
+            insertTransaction.setString(4, source);
+            insertTransaction.setString(5, destination);
+            insertTransaction.setInt(6, amount);
+            insertTransaction.setString(7, transactionMessage);
+            insertTransaction.executeUpdate();
+
+            // Update source account if applicable
+            if (source != null) {
+                updateSource.setInt(1, amount);
+                updateSource.setString(2, source);
+                updateSource.setInt(3, amount);
+                int rowsAffected = updateSource.executeUpdate();
+                if (rowsAffected == 0) {
+                    throw new SQLException("Insufficient funds in the source account");
+                }
+            }
+
+            // Update destination account if applicable
+            if (destination != null) {
+                updateDestination.setInt(1, amount);
+                updateDestination.setString(2, destination);
+                updateDestination.executeUpdate();
+            }
+
+            conn.commit();
+            getLogger().info("Transaction completed successfully");
+
+        } catch (SQLException e) {
+            getLogger().severe("Error executing transaction: " + e.getMessage());
+            try (Connection conn = getConnection();
+                 PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
+                
+                insertFailedTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
+                insertFailedTransaction.setString(2, transactType);
+                insertFailedTransaction.setString(3, induce);
+                insertFailedTransaction.setString(4, source);
+                insertFailedTransaction.setString(5, destination);
+                insertFailedTransaction.setInt(6, amount);
+                insertFailedTransaction.setString(7, e.getMessage().contains("Insufficient funds") ? "low_balance" : "unexpected_error");
+                insertFailedTransaction.executeUpdate();
+                
+                getLogger().info("Failed transaction recorded");
+            } catch (SQLException ex) {
+                getLogger().severe("Error recording failed transaction: " + ex.getMessage());
+            }
+        }
+    }
 }

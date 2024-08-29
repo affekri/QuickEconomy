@@ -112,35 +112,35 @@ public final class Main extends JavaPlugin {
 
     public void createTable() {
         try (Statement statement = connection.createStatement()) {
-            String sql = "CREATE table IF NOT EXISTS PlayerAccounts ("
-                    + "  UUID char(32) NOT NULL,"
-                    + "  AccountCreationDate date NOT NULL,"
-                    + "  PlayerName varchar(16) NOT NULL,"
-                    + "  Balance int NOT NULL DEFAULT 0,"
+            String sql = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
+                    + "  UUID CHAR(32) NOT NULL,"
+                    + "  AccountCreationDate DATE NOT NULL,"
+                    + "  PlayerName VARCHAR(16) NOT NULL,"
+                    + "  Balance INT NOT NULL DEFAULT 0,"
                     + "  PRIMARY KEY (UUID)"
                     + ");"
                     + ""
-                    + "CREATE table IF NOT EXISTS Transactions ("
-                    + "  TransactionID datetime NOT NULL,"
-                    + "  TransactionType varchar NOT NULL,"
-                    + "  Induce varchar(16) NOT NULL,"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount int NOT NULL,"
-                    + "  TransactionMessage varchar(32),"
+                    + "CREATE TABLE IF NOT EXISTS Transactions ("
+                    + "  TransactionID DATETIME NOT NULL,"
+                    + "  TransactionType VARCHAR(255) NOT NULL,"
+                    + "  Induce VARCHAR(16) NOT NULL,"
+                    + "  Source CHAR(32),"
+                    + "  Destination CHAR(32),"
+                    + "  Amount INT NOT NULL,"
+                    + "  TransactionMessage VARCHAR(32),"
                     + "  PRIMARY KEY (TransactionID),"
                     + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
                     + ");"
                     + ""
-                    + "CREATE table IF NOT EXISTS FailedTransactions ("
-                    + "  TransactionID datetime NOT NULL,"
-                    + "  TransactionType varchar NOT NULL,"
-                    + "  Induce varchar(16) NOT NULL,"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount int NOT NULL,"
-                    + "  Reason varchar(32) NOT NULL,"
+                    + "CREATE TABLE IF NOT EXISTS FailedTransactions ("
+                    + "  TransactionID DATETIME NOT NULL,"
+                    + "  TransactionType VARCHAR(255) NOT NULL,"
+                    + "  Induce VARCHAR(16) NOT NULL,"
+                    + "  Source CHAR(32),"
+                    + "  Destination CHAR(32),"
+                    + "  Amount INT NOT NULL,"
+                    + "  Reason VARCHAR(32) NOT NULL,"
                     + "  PRIMARY KEY (TransactionID),"
                     + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
@@ -169,4 +169,162 @@ public final class Main extends JavaPlugin {
             getLogger().severe("Error creating tables: " + e.getMessage());
         }
     }
-}
+
+    public void addAccount(String uuid, String playerName) {
+        String sql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) " +
+                     "VALUES (?, CURRENT_DATE, ?, 0) " +
+                     "ON DUPLICATE KEY UPDATE PlayerName = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, uuid);
+            pstmt.setString(2, playerName);
+            pstmt.setString(3, uuid);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            
+            if (rowsAffected > 0) {
+                getLogger().info(rowsAffected == 1 ? "New player account added successfully for " + playerName :
+                                                     "Player account updated for " + playerName);
+            } else {
+                getLogger().info("No changes made for player account: " + playerName);
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Error adding/updating player account: " + e.getMessage());
+        }
+    }
+
+    public void executeTransaction(String transactType, String induce, String source, String destination, int amount, String transactionMessage) {
+        String insertTransactionSQL = "INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String updateSourceSQL = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ? AND Balance >= ?";
+        String updateDestinationSQL = "UPDATE PlayerAccounts SET Balance = Balance + ? WHERE UUID = ?";
+        String insertFailedTransactionSQL = "INSERT INTO FailedTransactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, Reason) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement insertTransaction = conn.prepareStatement(insertTransactionSQL);
+             PreparedStatement updateSource = conn.prepareStatement(updateSourceSQL);
+             PreparedStatement updateDestination = conn.prepareStatement(updateDestinationSQL);
+             PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
+
+            conn.setAutoCommit(false);
+
+            // Insert transaction
+            insertTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
+            insertTransaction.setString(2, transactType);
+            insertTransaction.setString(3, induce);
+            insertTransaction.setString(4, source);
+            insertTransaction.setString(5, destination);
+            insertTransaction.setInt(6, amount);
+            insertTransaction.setString(7, transactionMessage);
+            insertTransaction.executeUpdate();
+
+            // Update source account if applicable
+            if (source != null) {
+                updateSource.setInt(1, amount);
+                updateSource.setString(2, source);
+                updateSource.setInt(3, amount);
+                int rowsAffected = updateSource.executeUpdate();
+                if (rowsAffected == 0) {
+                    throw new SQLException("Insufficient funds in the source account");
+                }
+            }
+
+            // Update destination account if applicable
+            if (destination != null) {
+                updateDestination.setInt(1, amount);
+                updateDestination.setString(2, destination);
+                updateDestination.executeUpdate();
+            }
+
+            conn.commit();
+            getLogger().info("Transaction completed successfully");
+
+        } catch (SQLException e) {
+            getLogger().severe("Error executing transaction: " + e.getMessage());
+            try (Connection conn = getConnection();
+                 PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
+                
+                insertFailedTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
+                insertFailedTransaction.setString(2, transactType);
+                insertFailedTransaction.setString(3, induce);
+                insertFailedTransaction.setString(4, source);
+                insertFailedTransaction.setString(5, destination);
+                insertFailedTransaction.setInt(6, amount);
+                insertFailedTransaction.setString(7, e.getMessage().contains("Insufficient funds") ? "low_balance" : "unexpected_error");
+                insertFailedTransaction.executeUpdate();
+                
+                getLogger().info("Failed transaction recorded");
+            } catch (SQLException ex) {
+                getLogger().severe("Error recording failed transaction: " + ex.getMessage());
+            }
+        }
+    }
+
+    public void createAutogiro(String uuid, String autoGiroName, String destination, int amount, int inverseFrequency, Integer endsAfter) {
+        String sql = "INSERT INTO Autogiros (Active, CreationDate, AutogiroName, Source, Destination, Amount, InverseFrequency, EndsAfter, TransactionCount) " +
+                     "VALUES (1, CURRENT_DATE, ?, ?, ?, ?, ?, ?, 0)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, autoGiroName);
+            pstmt.setString(2, uuid);
+            pstmt.setString(3, destination);
+            pstmt.setInt(4, amount);
+            pstmt.setInt(5, inverseFrequency);
+            if (endsAfter != null && endsAfter > 0) {
+                pstmt.setInt(6, endsAfter);
+            } else {
+                pstmt.setNull(6, java.sql.Types.INTEGER);
+            }
+            
+            int affectedRows = pstmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int autoGiroId = generatedKeys.getInt(1);
+                        getLogger().info("Autogiro created successfully with ID: " + autoGiroId);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Error creating autogiro: " + e.getMessage());
+        }
+    }
+
+    public void updateAutogiroState(int autoGiroId, String uuid, boolean active) {
+        String sql = "UPDATE Autogiros SET Active = ? WHERE AutogiroID = ? AND Source = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setBoolean(1, active);
+            pstmt.setInt(2, autoGiroId);
+            pstmt.setString(3, uuid);
+            
+            int affectedRows = pstmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                getLogger().info("Autogiro " + autoGiroId + " " + (active ? "activated" : "deactivated") + " successfully.");
+            } else {
+                getLogger().info("Autogiro not found or no changes made.");
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Error updating autogiro state: " + e.getMessage());
+        }
+    }
+
+    public void deleteAutogiro(int autoGiroId, String uuid) {
+        String sql = "DELETE FROM Autogiros WHERE AutogiroID = ? AND Source = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, autoGiroId);
+            pstmt.setString(2, uuid);
+            
+            int affectedRows = pstmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                getLogger().info("Autogiro " + autoGiroId + " deleted successfully.");
+            } else {
+                getLogger().info("Autogiro not found or no deletion performed.");
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Error deleting autogiro: " + e.getMessage());
+        }
+    }

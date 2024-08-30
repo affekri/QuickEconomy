@@ -5,6 +5,7 @@ import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
+import net.derfla.quickeconomy.util.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -13,10 +14,13 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import static net.derfla.quickeconomy.util.DatabaseManager.connection;
+
 
 public final class Main extends JavaPlugin {
 
-    private Connection connection;
+
+    public static boolean SQLMode = false;
 
     @Override
     public void onEnable() {
@@ -57,13 +61,13 @@ public final class Main extends JavaPlugin {
         if(getConfig().getBoolean("database.enabled")) {
             getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
             try {
-                connectToDatabase();
+                DatabaseManager.connectToDatabase();
             } catch (SQLException e) {
                 getLogger().severe("Could not establish a database connection: " + e.getMessage());
                 getServer().getPluginManager().disablePlugin(this);
             }
-
-            createTable();
+            SQLMode = true;
+            DatabaseManager.createTable();
 
         } else {
             getLogger().info("Running in file mode. See config to enable SQL mode.");
@@ -84,89 +88,5 @@ public final class Main extends JavaPlugin {
 
     public static Main getInstance() {
         return getPlugin(Main.class);
-    }
-
-    private void connectToDatabase() throws SQLException {
-        String type = getConfig().getString("database.type");
-        if ("mysql".equalsIgnoreCase(type)) {
-            String host = getConfig().getString("database.host");
-            int port = getConfig().getInt("database.port");
-            String database = getConfig().getString("database.database");
-            String user = getConfig().getString("database.username");
-            String password = getConfig().getString("database.password");
-
-            String url = "jdbc:mysql://" + host + ":" + port + "/" + database;
-            connection = DriverManager.getConnection(url, user, password);
-        } else if ("sqlite".equalsIgnoreCase(type)) {
-            String filePath = getConfig().getString("database.file");
-            String url = "jdbc:sqlite:" + filePath;
-            connection = DriverManager.getConnection(url);
-        }
-
-        getLogger().info("Database connection established.");
-    }
-
-    public Connection getConnection() {
-        return connection;
-    }
-
-    public void createTable() {
-        try (Statement statement = connection.createStatement()) {
-            String sql = "CREATE table IF NOT EXISTS PlayerAccounts ("
-                    + "  UUID char(32) NOT NULL,"
-                    + "  AccountCreationDate date NOT NULL,"
-                    + "  PlayerName varchar(16) NOT NULL,"
-                    + "  Balance int NOT NULL DEFAULT 0,"
-                    + "  PRIMARY KEY (UUID)"
-                    + ");"
-                    + ""
-                    + "CREATE table IF NOT EXISTS Transactions ("
-                    + "  TransactionID datetime NOT NULL,"
-                    + "  TransactionType varchar NOT NULL,"
-                    + "  Induce varchar(16) NOT NULL,"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount int NOT NULL,"
-                    + "  TransactionMessage varchar(32),"
-                    + "  PRIMARY KEY (TransactionID),"
-                    + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
-                    + ");"
-                    + ""
-                    + "CREATE table IF NOT EXISTS FailedTransactions ("
-                    + "  TransactionID datetime NOT NULL,"
-                    + "  TransactionType varchar NOT NULL,"
-                    + "  Induce varchar(16) NOT NULL,"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount int NOT NULL,"
-                    + "  Reason varchar(32) NOT NULL,"
-                    + "  PRIMARY KEY (TransactionID),"
-                    + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
-                    + ");"
-                    + ""
-                    + "CREATE table IF NOT EXISTS Autogiros ("
-                    + "  AutogiroID int NOT NULL AUTO_INCREMENT,"
-                    + "  Active tinyint(1) NOT NULL DEFAULT 1,"
-                    + "  CreationDate date,"
-                    + "  AutogiroName varchar(16),"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount int NOT NULL,"
-                    + "  InverseFrequency int NOT NULL,"
-                    + "  EndsAfter int,"
-                    + "  TransactionCount int NOT NULL DEFAULT 0,"
-                    + "  Failed datetime,"
-                    + "  PRIMARY KEY (AutogiroID),"
-                    + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Failed) REFERENCES FailedTransactions(TransactionID)"
-                    + ");";
-            statement.executeUpdate(sql);
-            getLogger().info("Economy tables created or already exist.");
-        } catch (SQLException e) {
-            getLogger().severe("Error creating tables: " + e.getMessage());
-        }
     }
 }

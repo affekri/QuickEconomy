@@ -162,69 +162,69 @@ public class DatabaseManager {
         }
     }
 
-    public static void executeTransaction(String transactType, String induce, String source, String destination, int amount, String transactionMessage) {
-        String insertTransactionSQL = "INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        String updateSourceSQL = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ? AND Balance >= ?";
-        String updateDestinationSQL = "UPDATE PlayerAccounts SET Balance = Balance + ? WHERE UUID = ?";
-        String insertFailedTransactionSQL = "INSERT INTO FailedTransactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, Reason) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    public static void executeTransaction(String transactType, String induce, String source,
+                                          String destination, double amount, String transactionMessage) {
+        String trimmedSource = TypeChecker.convertUUID(source);
+        String trimmedDestination = TypeChecker.convertUUID(destination);
+        String sql = "DECLARE @TransactionID DATETIME = GETDATE();"
+                + "DECLARE @TransactType varchar(16) = ?;"
+                + "DECLARE @Induce varchar(16) = ?;"
+                + "DECLARE @Source char(32) = ?;"
+                + "DECLARE @Destination char(32) = ?;"
+                + "DECLARE @Amount float = ?;"
+                + "DECLARE @TransactionMessage varchar(32) DEFAULT NULL = ?;"
+                + "DECLARE @NewSourceBalance float = (SELECT Balance - @Amount FROM PlayerAccounts WHERE UUID = @Source);"
+                + "DECLARE @NewDestinationBalance float = (SELECT Balance + @Amount FROM PlayerAccounts WHERE UUID = @Destination);"
+                + "BEGIN TRY"
+                + "    BEGIN TRANSACTION;"
+                + "    IF @Source IS NOT NULL AND @NewSourceBalance < 0"
+                + "    BEGIN"
+                + "        THROW 50001, 'Insufficient funds in the source account', 1;"
+                + "    END"
+                + "    INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage)"
+                + "    VALUES (@TransactionID, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage);"
+                + "    IF @Source IS NOT NULL"
+                + "    BEGIN"
+                + "        UPDATE PlayerAccounts"
+                + "        SET Balance = @NewSourceBalance"
+                + "        WHERE UUID = @Source;"
+                + "    END"
+                + "    IF @Destination IS NOT NULL"
+                + "    BEGIN"
+                + "        UPDATE PlayerAccounts"
+                + "        SET Balance = @NewDestinationBalance"
+                + "        WHERE UUID = @Destination;"
+                + "    END"
+                + "    BEGIN "
+                + "        UPDATE Transactions"
+                + "        SET Passed = 1"
+                + "        WHERE TransactionID = @TransactionID"
+                + "    COMMIT;"
+                + "END TRY"
+                + "BEGIN CATCH"
+                + "    ROLLBACK;"
+                + "    DECLARE @Reason varchar(32)"
+                + "    SET @Reason = CASE"
+                + "       WHEN ERROR_NUMBER() = 50001 THEN 'low_source_balance' ELSE 'unexpected_error' END);"
+                + "       END"
+                + "    INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage)"
+                + "    VALUES (@TransactionID, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage);"
+                + "    THROW;"
+                + "END CATCH;";
 
         try (Connection conn = getConnection();
-             PreparedStatement insertTransaction = conn.prepareStatement(insertTransactionSQL);
-             PreparedStatement updateSource = conn.prepareStatement(updateSourceSQL);
-             PreparedStatement updateDestination = conn.prepareStatement(updateDestinationSQL);
-             PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, transactType);
+            pstmt.setString(2, induce);
+            pstmt.setString(3, trimmedSource);
+            pstmt.setString(4, trimmedDestination);
+            pstmt.setDouble(5, amount);
+            pstmt.setString(6, transactionMessage);
 
-            conn.setAutoCommit(false);
-
-            // Insert transaction
-            insertTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
-            insertTransaction.setString(2, transactType);
-            insertTransaction.setString(3, induce);
-            insertTransaction.setString(4, source);
-            insertTransaction.setString(5, destination);
-            insertTransaction.setInt(6, amount);
-            insertTransaction.setString(7, transactionMessage);
-            insertTransaction.executeUpdate();
-
-            // Update source account if applicable
-            if (source != null) {
-                updateSource.setInt(1, amount);
-                updateSource.setString(2, source);
-                updateSource.setInt(3, amount);
-                int rowsAffected = updateSource.executeUpdate();
-                if (rowsAffected == 0) {
-                    throw new SQLException("Insufficient funds in the source account");
-                }
-            }
-
-            // Update destination account if applicable
-            if (destination != null) {
-                updateDestination.setInt(1, amount);
-                updateDestination.setString(2, destination);
-                updateDestination.executeUpdate();
-            }
-
-            conn.commit();
-            plugin.getLogger().info("Transaction completed successfully");
-
+            pstmt.executeUpdate();
+            plugin.getLogger().info("Transaction executed successfully");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
-            try (Connection conn = getConnection();
-                 PreparedStatement insertFailedTransaction = conn.prepareStatement(insertFailedTransactionSQL)) {
-
-                insertFailedTransaction.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
-                insertFailedTransaction.setString(2, transactType);
-                insertFailedTransaction.setString(3, induce);
-                insertFailedTransaction.setString(4, source);
-                insertFailedTransaction.setString(5, destination);
-                insertFailedTransaction.setInt(6, amount);
-                insertFailedTransaction.setString(7, e.getMessage().contains("Insufficient funds") ? "low_balance" : "unexpected_error");
-                insertFailedTransaction.executeUpdate();
-
-                plugin.getLogger().info("Failed transaction recorded");
-            } catch (SQLException ex) {
-                plugin.getLogger().severe("Error recording failed transaction: " + ex.getMessage());
-            }
         }
     }
 }

@@ -87,27 +87,25 @@ public class DatabaseManager {
     }
 
     public static void addAccount(String uuid, String playerName) {
-
-        String sql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) " +
-                "VALUES (?, CURRENT_DATE, ?, 0) " +
-                "ON DUPLICATE KEY UPDATE PlayerName = ?";
-
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String sql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName) "
+                   + "VALUES (?, GETDATE(), ?) "
+                   + "ON DUPLICATE KEY UPDATE PlayerName = VALUES(PlayerName);";
+    
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
+            pstmt.setString(1, trimmedUuid);
             pstmt.setString(2, playerName);
-            pstmt.setString(3, uuid);
-
             int rowsAffected = pstmt.executeUpdate();
-
+            
             if (rowsAffected > 0) {
-                plugin.getLogger().info(rowsAffected == 1 ? "New player account added successfully for " + playerName :
-                        "Player account updated for " + playerName);
+                plugin.getLogger().info("New player account added successfully for " + playerName);
             } else {
-                plugin.getLogger().info("No changes made for player account: " + playerName);
+                plugin.getLogger().info("Account already exists for " + playerName);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error adding/updating player account: " + e.getMessage());
+            plugin.getLogger().severe("Error adding player account: " + e.getMessage());
         }
+        createTransactionsView(trimmedUuid);
     }
 
     public static void executeTransaction(String transactType, String induce, String source, String destination, int amount, String transactionMessage) {

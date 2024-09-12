@@ -61,7 +61,7 @@ public class Metrics {
             // Inform the server owners about bStats
             config
                     .options()
-                    .header(
+                    .setHeader(
                             "bStats (https://bStats.org) collects some basic information for plugin authors, like how\n"
                                     + "many people use their plugin and their total player count. It's recommended to keep bStats\n"
                                     + "enabled, but if you're not comfortable with this, you can turn this setting off. There is no\n"

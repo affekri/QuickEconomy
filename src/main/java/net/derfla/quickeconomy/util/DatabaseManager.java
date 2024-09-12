@@ -340,4 +340,26 @@ public class DatabaseManager {
         }
     }
 
+    public static void stateChangeAutopay(int state, int autopayID, String uuid) {
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setByte(1, (byte) state);
+            pstmt.setInt(2, autopayID);
+            pstmt.setString(3, trimmedUuid);
+
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                plugin.getLogger().info("Autopay updated successfully");
+            } else {
+                plugin.getLogger().info("Autopay not found. No update was performed.");
+            }
+        } catch (SQLException e) {
+            String action = (state == 1) ? "activating" : "deactivating";
+            plugin.getLogger().severe("Error " + action + " autopay: " + e.getMessage());
+        }
+    }
+
 }

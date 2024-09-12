@@ -382,4 +382,34 @@ public class DatabaseManager {
         }
     }
 
+    public static List<Map<String, Object>> viewAutopays(String uuid) {
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String sql = "SELECT * FROM Autopays WHERE Source = ? ORDER BY AutopayID";
+        List<Map<String, Object>> autopays = new ArrayList<>();
+    
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, trimmedUuid);
+    
+            try (ResultSet rs = pstmt.executeQuery()) {
+                ResultSetMetaData metaData = rs.getMetaData();
+                int columnCount = metaData.getColumnCount();
+    
+                while (rs.next()) {
+                    Map<String, Object> autopay = new HashMap<>();
+                    for (int i = 1; i <= columnCount; i++) {
+                        String columnName = metaData.getColumnName(i);
+                        Object value = rs.getObject(i);
+                        autopay.put(columnName, value);
+                    }
+                    autopays.add(autopay);
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error viewing autopays for UUID " + uuid + ": " + e.getMessage());
+        }
+    
+        return autopays;
+    }
+
 }

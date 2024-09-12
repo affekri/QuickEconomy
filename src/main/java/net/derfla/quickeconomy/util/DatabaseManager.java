@@ -34,40 +34,53 @@ public class DatabaseManager {
         plugin.getLogger().info("Database connection established.");
     }
 
-    public static void createTable() {
+        public static void createTables() {
         try (Statement statement = connection.createStatement()) {
-            String sql = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
-                    + "  UUID CHAR(32) NOT NULL,"
-                    + "  AccountCreationDate DATE NOT NULL,"
-                    + "  PlayerName VARCHAR(16) NOT NULL,"
-                    + "  Balance INT NOT NULL DEFAULT 0,"
+            // Create PlayerAccounts table
+            String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
+                    + "  UUID char(32) NOT NULL,"
+                    + "  AccountCreationDate DATETIME NOT NULL,"
+                    + "  PlayerName varchar(16) NOT NULL,"
+                    + "  Balance float NOT NULL DEFAULT 0,"
                     + "  PRIMARY KEY (UUID)"
-                    + ");"
-                    + "CREATE TABLE IF NOT EXISTS Transactions ("
+                    + ");";
+            statement.executeUpdate(sqlPlayerAccounts);
+
+            String sqlTransactions = "CREATE TABLE IF NOT EXISTS Transactions ("
                     + "  TransactionID DATETIME NOT NULL,"
-                    + "  TransactionType VARCHAR(255) NOT NULL,"
-                    + "  Induce VARCHAR(16) NOT NULL,"
-                    + "  Source CHAR(32),"
-                    + "  Destination CHAR(32),"
-                    + "  Amount INT NOT NULL,"
-                    + "  TransactionMessage VARCHAR(32),"
+                    + "  TransactionType varchar(16) NOT NULL,"
+                    + "  Induce varchar(16) NOT NULL,"
+                    + "  Source char(32),"
+                    + "  Destination char(32),"
+                    + "  NewSourceBalance float,"
+                    + "  NewDestinationBalance float,"
+                    + "  Amount float NOT NULL,"
+                    + "  Passed tinyint(1),"
+                    + "  PassedReason varchar(16) DEFAULT NULL,"
+                    + "  TransactionMessage varchar(32),"
                     + "  PRIMARY KEY (TransactionID),"
                     + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
-                    + ");"
-                    + "CREATE TABLE IF NOT EXISTS FailedTransactions ("
-                    + "  TransactionID DATETIME NOT NULL,"
-                    + "  TransactionType VARCHAR(255) NOT NULL,"
-                    + "  Induce VARCHAR(16) NOT NULL,"
-                    + "  Source CHAR(32),"
-                    + "  Destination CHAR(32),"
-                    + "  Amount INT NOT NULL,"
-                    + "  Reason VARCHAR(32) NOT NULL,"
-                    + "  PRIMARY KEY (TransactionID),"
+                    + ");";
+            statement.executeUpdate(sqlTransactions);
+
+            String sqlAutopays = "CREATE TABLE IF NOT EXISTS Autopays ("
+                    + "  AutopayID int NOT NULL AUTO_INCREMENT,"
+                    + "  Active tinyint(1) NOT NULL DEFAULT 1,"
+                    + "  CreationDate DATETIME NOT NULL,"
+                    + "  AutopayName varchar(16),"
+                    + "  Source char(32),"
+                    + "  Destination char(32),"
+                    + "  Amount float NOT NULL,"
+                    + "  InverseFrequency int NOT NULL,"
+                    + "  EndsAfter int NOT NULL,"
+                    + "  PRIMARY KEY (AutopayID),"
                     + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)";
-            statement.executeUpdate(sql);
-            plugin.getLogger().info("Economy table created or already exists.");
+                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
+                    + ");";
+            statement.executeUpdate(sqlAutopays);
+
+            plugin.getLogger().info("Tables created or already exist.");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating tables: " + e.getMessage());
         }

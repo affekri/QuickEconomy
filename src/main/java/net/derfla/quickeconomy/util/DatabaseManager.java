@@ -162,6 +162,35 @@ public class DatabaseManager {
         }
     }
 
+    public static List<Map<String, Object>> displayTransactionsView(String uuid) {
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String viewName = "vw_Transactions_" + trimmedUuid;
+        String sql = "SELECT * FROM " + viewName + " ORDER BY TransactionDateTime DESC";
+        List<Map<String, Object>> transactions = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+
+            while (rs.next()) {
+                Map<String, Object> transaction = new HashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = metaData.getColumnName(i);
+                    Object value = rs.getObject(i);
+                    transaction.put(columnName, value);
+                }
+                transactions.add(transaction);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error viewing transactions for UUID " + trimmedUuid + ": " + e.getMessage());
+        }
+
+        return transactions;
+    }
+
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
         String trimmedSource = TypeChecker.convertUUID(source);
@@ -227,4 +256,5 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
         }
     }
+
 }

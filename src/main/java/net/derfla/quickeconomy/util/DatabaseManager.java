@@ -362,4 +362,24 @@ public class DatabaseManager {
         }
     }
 
+    public static void deleteAutopay(int autopayID, String uuid) {
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String sql = "DELETE FROM Autopays WHERE AutopayID = ? AND Source = ?;";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, autopayID);
+            pstmt.setString(2, trimmedUuid);
+
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                plugin.getLogger().info("Autopay deleted successfully");
+            } else {
+                plugin.getLogger().info("Autopay not found. No deletion was performed.");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error deleting autopay: " + e.getMessage());
+        }
+    }
+
 }

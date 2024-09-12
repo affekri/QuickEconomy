@@ -257,4 +257,31 @@ public class DatabaseManager {
         }
     }
 
+    public static List<Map<String, Object>> listAllAccounts() {
+        String sql = "SELECT PlayerName, Balance, AccountCreationDate FROM PlayerAccounts ORDER BY AccountCreationDate";
+        List<Map<String, Object>> accounts = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            ResultSet rs = pstmt.executeQuery()) {
+
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+
+            while (rs.next()) {
+                Map<String, Object> account = new HashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = metaData.getColumnName(i);
+                    Object value = rs.getObject(i);
+                    account.put(columnName, value);
+                }
+                accounts.add(account);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error listing all accounts: " + e.getMessage());
+        }
+
+        return accounts;
+    }
+
 }

@@ -284,4 +284,60 @@ public class DatabaseManager {
         return accounts;
     }
 
+    public static void addAutopay(String autopayName, String uuid, String destination,
+                                   double amount, int inverseFrequency, int endsAfter) {
+        String trimmedUuid = TypeChecker.convertUUID(uuid);
+        String trimmedDestination = TypeChecker.convertUUID(destination);
+
+        if (amount < 0) {
+            plugin.getLogger().severe("Error: Amount must be greater than 0.");
+            return;
+        }
+        if (inverseFrequency < 0) {
+            plugin.getLogger().severe("Error: InverseFrequency must be greater than 0.");
+            return;
+        }
+        if (endsAfter <= 0) {
+            plugin.getLogger().severe("Error: EndsAfter must be 0 (for continuous) or greater.");
+            return;
+        }
+
+        String sql = "DECLARE @AutopayName varchar(16) = ?;"
+                + "DECLARE @UUID char(32) = ?;"
+                + "DECLARE @Destination char(32) = ?;"
+                + "DECLARE @Amount float = ?;"
+                + "DECLARE @InverseFrequency int NOT NULL = ?;"
+                + "DECLARE @EndsAfter int NOT NULL = ?;"
+                + "BEGIN TRY"
+                + "    INSERT INTO Autopays ("
+                + "        Active, CreationDate, AutopayName, Source, Destination,"
+                + "        Amount, InverseFrequency, EndsAfter"
+                + "    )"
+                + "    VALUES ("
+                + "        1, GETDATE(), @AutopayName, @UUID, @Destination,"
+                + "        @Amount, @InverseFrequency, @EndsAfter"
+                + "    );"
+                + "    PRINT 'Autopay created successfully.';"
+                + "END TRY"
+                + "BEGIN CATCH"
+                + "    PRINT 'Error occurred while creating autopay:';"
+                + "    PRINT ERROR_MESSAGE();"
+                + "END CATCH;";
+
+        try (Connection conn = getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, autopayName);
+            pstmt.setString(2, trimmedUuid);
+            pstmt.setString(3, trimmedDestination);
+            pstmt.setDouble(4, amount);
+            pstmt.setInt(5, inverseFrequency);
+            pstmt.setInt(6, endsAfter);
+
+            pstmt.executeUpdate();
+            plugin.getLogger().info("Autopay added successfully");
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error adding autopay: " + e.getMessage());
+        }
+    }
+
 }

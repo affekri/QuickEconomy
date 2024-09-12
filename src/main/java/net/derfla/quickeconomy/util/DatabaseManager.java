@@ -108,6 +108,60 @@ public class DatabaseManager {
         createTransactionsView(trimmedUuid);
     }
 
+    public static void createTransactionsView(String uuid) {
+        try (Statement statement = connection.createStatement()) {
+            String trimmedUuid = TypeChecker.convertUUID(uuid);
+            String viewName = "vw_Transactions_" + trimmedUuid;
+            String sql = "CREATE VIEW IF NOT EXISTS" + viewName + " AS "
+                    + "SELECT "
+                    + "    DATE_FORMAT(t.TransactionID, '%Y-%m-%d %H:%i') AS TransactionDateTime, "
+                    + "    CASE "
+                    + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
+                    + "        ELSE t.Amount"
+                    + "    END AS Amount,"
+                    + "    pa.PlayerName, "
+                    + "    CASE "
+                    + "        WHEN t.Passed = 1 THEN 'Passed' "
+                    + "        WHEN t.Passed = 0 THEN 'Failed' "
+                    + "        ELSE 'Unknown' "
+                    + "    END AS Passed, "
+                    + "    CASE WHEN t.Passed != 1 THEN t.PassedReason ELSE NULL END AS PassedReason, "
+                    + "    CASE "
+                    + "        WHEN t.Source != '" + trimmedUuid + "' THEN "
+                    + "            CASE "
+                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                WHEN t.Induce = 'command' THEN COALESCE(NULLIF(t.TransactionMessage, ''), '-') "
+                    + "                ELSE '-' "
+                    + "            END "
+                    + "        ELSE "
+                    + "            CASE "
+                    + "                WHEN t.TransactionType = 'insert' THEN 'Bank deposit' "
+                    + "                WHEN t.TransactionType = 'withdraw' THEN 'Bank withdrawal' "
+                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                WHEN t.TransactionType = 'p2p' THEN CASE "
+                    + "                    WHEN t.Induce REGEXP '^[0-9]+$' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                    WHEN t.Induce = 'command' THEN 'Command' "
+                    + "                    WHEN t.Induce = 'purchase' THEN 'Purchase' "
+                    + "                    ELSE 'Unknown' "
+                    + "                END "
+                    + "                WHEN t.TransactionType = 'system' THEN CASE "
+                    + "                    WHEN t.Induce = 'admin_command' THEN 'Admin command' "
+                    + "                    ELSE 'Unknown' "
+                    + "                END "
+                    + "                ELSE 'Unknown' "
+                    + "            END "
+                    + "    END AS Reason "
+                    + "FROM Transactions t "
+                    + "LEFT JOIN PlayerAccounts pa ON t.Destination = pa.UUID "
+                    + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "';";
+            
+            statement.executeUpdate(sql);
+            plugin.getLogger().info("Transaction view created for player UUID: " + uuid);
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
+    }
+
     public static void executeTransaction(String transactType, String induce, String source, String destination, int amount, String transactionMessage) {
         String insertTransactionSQL = "INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage) VALUES (?, ?, ?, ?, ?, ?, ?)";
         String updateSourceSQL = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ? AND Balance >= ?";

@@ -32,4 +32,34 @@ public class TypeChecker {
     public static String getRawString(Component component) {
         return ((TextComponent) component).content();
     }
+
+    public static String trimUUID(String uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        if (uuid.length() == 36) {
+            return uuid.replaceAll("-", "");
+        }
+        else if (uuid.length() == 32) {
+            return uuid;
+        }
+        else {
+            throw new IllegalArgumentException("Invalid UUID format");
+        }
+    }
+
+    public static String untrimUUID(String uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        if (uuid.length() == 32) {
+            return uuid.replaceAll("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5");
+        } 
+        else if (uuid.length() == 36) {
+            return uuid;
+        }
+        else {
+            throw new IllegalArgumentException("Invalid UUID format");
+        }
+    }
 }

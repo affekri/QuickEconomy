@@ -118,7 +118,7 @@ public class DatabaseManager {
             String viewName = "vw_Transactions_" + trimmedUuid;
             String sql = "CREATE VIEW IF NOT EXISTS" + viewName + " AS "
                     + "SELECT "
-                    + "    DATE_FORMAT(t.TransactionID, '%Y-%m-%d %H:%i') AS TransactionDateTime, "
+                    + "    CAST(t.TransactionID AS TIMESTAMP) AS TransactionDateTime, "
                     + "    CASE "
                     + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
                     + "        ELSE t.Amount"

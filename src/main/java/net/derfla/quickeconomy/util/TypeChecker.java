@@ -28,7 +28,6 @@ public class TypeChecker {
         return Float.parseFloat(formattedFloat);
     }
 
-
     public static String getRawString(Component component) {
         return ((TextComponent) component).content();
     }

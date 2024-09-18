@@ -45,7 +45,6 @@ public class BlockOwner {
     }
 
     public static void unlockFromPlayer(Chest chest, String player) {
-        plugin.getLogger().info("unlock");
         String nbt = chest.getPersistentDataContainer().get(lockedKey, PersistentDataType.STRING);
         chest.getPersistentDataContainer().remove(lockedKey);
         chest.update();

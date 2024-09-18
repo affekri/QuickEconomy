@@ -28,24 +28,36 @@ public class TypeChecker {
         return Float.parseFloat(formattedFloat);
     }
 
-
     public static String getRawString(Component component) {
         return ((TextComponent) component).content();
     }
 
-    public static String convertUUID(String uuid) {
+    public static String trimUUID(String uuid) {
         if (uuid == null) {
             return null;
         }
-        
-        // Check if the UUID is in trimmed format (length 32)
-        if (uuid.length() == 32) {
-            // Convert trimmed UUID to standard UUID format
-            return uuid.replaceAll("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5");
-        } else if (uuid.length() == 36) {
-            // Convert standard UUID to trimmed format
+        if (uuid.length() == 36) {
             return uuid.replaceAll("-", "");
-        } else {
+        }
+        else if (uuid.length() == 32) {
+            return uuid;
+        }
+        else {
+            throw new IllegalArgumentException("Invalid UUID format");
+        }
+    }
+
+    public static String untrimUUID(String uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        if (uuid.length() == 32) {
+            return uuid.replaceAll("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5");
+        } 
+        else if (uuid.length() == 36) {
+            return uuid;
+        }
+        else {
             throw new IllegalArgumentException("Invalid UUID format");
         }
     }

@@ -92,33 +92,76 @@ public class DatabaseManager {
 
     public static void addAccount(String uuid, String playerName) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName) "
-                   + "VALUES (?, GETDATE(), ?) "
-                   + "ON DUPLICATE KEY UPDATE PlayerName = VALUES(PlayerName);";
-    
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, trimmedUuid);
-            pstmt.setString(2, playerName);
-            int rowsAffected = pstmt.executeUpdate();
-            
-            if (rowsAffected > 0) {
-                plugin.getLogger().info("New player account added successfully for " + playerName);
-            } else {
-                plugin.getLogger().info("Account already exists for " + playerName);
+
+        // Try to insert a new account first
+        String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName) "
+                + "VALUES (?, current_timestamp(), ?)";
+
+        // If the insert fails due to duplicate key, then update the player name
+        String updateSql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
+
+        try {
+            // Attempt to insert a new account
+            try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
+                insertPstmt.setString(1, trimmedUuid);
+                insertPstmt.setString(2, playerName);
+                int rowsInserted = insertPstmt.executeUpdate();
+
+                if (rowsInserted > 0) {
+                    plugin.getLogger().info("New player account added successfully for " + playerName);
+                }
+            } catch (SQLException insertException) {
+                // If insertion fails, it may be because the account already exists, so we attempt to update
+                if (insertException.getErrorCode() == 1062) {
+                    try (PreparedStatement updatePstmt = connection.prepareStatement(updateSql)) {
+                        updatePstmt.setString(1, playerName);
+                        updatePstmt.setString(2, trimmedUuid);
+                        int rowsUpdated = updatePstmt.executeUpdate();
+
+                        if (rowsUpdated > 0) {
+                            plugin.getLogger().info("Account already exists, player name updated for " + playerName);
+                        }
+                    }
+                } else {
+                    throw insertException;  // Rethrow if it's a different SQL exception
+                }
             }
         } catch (SQLException e) {
             plugin.getLogger().severe("Error adding player account: " + e.getMessage());
         }
+
         createTransactionsView(trimmedUuid);
     }
 
+
     public static void createTransactionsView(String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String viewName = "vw_Transactions_" + trimmedUuid;
+        String databaseName = plugin.getConfig().getString("database.database");
+        String checksql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+
+        try (PreparedStatement preparedStatement = connection.prepareStatement(checksql)) {
+            // Set the parameters for view name and database name
+            preparedStatement.setString(1, viewName);
+            preparedStatement.setString(2, databaseName);
+
+            // Execute the query and get the result
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    // Return true if the view exists (COUNT > 0)
+                    if (resultSet.getInt(1) > 0) {
+                        return;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
+
         try (Statement statement = connection.createStatement()) {
-            String trimmedUuid = TypeChecker.trimUUID(uuid);
-            String viewName = "vw_Transactions_" + trimmedUuid;
-            String sql = "CREATE VIEW IF NOT EXISTS" + viewName + " AS "
+            String sql = "CREATE VIEW " + viewName + " AS "
                     + "SELECT "
-                    + "    DATE_FORMAT(t.TransactionID, '%Y-%m-%d %H:%i') AS TransactionDateTime, "
+                    + "    CAST(t.TransactionID AS DATETIME) AS TransactionDateTime, "
                     + "    CASE "
                     + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
                     + "        ELSE t.Amount"

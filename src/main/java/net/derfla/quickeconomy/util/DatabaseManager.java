@@ -554,5 +554,27 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error updating balance for UUID " + uuid + ": " + e.getMessage());
         }
     }
+
+    public static void migrateToDatabase() {
+        try {
+            FileConfiguration balanceConfig = BalanceFile.get();
+            for (String key : balanceConfig.getKeys(false)) {
+                double balance = balanceConfig.getDouble(key + ".balance");
+                String uuid = key; // Assuming the key is the UUID
+                
+                // Check if the account exists in the PlayerAccounts table
+                if (!accountExists(uuid)) { // Use the new method to check existence
+                    // If not, add the account with the balance
+                    addAccount(uuid, balanceConfig.getString(key + ".playerName"), balance); // Pass balance here
+                } else {
+                    // If it exists, update the balance
+                    setPlayerBalance(uuid, balance);
+                }
+            }
+            plugin.getLogger().info("Migration to database completed successfully.");
+        } catch (Exception e) {
+            plugin.getLogger().severe("Error during migration to database: " + e.getMessage());
+        }
+    }
   
 }

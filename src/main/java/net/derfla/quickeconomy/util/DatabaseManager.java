@@ -1,6 +1,9 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.file.BalanceFile;
+
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.*;
@@ -554,5 +557,63 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error updating balance for UUID " + uuid + ": " + e.getMessage());
         }
     }
-  
+
+    public static void migrateToDatabase() {
+        FileConfiguration balanceConfig = BalanceFile.get();
+        for (String key : balanceConfig.getKeys(false)) {
+            double balance = balanceConfig.getDouble(key + ".balance");
+            String uuid = key; // Assuming the key is the UUID
+            // Check if the account exists in the PlayerAccounts table
+            if (displayBalance(uuid) == 0.0) {
+                // If not, add the account with the balance
+                addAccount(uuid, balanceConfig.getString(key + ".playerName")); // Assuming playerName is stored
+            } else {
+                // If it exists, update the balance
+                setPlayerBalance(uuid, balance);
+            }
+        }
+    }
+
+    public static void migrateToBalanceFile() {
+        String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
+        String sql = "SELECT UUID, PlayerName, Balance FROM PlayerAccounts";
+        
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
+             ResultSet rsCount = pstmtCount.executeQuery();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            int playerCount = 0;
+            if (rsCount.next()) {
+                playerCount = rsCount.getInt("playerCount");
+            }
+            
+            if (BalanceFile.get() == null) {
+                BalanceFile.setup();
+            }
+            // Clear existing data in balance.yml
+            FileConfiguration balanceConfig = BalanceFile.get();
+            for (String key : balanceConfig.getKeys(false)) {
+                balanceConfig.set(key, null);
+            }
+
+            // Iterate through the results and populate balance.yml
+            while (rs.next()) {
+                String uuid = rs.getString("UUID");
+                String playerName = rs.getString("PlayerName");
+                double balance = rs.getDouble("Balance");
+    
+                balanceConfig.set(uuid + ".playerName", playerName);
+                balanceConfig.set(uuid + ".balance", balance);
+            }
+            // Save the updated configuration to balance.yml
+            BalanceFile.save();
+            plugin.getLogger().info("Successfully migrated " + playerCount + " players to balance.yml");
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error migrating to balance.yml: " + e.getMessage());
+        }
+    }
+
+
 }

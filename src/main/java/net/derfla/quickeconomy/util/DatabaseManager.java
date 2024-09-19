@@ -617,5 +617,21 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error migrating to balance.yml: " + e.getMessage());
         }
     }
+
+    private static boolean accountExists(String uuid) {
+        String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, TypeChecker.trimUUID(uuid));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0; // Return true if count is greater than 0
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking account existence: " + e.getMessage());
+        }
+        return false;
+    }
   
 }

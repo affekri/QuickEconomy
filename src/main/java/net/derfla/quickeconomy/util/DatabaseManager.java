@@ -633,5 +633,24 @@ public class DatabaseManager {
         }
         return false;
     }
+
+    public static void updatePlayerName(String uuid, String playerName) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
+    
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, playerName);
+            pstmt.setString(2, trimmedUuid);
+            int rowsUpdated = pstmt.executeUpdate();
+    
+            if (rowsUpdated > 0) {
+                plugin.getLogger().info("Player name updated successfully for UUID: " + trimmedUuid);
+            } else {
+                plugin.getLogger().info("No account found for UUID: " + trimmedUuid);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error updating player name for UUID " + trimmedUuid + ": " + e.getMessage());
+        }
+    }
   
 }

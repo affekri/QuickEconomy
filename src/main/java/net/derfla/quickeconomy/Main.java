@@ -51,10 +51,6 @@ public final class Main extends JavaPlugin {
         getConfig().options().copyDefaults(true);
         saveDefaultConfig();
 
-        BalanceFile.setup();
-        BalanceFile.get().options().copyDefaults(true);
-        BalanceFile.save();
-
         int pluginID = 20985;
         Metrics metrics = new Metrics(this, pluginID);
 
@@ -67,10 +63,15 @@ public final class Main extends JavaPlugin {
                 getServer().getPluginManager().disablePlugin(this);
             }
             SQLMode = true;
-            DatabaseManager.createTable();
-
+            DatabaseManager.createTables();
+            if (BalanceFile.get() != null) {
+                DatabaseManager.migrateToDatabase();
+            }
         } else {
             getLogger().info("Running in file mode. See config to enable SQL mode.");
+            BalanceFile.setup();
+            BalanceFile.get().options().copyDefaults(true);
+            BalanceFile.save();
         }
     }
 
@@ -90,3 +91,4 @@ public final class Main extends JavaPlugin {
         return getPlugin(Main.class);
     }
 }
+

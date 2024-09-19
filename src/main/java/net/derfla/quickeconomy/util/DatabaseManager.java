@@ -534,5 +534,25 @@ public class DatabaseManager {
             }
         }
     }
+
+    public static void setPlayerBalance(String uuid, double balance) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET Balance = ? WHERE UUID = ?;";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, balance);
+            pstmt.setString(2, trimmedUuid);
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                plugin.getLogger().info("Balance updated successfully for UUID: " + uuid);
+            } else {
+                plugin.getLogger().info("No account found for UUID: " + uuid);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error updating balance for UUID " + uuid + ": " + e.getMessage());
+        }
+    }
   
 }

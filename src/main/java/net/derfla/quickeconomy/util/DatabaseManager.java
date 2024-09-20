@@ -105,6 +105,7 @@ public class DatabaseManager {
             try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
                 insertPstmt.setString(2, playerName);
+                insertPstmt.setDouble(3, balance);
                 int rowsInserted = insertPstmt.executeUpdate();
 
                 if (rowsInserted > 0) {

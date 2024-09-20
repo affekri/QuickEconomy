@@ -51,5 +51,19 @@ public class BalanceFile {
         // Reloads the file
         customFile = YamlConfiguration.loadConfiguration(file);
     }
+
+    public static void delete() {
+        // Deletes the file
+        if (file.exists()) {
+            if (file.delete()) {
+                plugin.getLogger().info("Deleted file: " + file.getName());
+            } else {
+                plugin.getLogger().warning("Couldn't delete file: " + file.getName());
+            }
+        } else {
+            plugin.getLogger().warning("File does not exist: " + file.getName());
+        }
+    }
+    
 }
 

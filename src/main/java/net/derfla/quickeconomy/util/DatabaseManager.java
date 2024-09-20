@@ -90,12 +90,12 @@ public class DatabaseManager {
         }
     }
 
-    public static void addAccount(String uuid, String playerName) {
+    public static void addAccount(String uuid, String playerName, double Balance) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
 
         // Try to insert a new account first
-        String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName) "
-                + "VALUES (?, current_timestamp(), ?)";
+        String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) "
+                + "VALUES (?, current_timestamp(), ?, ?)";
 
         // If the insert fails due to duplicate key, then update the player name
         String updateSql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";

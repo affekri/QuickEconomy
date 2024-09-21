@@ -34,6 +34,32 @@ public final class Main extends JavaPlugin {
         getCommand("bank").setExecutor(new BankCommand());
 
         // Register events
+        registerEvents();
+
+        // Config file
+        getConfig().options().copyDefaults(true);
+        saveDefaultConfig();
+
+        int pluginID = 20985;
+        Metrics metrics = new Metrics(this, pluginID);
+
+        // Database and file usage
+        if (getConfig().getBoolean("database.enabled")) {
+            setupSQLMode();
+        } else {
+            setupFileMode();
+        }
+    }
+
+    private void setCommandExecutor(String command, JavaPlugin executor) {
+        if (getCommand(command) != null) {
+            getCommand(command).setExecutor(executor);
+        } else {
+            getLogger().warning("Command '" + command + "' not found in plugin.yml");
+        }
+    }
+
+    private void registerEvents() {
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerPlaceSignListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerClickSignListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new InventoryClickListener(), this);
@@ -46,40 +72,33 @@ public final class Main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new HopperMoveItemEvent(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerCloseInventoryListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerChangeSettingsListener(), this);
+    }
 
-        // Config file
-        getConfig().options().copyDefaults(true);
-        saveDefaultConfig();
+    private void setupFileMode() {
+        getLogger().info("Running in file mode. See config to enable SQL mode.");
+        BalanceFile.setup();
+        BalanceFile.get().options().copyDefaults(true);
+        BalanceFile.save();
+    }
 
-        int pluginID = 20985;
-        Metrics metrics = new Metrics(this, pluginID);
-
-        // Database usage
-        if(getConfig().getBoolean("database.enabled")) {
-            getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
-            try {
-                DatabaseManager.connectToDatabase();
-            } catch (SQLException e) {
-                getLogger().severe("Could not establish a database connection: " + e.getMessage());
-                getServer().getPluginManager().disablePlugin(this);
-            }
+    private void setupSQLMode() {
+        getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
+        try {
+            DatabaseManager.connectToDatabase();
             SQLMode = true;
             DatabaseManager.createTables();
             if (BalanceFile.get() != null) {
-                if (DatabaseManager.migrateToDatabase()) { // Check if migration was successful
+                if (DatabaseManager.migrateToDatabase()) {
                     if (BalanceFile.delete()) {
                         getLogger().info("balance.yml has been removed after successful migration.");
                     }
-                }
-                if (!DatabaseManager.migrateToDatabase()) {
-                    getLogger().info("You can set balances manually with /bal set <playername>");
+                } else {
+                    getLogger().info("Migration unsuccessful. You can set balances manually with /bal set <playername>");
                 }
             }
-        } else {
-            getLogger().info("Running in file mode. See config to enable SQL mode.");
-            BalanceFile.setup();
-            BalanceFile.get().options().copyDefaults(true);
-            BalanceFile.save();
+        } catch (SQLException e) {
+            getLogger().severe("Could not establish a database connection: " + e.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
         }
     }
 

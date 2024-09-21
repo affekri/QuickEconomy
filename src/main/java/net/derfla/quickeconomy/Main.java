@@ -54,6 +54,7 @@ public final class Main extends JavaPlugin {
         int pluginID = 20985;
         Metrics metrics = new Metrics(this, pluginID);
 
+        // Database usage
         if(getConfig().getBoolean("database.enabled")) {
             getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
             try {
@@ -65,7 +66,14 @@ public final class Main extends JavaPlugin {
             SQLMode = true;
             DatabaseManager.createTables();
             if (BalanceFile.get() != null) {
-                DatabaseManager.migrateToDatabase();
+                if (DatabaseManager.migrateToDatabase()) { // Check if migration was successful
+                    if (BalanceFile.delete()) {
+                        getLogger().info("balance.yml has been removed after successful migration.");
+                    }
+                }
+                if (!DatabaseManager.migrateToDatabase()) {
+                    getLogger().info("You can set balances manually with /bal set <playername>");
+                }
             }
         } else {
             getLogger().info("Running in file mode. See config to enable SQL mode.");

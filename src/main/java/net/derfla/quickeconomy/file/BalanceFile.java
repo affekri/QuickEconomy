@@ -6,8 +6,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*
 
 public class BalanceFile {
 
@@ -67,6 +66,6 @@ public class BalanceFile {
             return false;
         }
     }
-    
+
 }
 

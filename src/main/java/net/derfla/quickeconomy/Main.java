@@ -71,6 +71,8 @@ public final class Main extends JavaPlugin {
         BalanceFile.setup();
         BalanceFile.get().options().copyDefaults(true);
         BalanceFile.save();
+        if(BalanceFile.get().contains("players.") && BalanceFile.checkFormat().equals("playerName"))
+            BalanceFile.convertKeys();
     }
 
     private void setupSQLMode() {

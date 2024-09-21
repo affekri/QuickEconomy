@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.command;
 
+import net.derfla.quickeconomy.util.MojangAPI;
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -30,7 +31,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             Player player = ((Player) sender).getPlayer();
-            player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(player.getName()))).style(Styles.INFOSTYLE));
+            player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
             return true;
         }
         if (strings.length == 1) {
@@ -40,14 +41,14 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             }
             String checkPlayer;
             if (Bukkit.getServer().getPlayerExact(strings[0]) != null) {
-                checkPlayer = Bukkit.getServer().getPlayerExact(strings[0]).getName();
+                checkPlayer = Bukkit.getServer().getPlayerExact(strings[0]).getUniqueId().toString();
             } else checkPlayer = strings[0];
-            float balance = Balances.getPlayerBalance(checkPlayer);
+            float balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
             if (balance == 0.0f) {
                 sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[0])).style(Styles.ERRORSTYLE));
                 return true;
             }
-            sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(checkPlayer), Component.text(balance)).style(Styles.INFOSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[0]), Component.text(balance)).style(Styles.INFOSTYLE));
             return true;
         }
         if (strings[1] == null) {
@@ -75,11 +76,11 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     }
                     Player player = ((Player) sender).getPlayer();
 
-                    Balances.setPlayerBalance(player.getName(), money);
+                    Balances.setPlayerBalance(String.valueOf(player.getUniqueId()), money);
                     player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
                     break;
                 }
-                Balances.setPlayerBalance(strings[2], money);
+                Balances.setPlayerBalance(MojangAPI.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.set", Component.text(strings[2]), Component.text(money)).style(Styles.INFOSTYLE));
                 break;
 
@@ -96,11 +97,11 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     }
                     Player player = ((Player) sender).getPlayer();
 
-                    Balances.addPlayerBalance(player.getName(), money);
+                    Balances.addPlayerBalance(String.valueOf(player.getUniqueId()), money);
                     player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.addPlayerBalance(strings[2], money);
+                Balances.addPlayerBalance(MojangAPI.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -115,11 +116,11 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         break;
                     }
                     Player player = ((Player) sender).getPlayer();
-                    Balances.subPlayerBalance(player.getName(), money);
+                    Balances.subPlayerBalance(String.valueOf(player.getUniqueId()), money);
                     player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.subPlayerBalance(strings[2], money);
+                Balances.subPlayerBalance(MojangAPI.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -140,17 +141,20 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
                     break;
                 }
-                if (Bukkit.getServer().getPlayer(strings[2]) == null || Balances.getPlayerBalance(strings[2]) == 0.0f) {
+                String targetUUID = TypeChecker.trimUUID(MojangAPI.getUUID(strings[2]));
+
+
+                if (Balances.hasAccount(targetUUID)) {
                     sender.sendMessage( Component.translatable("player.notexists", Component.text(strings[2])));
                     break;
                 }
+
                 Player player = ((Player) sender).getPlayer();
-                if (Balances.getPlayerBalance(player.getName()) < money) {
+                if (Balances.getPlayerBalance(String.valueOf(player.getUniqueId())) < money) {
                     player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
-                Balances.subPlayerBalance(player.getName(), money);
-                Balances.addPlayerBalance(strings[2], money);
+                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), MojangAPI.getUUID(strings[2]), money, null);
 
                 player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {
@@ -189,7 +193,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         if (strings.length == 2) {
             String balance;
             if (sender instanceof Player) {
-                balance = String.valueOf(Balances.getPlayerBalance(sender.getName()));
+                balance = String.valueOf(Balances.getPlayerBalance(String.valueOf(((Player) sender).getUniqueId())));
             } else balance = "1001";
             return Stream.of("10", "100", "1000", balance)
                     .filter(amount -> amount.startsWith(strings[1]))

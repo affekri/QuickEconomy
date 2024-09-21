@@ -6,8 +6,6 @@ import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import com.google.common.io.Files;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -611,7 +611,7 @@ public class DatabaseManager {
         }
     }
 
-    private static boolean accountExists(@NotNull String uuid) {
+    public static boolean accountExists(@NotNull String uuid) {
         String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {

@@ -9,10 +9,7 @@ import net.derfla.quickeconomy.util.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 import static net.derfla.quickeconomy.util.DatabaseManager.connection;
 
@@ -40,23 +37,18 @@ public final class Main extends JavaPlugin {
         getConfig().options().copyDefaults(true);
         saveDefaultConfig();
 
-        int pluginID = 20985;
-        Metrics metrics = new Metrics(this, pluginID);
-
         // Database and file usage
         if (getConfig().getBoolean("database.enabled")) {
             setupSQLMode();
         } else {
             setupFileMode();
         }
-    }
 
-    private void setCommandExecutor(String command, JavaPlugin executor) {
-        if (getCommand(command) != null) {
-            getCommand(command).setExecutor(executor);
-        } else {
-            getLogger().warning("Command '" + command + "' not found in plugin.yml");
-        }
+        int pluginID = 20985;
+        Metrics metrics = new Metrics(this, pluginID);
+        metrics.addCustomChart(new Metrics.SimplePie("sql_mode", () -> {
+            return SQLMode ? "SQL-mode" : "File-mode";
+        }));
     }
 
     private void registerEvents() {
@@ -79,6 +71,8 @@ public final class Main extends JavaPlugin {
         BalanceFile.setup();
         BalanceFile.get().options().copyDefaults(true);
         BalanceFile.save();
+        if(BalanceFile.get().contains("players.") && BalanceFile.checkFormat().equals("playerName"))
+            BalanceFile.convertKeys();
     }
 
     private void setupSQLMode() {
@@ -118,4 +112,3 @@ public final class Main extends JavaPlugin {
         return getPlugin(Main.class);
     }
 }
-

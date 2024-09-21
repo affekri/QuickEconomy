@@ -111,7 +111,7 @@ public class PlayerPlaceSignListener implements Listener {
             event.line(2, Component.text(player.getName()).style(Styles.BODY));
             String line3 = TypeChecker.getRawString(event.line(3));
             if (!line3.isEmpty()) {
-                if (Balances.getPlayerBalance(line3) == 0.0f && Bukkit.getPlayer(line3) == null) {
+                if (!Balances.hasAccount(MojangAPI.getUUID(line3)) && Bukkit.getPlayer(line3) == null) {
                     event.line(3, Component.empty());
                     player.sendMessage(Component.translatable("player.notexists", Styles.ERRORSTYLE));
                 } else if (line3.equals(player.getName())) {

@@ -866,5 +866,3 @@ public class Metrics {
         }
     }
 }
-    }
-}

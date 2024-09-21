@@ -5,6 +5,7 @@ import net.derfla.quickeconomy.file.BalanceFile;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void addAccount(String uuid, String playerName, double balance) {
+    public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
 
         if (accountExists(trimmedUuid)) {
@@ -119,7 +120,7 @@ public class DatabaseManager {
     }
 
 
-    private static void createTransactionsView(String uuid) {
+    private static void createTransactionsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
         String databaseName = plugin.getConfig().getString("database.database");
@@ -194,8 +195,8 @@ public class DatabaseManager {
         }
     }
 
-    public static void executeTransaction(String transactType, String induce, String source,
-                                          String destination, double amount, String transactionMessage) {
+    public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
+                                          String destination, @NotNull double amount, String transactionMessage) {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
         String sql = "DECLARE @TransactionID DATETIME = GETDATE();"
@@ -260,7 +261,7 @@ public class DatabaseManager {
         }
     }
 
-    public static double displayBalance(String uuid) {
+    public static double displayBalance(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
         double balance = 0.0;
@@ -281,7 +282,7 @@ public class DatabaseManager {
         return balance;
     }
 
-    public static List<Map<String, Object>> displayTransactionsView(String uuid) {
+    public static List<Map<String, Object>> displayTransactionsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
         String sql = "SELECT * FROM " + viewName + " ORDER BY TransactionDateTime DESC";
@@ -310,8 +311,8 @@ public class DatabaseManager {
         return transactions;
     }
 
-    public static void addAutopay(String autopayName, String uuid, String destination,
-                                   double amount, int inverseFrequency, int endsAfter) {
+    public static void addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
+                                  @NotNull double amount, @NotNull int inverseFrequency, @NotNull int endsAfter) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String trimmedDestination = TypeChecker.trimUUID(destination);
 
@@ -366,7 +367,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void stateChangeAutopay(boolean activeState, int autopayID, String uuid) {
+    public static void stateChangeAutopay(@NotNull boolean activeState, @NotNull int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
 
@@ -388,7 +389,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void deleteAutopay(int autopayID, String uuid) {
+    public static void deleteAutopay(@NotNull int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "DELETE FROM Autopays WHERE AutopayID = ? AND Source = ?;";
 
@@ -408,7 +409,7 @@ public class DatabaseManager {
         }
     }
 
-    public static List<Map<String, Object>> viewAutopays(String uuid) {
+    public static List<Map<String, Object>> viewAutopays(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT * FROM Autopays WHERE Source = ? ORDER BY AutopayID";
         List<Map<String, Object>> autopays = new ArrayList<>();
@@ -465,7 +466,7 @@ public class DatabaseManager {
         return accounts;
     }
 
-    public static void rollback(Timestamp rollbackTime, boolean keepTransactions) {
+    public static void rollback(@NotNull Timestamp rollbackTime, @NotNull boolean keepTransactions) {
         String getBalances = "SELECT pa.UUID, pa.Balance, COALESCE(t.NewSourceBalance, t.NewDestinationBalance) AS RollbackBalance FROM PlayerAccounts pa LEFT JOIN (SELECT DISTINCT ON (Source) Source, NewSourceBalance FROM Transactions WHERE TransactionID <= ? ORDER BY Source, TransactionID DESC) t ON pa.UUID = t.Source";
         String deleteTransactions = "DELETE FROM Transactions WHERE TransactionID > ?";
         String getAutopays = "SELECT AutopayID, CreationDate, Source FROM Autopays";
@@ -520,7 +521,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void setPlayerBalance(String uuid, double balance) {
+    public static void setPlayerBalance(@NotNull String uuid, @NotNull double balance) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET Balance = ? WHERE UUID = ?;";
 
@@ -610,7 +611,7 @@ public class DatabaseManager {
         }
     }
 
-    private static boolean accountExists(String uuid) {
+    private static boolean accountExists(@NotNull String uuid) {
         String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -644,8 +645,5 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error updating player name for UUID " + trimmedUuid + ": " + e.getMessage());
         }
     }
-
-    
-
 
 }

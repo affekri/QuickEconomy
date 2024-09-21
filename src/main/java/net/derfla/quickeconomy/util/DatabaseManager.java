@@ -6,6 +6,8 @@ import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
+import com.google.common.io.Files;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -93,51 +95,33 @@ public class DatabaseManager {
         }
     }
 
-    public static void addAccount(String uuid, String playerName) {
+    public static void addAccount(String uuid, String playerName, double balance) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
 
-        // Try to insert a new account first
-        String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName) "
-                + "VALUES (?, current_timestamp(), ?)";
-
-        // If the insert fails due to duplicate key, then update the player name
-        String updateSql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
-
-        try {
-            // Attempt to insert a new account
+        if (accountExists(trimmedUuid)) {
+            plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
+        } else {
+            String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) "
+                    + "VALUES (?, current_timestamp(), ?, ?)";
             try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
                 insertPstmt.setString(2, playerName);
+                insertPstmt.setDouble(3, balance);
                 int rowsInserted = insertPstmt.executeUpdate();
 
                 if (rowsInserted > 0) {
                     plugin.getLogger().info("New player account added successfully for " + playerName);
                 }
-            } catch (SQLException insertException) {
-                // If insertion fails, it may be because the account already exists, so we attempt to update
-                if (insertException.getErrorCode() == 1062) {
-                    try (PreparedStatement updatePstmt = connection.prepareStatement(updateSql)) {
-                        updatePstmt.setString(1, playerName);
-                        updatePstmt.setString(2, trimmedUuid);
-                        int rowsUpdated = updatePstmt.executeUpdate();
-
-                        if (rowsUpdated > 0) {
-                            plugin.getLogger().info("Account already exists, player name updated for " + playerName);
-                        }
-                    }
-                } else {
-                    throw insertException;  // Rethrow if it's a different SQL exception
-                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Error adding player account: " + e.getMessage());
             }
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error adding player account: " + e.getMessage());
         }
 
         createTransactionsView(trimmedUuid);
     }
 
 
-    public static void createTransactionsView(String uuid) {
+    private static void createTransactionsView(String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
         String databaseName = plugin.getConfig().getString("database.database");
@@ -558,62 +542,112 @@ public class DatabaseManager {
         }
     }
 
-    public static void migrateToDatabase() {
-        FileConfiguration balanceConfig = BalanceFile.get();
-        for (String key : balanceConfig.getKeys(false)) {
-            double balance = balanceConfig.getDouble(key + ".balance");
-            String uuid = key; // Assuming the key is the UUID
-            // Check if the account exists in the PlayerAccounts table
-            if (displayBalance(uuid) == 0.0) {
-                // If not, add the account with the balance
-                addAccount(uuid, balanceConfig.getString(key + ".playerName")); // Assuming playerName is stored
-            } else {
-                // If it exists, update the balance
-                setPlayerBalance(uuid, balance);
+    public static boolean migrateToDatabase() {
+        try {
+            FileConfiguration balanceConfig = BalanceFile.get();
+            for (String key : balanceConfig.getKeys(false)) {
+                double balance = balanceConfig.getDouble(key + ".balance");
+                String trimmedUuid = TypeChecker.trimUUID(key);
+
+                if (!accountExists(trimmedUuid)) {
+                    addAccount(trimmedUuid, balanceConfig.getString(key + ".playerName"), balance);
+                } else {
+                    setPlayerBalance(trimmedUuid, balance);
+                }
             }
+            plugin.getLogger().info("Migration to database completed successfully.");
+            return true;
+        } catch (Exception e) {
+            plugin.getLogger().severe("Error during migration to database: " + e.getMessage());
+            return false;
         }
     }
 
     public static void migrateToBalanceFile() {
         String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
         String sql = "SELECT UUID, PlayerName, Balance FROM PlayerAccounts";
-        
+
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
-             ResultSet rsCount = pstmtCount.executeQuery();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+            PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
+            ResultSet rsCount = pstmtCount.executeQuery();
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            ResultSet rs = pstmt.executeQuery()) {
 
             int playerCount = 0;
             if (rsCount.next()) {
                 playerCount = rsCount.getInt("playerCount");
             }
-            
+
             if (BalanceFile.get() == null) {
                 BalanceFile.setup();
+                BalanceFile.get().options().copyDefaults(true);
+                BalanceFile.save();
             }
-            // Clear existing data in balance.yml
+
             FileConfiguration balanceConfig = BalanceFile.get();
             for (String key : balanceConfig.getKeys(false)) {
                 balanceConfig.set(key, null);
             }
 
-            // Iterate through the results and populate balance.yml
             while (rs.next()) {
                 String uuid = rs.getString("UUID");
                 String playerName = rs.getString("PlayerName");
                 double balance = rs.getDouble("Balance");
-    
-                balanceConfig.set(uuid + ".playerName", playerName);
-                balanceConfig.set(uuid + ".balance", balance);
+
+                // Validate data before writing
+                if (uuid != null && playerName != null && balance >= 0) {
+                    balanceConfig.set(uuid + ".playerName", playerName);
+                    balanceConfig.set(uuid + ".balance", balance);
+                } else {
+                    plugin.getLogger().warning("Invalid data for UUID: " + uuid);
+                }
             }
+
             // Save the updated configuration to balance.yml
             BalanceFile.save();
             plugin.getLogger().info("Successfully migrated " + playerCount + " players to balance.yml");
+
         } catch (SQLException e) {
             plugin.getLogger().severe("Error migrating to balance.yml: " + e.getMessage());
         }
     }
+
+    private static boolean accountExists(String uuid) {
+        String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, TypeChecker.trimUUID(uuid));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0; // Return true if count is greater than 0
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking account existence: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public static void updatePlayerName(String uuid, String playerName) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
+    
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, playerName);
+            pstmt.setString(2, trimmedUuid);
+            int rowsUpdated = pstmt.executeUpdate();
+    
+            if (rowsUpdated > 0) {
+                plugin.getLogger().info("Player name updated successfully for UUID: " + trimmedUuid);
+            } else {
+                plugin.getLogger().info("No account found for UUID: " + trimmedUuid);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error updating player name for UUID " + trimmedUuid + ": " + e.getMessage());
+        }
+    }
+
+    
 
 
 }

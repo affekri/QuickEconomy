@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
 import java.util.*;
+
 import java.io.FileWriter;
 import java.io.IOException;
 
@@ -135,7 +136,7 @@ public class DatabaseManager {
                 insertPstmt.setDouble(4, balance);
                 insertPstmt.setDouble(5, change);
                 int rowsInserted = insertPstmt.executeUpdate();
-
+              
                 if (rowsInserted > 0) {
                     plugin.getLogger().info("New player account added successfully for " + playerName);
                 }
@@ -146,7 +147,6 @@ public class DatabaseManager {
 
         createTransactionsView(trimmedUuid);
     }
-
 
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                           String destination, double amount, String transactionMessage) {
@@ -521,6 +521,7 @@ public class DatabaseManager {
                 if (!keepTransactions) {
                     pstmtDelete.setTimestamp(1, rollbackTime);
                     pstmtDelete.executeUpdate();
+
                     // Set the player's balance to the rollback balance (without a transaction)
                     setPlayerBalance(trimmedUuid, rollbackBalance, 0);
                 } else {

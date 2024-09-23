@@ -74,13 +74,13 @@ public class DatabaseManager {
                     + "  AccountDatetime varchar(23) NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
                     + "  Balance float NOT NULL DEFAULT 0,"
-                    + "  Change float NOT NULL DEFAULT 0"
+                    + "  BalChange float NOT NULL DEFAULT 0,"
                     + "  PRIMARY KEY (UUID)"
                     + ");";
             statement.executeUpdate(sqlPlayerAccounts);
 
             String sqlTransactions = "CREATE TABLE IF NOT EXISTS Transactions ("
-                    + "  TransactionID bigint NOT NULL AUTO_INCREMENT"
+                    + "  TransactionID bigint NOT NULL AUTO_INCREMENT,"
                     + "  TransactionDatetime varchar(23) NOT NULL,"
                     + "  TransactionType varchar(16) NOT NULL,"
                     + "  Induce varchar(16) NOT NULL,"
@@ -100,7 +100,7 @@ public class DatabaseManager {
 
             String sqlAutopays = "CREATE TABLE IF NOT EXISTS Autopays ("
                     + "  AutopayID bigint NOT NULL AUTO_INCREMENT,"
-                    + "  AutopayDatetime varchar(23) NOT NULL"
+                    + "  AutopayDatetime DATETIME NOT NULL,"
                     + "  Active tinyint(1) NOT NULL DEFAULT 1,"
                     + "  AutopayName varchar(16),"
                     + "  Source char(32),"
@@ -129,17 +129,17 @@ public class DatabaseManager {
         if (accountExists(trimmedUuid)) {
             plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
         } else {
-            String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, Change) "
+            String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, BalChange) "
                     + "VALUES (?, ?, ?, ?, ?)";
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
-                insertPstmt.setString(1, trimmedUuid);
-                insertPstmt.selString(2, currentTimeString);
-                insertPstmt.setString(3, playerName);
-                insertPstmt.setDouble(4, balance);
-                insertPstmt.setDouble(5, change);
-                int rowsInserted = insertPstmt.executeUpdate();
-              
+                pstmt.setString(1, trimmedUuid);
+                pstmt.setString(2, currentTimeString);
+                pstmt.setString(3, playerName);
+                pstmt.setDouble(4, balance);
+                pstmt.setDouble(5, change);
+                int rowsInserted = pstmt.executeUpdate();
+
                 if (rowsInserted > 0) {
                     plugin.getLogger().info("New player account added successfully for " + playerName);
                 }
@@ -227,7 +227,8 @@ public class DatabaseManager {
         String databaseName = plugin.getConfig().getString("database.database");
         String checkSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
 
-        try (PreparedStatement preparedStatement = connection.prepareStatement(checkSQL)) {
+        try (Connection conn = getConnection();
+             PreparedStatement preparedStatement = conn.prepareStatement(checkSQL)) {
             preparedStatement.setString(1, viewName);
             preparedStatement.setString(2, databaseName);
 
@@ -241,7 +242,8 @@ public class DatabaseManager {
             return;
         }
 
-        try (Statement statement = connection.createStatement()) {
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
             String sql = "CREATE VIEW " + viewName + " AS "
                     + "SELECT "
                     + "    t.TransactionDatetime, "
@@ -470,7 +472,7 @@ public class DatabaseManager {
 
 
     public static List<Map<String, Object>> listAllAccounts() {
-        String sql = "SELECT PlayerName, Balance, Change, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
+        String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
         List<Map<String, Object>> accounts = new ArrayList<>();
 
         try (Connection conn = getConnection();
@@ -501,7 +503,7 @@ public class DatabaseManager {
         String deleteTransactions = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
         String getAutopays = "SELECT AutopayID, AutopayDatetime, Source FROM Autopays";
         String deactivateAutopays = "UPDATE Autopays SET Active = 0 WHERE CreationDate <= ?";
-        String updateChangeToZero = "UPDATE PlayerAccounts SET Change = 0";
+        String updateChangeToZero = "UPDATE PlayerAccounts SET BalChange = 0";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmtGet = conn.prepareStatement(getBalances);
@@ -566,12 +568,12 @@ public class DatabaseManager {
     public static void setPlayerBalance(@NotNull String uuid, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-        String sql = "UPDATE PlayerAccounts SET Balance = ?, Change = ? WHERE UUID = ?;";
+        String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setDouble(1, balance);
-            pstmt.setDouble(1, change);
+            pstmt.setDouble(2, change);
             pstmt.setString(3, trimmedUuid);
             int rowsAffected = pstmt.executeUpdate();
 

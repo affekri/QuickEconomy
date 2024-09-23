@@ -156,65 +156,71 @@ public class DatabaseManager {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String currentTimeString = sdf.format(currentTime);
-        String sql = "DECLARE @TransactionDatetime varchar(23) = ?;"
-                + "DECLARE @TransactType varchar(16) = ?;"
-                + "DECLARE @Induce varchar(16) = ?;"
-                + "DECLARE @Source char(32) = ?;"
-                + "DECLARE @Destination char(32) = ?;"
-                + "DECLARE @Amount float = ?;"
-                + "DECLARE @TransactionMessage varchar(32) DEFAULT NULL = ?;"
-                + "DECLARE @NewSourceBalance float = (SELECT Balance - @Amount FROM PlayerAccounts WHERE UUID = @Source);"
-                + "DECLARE @NewDestinationBalance float = (SELECT Balance + @Amount FROM PlayerAccounts WHERE UUID = @Destination);"
-                + "BEGIN TRY"
-                + "    BEGIN TRANSACTION;"
-                + "    IF @Source IS NOT NULL AND @NewSourceBalance <= 0"
-                + "    BEGIN"
-                + "        THROW 50001, 'Insufficient funds in the source account', 1;"
-                + "    END"
-                + "    INSERT INTO Transactions (TransactionDatetime, TransactionType, Induce, Source, Destination, Amount, TransactionMessage, Passed)"
-                + "    VALUES (@TransactionDatetime, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage, 1);"
-                + "    IF @Source IS NOT NULL"
-                + "    BEGIN"
-                + "        UPDATE PlayerAccounts"
-                + "        SET Balance = @NewSourceBalance"
-                + "        WHERE UUID = @Source;"
-                + "    END"
-                + "    IF @Destination IS NOT NULL"
-                + "    BEGIN"
-                + "        UPDATE PlayerAccounts"
-                + "        SET Balance = @NewDestinationBalance"
-                + "        WHERE UUID = @Destination;"
-                + "    END"
-                + "    BEGIN "
-                + "        UPDATE Transactions"
-                + "        SET Passed = 1"
-                + "        WHERE TransactionID = LAST_INSERT_ID()"
-                + "    COMMIT;"
-                + "BEGIN CATCH"
-                + "    ROLLBACK;"
-                + "    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();"
-                + "    DECLARE @ErrorSeverity INT = ERROR_SEVERITY();"
-                + "    DECLARE @ErrorState INT = ERROR_STATE();"
-                + "    INSERT INTO Transactions (TransactionDatetime, TransactionType, Induce, Source, Destination, Amount, TransactionMessage, Passed, PassedReason)"
-                + "    VALUES (@TransactionDatetime, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage, 0, @ErrorMessage);"
-                + "    WHERE TransactionID = LAST_INSERT_ID()"
-                + "    RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);"
-                + "END CATCH;";
 
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, currentTimeString);
-            pstmt.setString(2, transactType);
-            pstmt.setString(3, induce);
-            pstmt.setString(4, trimmedSource);
-            pstmt.setString(5, trimmedDestination);
-            pstmt.setDouble(6, amount);
-            pstmt.setString(7, transactionMessage);
+        // SQL to handle the transaction
+        String sqlUpdateSource = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ?";
+        String sqlUpdateDestination = "UPDATE PlayerAccounts SET Balance = Balance + ? WHERE UUID = ?";
+        String sqlInsertTransaction = "INSERT INTO Transactions (TransactionDatetime, TransactionType, Induce, Source, Destination, NewSourceBalance, NewDestinationBalance, Amount, Passed, TransactionMessage)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-            pstmt.executeUpdate();
-            plugin.getLogger().info("Transaction of " + amount + " executed successfully");
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);  // Begin transaction
+
+            // Update source account balance if applicable
+            Double newSourceBalance = null;
+            if (trimmedSource != null) {
+                try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(
+                        "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
+                    pstmtUpdateSource.setString(1, trimmedSource);
+                    ResultSet rs = pstmtUpdateSource.executeQuery();
+                    if (rs.next()) {
+                        newSourceBalance = rs.getDouble(1) - amount;  // Calculate new source balance
+                    }
+                }
+
+                try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(sqlUpdateSource)) {
+                    pstmtUpdateSource.setDouble(1, amount);
+                    pstmtUpdateSource.setString(2, trimmedSource);
+                    pstmtUpdateSource.executeUpdate();
+                }
+            }
+
+            // Update destination account balance if applicable
+            Double newDestinationBalance = null;
+            if (trimmedDestination != null) {
+                try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(
+                        "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
+                    pstmtUpdateDestination.setString(1, trimmedDestination);
+                    ResultSet rs = pstmtUpdateDestination.executeQuery();
+                    if (rs.next()) {
+                        newDestinationBalance = rs.getDouble(1) + amount;  // Calculate new destination balance
+                    }
+                }
+
+                try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(sqlUpdateDestination)) {
+                    pstmtUpdateDestination.setDouble(1, amount);
+                    pstmtUpdateDestination.setString(2, trimmedDestination);
+                    pstmtUpdateDestination.executeUpdate();
+                }
+            }
+
+            // Insert into Transactions table
+            try (PreparedStatement pstmtInsertTransaction = conn.prepareStatement(sqlInsertTransaction)) {
+                pstmtInsertTransaction.setString(1, currentTime.toString());         // TransactionDatetime
+                pstmtInsertTransaction.setString(2, transactType);                   // TransactionType
+                pstmtInsertTransaction.setString(3, induce);                         // Induce
+                pstmtInsertTransaction.setString(4, trimmedSource);                  // Source
+                pstmtInsertTransaction.setString(5, trimmedDestination);             // Destination
+                pstmtInsertTransaction.setObject(6, newSourceBalance);               // NewSourceBalance (nullable)
+                pstmtInsertTransaction.setObject(7, newDestinationBalance);          // NewDestinationBalance (nullable)
+                pstmtInsertTransaction.setDouble(8, amount);                         // Amount
+                pstmtInsertTransaction.setInt(9, 1);                              // Passed (always 1 if successful)
+                pstmtInsertTransaction.setString(10, transactionMessage);            // TransactionMessage
+                pstmtInsertTransaction.executeUpdate();
+            }
+
+            // Commit the transaction
+            conn.commit();
         } catch (SQLException e) {
             plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
         }

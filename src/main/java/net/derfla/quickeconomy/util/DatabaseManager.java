@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -69,7 +70,7 @@ public class DatabaseManager {
             // Create PlayerAccounts table
             String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
                     + "  UUID char(32) NOT NULL,"
-                    + "  AccountDatetime DATETIME NOT NULL,"
+                    + "  AccountDatetime varchar(23) NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
                     + "  Balance float NOT NULL DEFAULT 0,"
                     + "  Change float NOT NULL DEFAULT 0"
@@ -79,7 +80,7 @@ public class DatabaseManager {
 
             String sqlTransactions = "CREATE TABLE IF NOT EXISTS Transactions ("
                     + "  TransactionID bigint NOT NULL AUTO_INCREMENT"
-                    + "  TransactionDatetime DATETIME NOT NULL,"
+                    + "  TransactionDatetime varchar(23) NOT NULL,"
                     + "  TransactionType varchar(16) NOT NULL,"
                     + "  Induce varchar(16) NOT NULL,"
                     + "  Source char(32),"
@@ -98,7 +99,7 @@ public class DatabaseManager {
 
             String sqlAutopays = "CREATE TABLE IF NOT EXISTS Autopays ("
                     + "  AutopayID bigint NOT NULL AUTO_INCREMENT,"
-                    + "  AutopayDatetime DATETIME NOT NULL"
+                    + "  AutopayDatetime varchar(23) NOT NULL"
                     + "  Active tinyint(1) NOT NULL DEFAULT 1,"
                     + "  AutopayName varchar(16),"
                     + "  Source char(32),"
@@ -121,6 +122,8 @@ public class DatabaseManager {
     public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String currentTimeString = sdf.format(currentTime);
 
         if (accountExists(trimmedUuid)) {
             plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
@@ -130,7 +133,7 @@ public class DatabaseManager {
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
-                insertPstmt.setTimestamp(2, currentTime);
+                insertPstmt.selString(2, currentTimeString);
                 insertPstmt.setString(3, playerName);
                 insertPstmt.setDouble(4, balance);
                 insertPstmt.setDouble(5, change);
@@ -153,7 +156,9 @@ public class DatabaseManager {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        String sql = "DECLARE @TransactionDatetime DATETIME = ?;"
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String currentTimeString = sdf.format(currentTime);
+        String sql = "DECLARE @TransactionDatetime varchar(23) = ?;"
                 + "DECLARE @TransactType varchar(16) = ?;"
                 + "DECLARE @Induce varchar(16) = ?;"
                 + "DECLARE @Source char(32) = ?;"
@@ -200,7 +205,7 @@ public class DatabaseManager {
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setTimestamp(1, currentTime);
+            pstmt.setString(1, currentTimeString);
             pstmt.setString(2, transactType);
             pstmt.setString(3, induce);
             pstmt.setString(4, trimmedSource);
@@ -256,7 +261,7 @@ public class DatabaseManager {
                     + "ORDER BY t.TransactionDatetime DESC;";
 
             statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
+            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
         }
@@ -343,6 +348,8 @@ public class DatabaseManager {
             return;
         }
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String currentTimeString = sdf.format(currentTime);
         String sql = "DECLARE @AutopayName varchar(16) = ?;"
                 + "DECLARE @UUID char(32) = ?;"
                 + "AutopayDatetime DATETIME = ?;"
@@ -370,7 +377,7 @@ public class DatabaseManager {
             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, autopayName);
             pstmt.setString(2, trimmedUuid);
-            pstmt.setTimestamp(3, currentTime);
+            pstmt.setString(3, currentTimeString);
             pstmt.setString(4, trimmedDestination);
             pstmt.setDouble(5, amount);
             pstmt.setInt(6, inverseFrequency);

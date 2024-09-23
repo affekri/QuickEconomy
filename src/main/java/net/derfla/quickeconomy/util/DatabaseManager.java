@@ -8,10 +8,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class DatabaseManager {
 
@@ -47,15 +44,17 @@ public class DatabaseManager {
             // Create PlayerAccounts table
             String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
                     + "  UUID char(32) NOT NULL,"
-                    + "  AccountCreationDate DATETIME NOT NULL,"
+                    + "  AccountDatetime DATETIME NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
                     + "  Balance float NOT NULL DEFAULT 0,"
+                    + "  Change float NOT NULL DEFAULT 0"
                     + "  PRIMARY KEY (UUID)"
                     + ");";
             statement.executeUpdate(sqlPlayerAccounts);
 
             String sqlTransactions = "CREATE TABLE IF NOT EXISTS Transactions ("
-                    + "  TransactionID DATETIME NOT NULL,"
+                    + "  TransactionID bigint NOT NULL AUTO_INCREMENT"
+                    + "  TransactionDatetime DATETIME NOT NULL,"
                     + "  TransactionType varchar(16) NOT NULL,"
                     + "  Induce varchar(16) NOT NULL,"
                     + "  Source char(32),"
@@ -73,9 +72,9 @@ public class DatabaseManager {
             statement.executeUpdate(sqlTransactions);
 
             String sqlAutopays = "CREATE TABLE IF NOT EXISTS Autopays ("
-                    + "  AutopayID int NOT NULL AUTO_INCREMENT,"
+                    + "  AutopayID bigint NOT NULL AUTO_INCREMENT,"
+                    + "  AutopayDatetime DATETIME NOT NULL"
                     + "  Active tinyint(1) NOT NULL DEFAULT 1,"
-                    + "  CreationDate DATETIME NOT NULL,"
                     + "  AutopayName varchar(16),"
                     + "  Source char(32),"
                     + "  Destination char(32),"
@@ -94,18 +93,19 @@ public class DatabaseManager {
         }
     }
 
-    public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance) {
+    public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
 
         if (accountExists(trimmedUuid)) {
             plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
         } else {
-            String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountCreationDate, PlayerName, Balance) "
-                    + "VALUES (?, current_timestamp(), ?, ?)";
+            String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, Change) "
+                    + "VALUES (?, NOW(), ?, ?, ?)";
             try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
                 insertPstmt.setString(2, playerName);
                 insertPstmt.setDouble(3, balance);
+                insertPstmt.setDouble(4, change);
                 int rowsInserted = insertPstmt.executeUpdate();
 
                 if (rowsInserted > 0) {
@@ -119,87 +119,11 @@ public class DatabaseManager {
         createTransactionsView(trimmedUuid);
     }
 
-
-    private static void createTransactionsView(@NotNull String uuid) {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String viewName = "vw_Transactions_" + trimmedUuid;
-        String databaseName = plugin.getConfig().getString("database.database");
-        String checksql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
-
-        try (PreparedStatement preparedStatement = connection.prepareStatement(checksql)) {
-            // Set the parameters for view name and database name
-            preparedStatement.setString(1, viewName);
-            preparedStatement.setString(2, databaseName);
-
-            // Execute the query and get the result
-            try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                if (resultSet.next()) {
-                    // Return true if the view exists (COUNT > 0)
-                    if (resultSet.getInt(1) > 0) {
-                        return;
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
-        }
-
-        try (Statement statement = connection.createStatement()) {
-            String sql = "CREATE VIEW " + viewName + " AS "
-                    + "SELECT "
-                    + "    CAST(t.TransactionID AS DATETIME) AS TransactionDateTime, "
-                    + "    CASE "
-                    + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
-                    + "        ELSE t.Amount"
-                    + "    END AS Amount,"
-                    + "    pa.PlayerName, "
-                    + "    CASE "
-                    + "        WHEN t.Passed = 1 THEN 'Passed' "
-                    + "        WHEN t.Passed = 0 THEN 'Failed' "
-                    + "        ELSE 'Unknown' "
-                    + "    END AS Passed, "
-                    + "    CASE WHEN t.Passed != 1 THEN t.PassedReason ELSE NULL END AS PassedReason, "
-                    + "    CASE "
-                    + "        WHEN t.Source != '" + trimmedUuid + "' THEN "
-                    + "            CASE "
-                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                WHEN t.Induce = 'command' THEN COALESCE(NULLIF(t.TransactionMessage, ''), '-') "
-                    + "                ELSE '-' "
-                    + "            END "
-                    + "        ELSE "
-                    + "            CASE "
-                    + "                WHEN t.TransactionType = 'insert' THEN 'Bank deposit' "
-                    + "                WHEN t.TransactionType = 'withdraw' THEN 'Bank withdrawal' "
-                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                WHEN t.TransactionType = 'p2p' THEN CASE "
-                    + "                    WHEN t.Induce REGEXP '^[0-9]+$' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                    WHEN t.Induce = 'command' THEN 'Command' "
-                    + "                    WHEN t.Induce = 'purchase' THEN 'Purchase' "
-                    + "                    ELSE 'Unknown' "
-                    + "                END "
-                    + "                WHEN t.TransactionType = 'system' THEN CASE "
-                    + "                    WHEN t.Induce = 'admin_command' THEN 'Admin command' "
-                    + "                    ELSE 'Unknown' "
-                    + "                END "
-                    + "                ELSE 'Unknown' "
-                    + "            END "
-                    + "    END AS Reason "
-                    + "FROM Transactions t "
-                    + "LEFT JOIN PlayerAccounts pa ON t.Destination = pa.UUID "
-                    + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "';";
-            
-            statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
-        }
-    }
-
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
-                                          String destination, @NotNull double amount, String transactionMessage) {
+                                          String destination, double amount, String transactionMessage) {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
-        String sql = "DECLARE @TransactionID DATETIME = GETDATE();"
+        String sql = "DECLARE @TransactionDatetime DATETIME = NOW();"
                 + "DECLARE @TransactType varchar(16) = ?;"
                 + "DECLARE @Induce varchar(16) = ?;"
                 + "DECLARE @Source char(32) = ?;"
@@ -210,12 +134,12 @@ public class DatabaseManager {
                 + "DECLARE @NewDestinationBalance float = (SELECT Balance + @Amount FROM PlayerAccounts WHERE UUID = @Destination);"
                 + "BEGIN TRY"
                 + "    BEGIN TRANSACTION;"
-                + "    IF @Source IS NOT NULL AND @NewSourceBalance < 0"
+                + "    IF @Source IS NOT NULL AND @NewSourceBalance <= 0"
                 + "    BEGIN"
                 + "        THROW 50001, 'Insufficient funds in the source account', 1;"
                 + "    END"
-                + "    INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage)"
-                + "    VALUES (@TransactionID, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage);"
+                + "    INSERT INTO Transactions (TransactionDatetime, TransactionType, Induce, Source, Destination, Amount, TransactionMessage, Passed)"
+                + "    VALUES (@TransactionDatetime, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage, 1);"
                 + "    IF @Source IS NOT NULL"
                 + "    BEGIN"
                 + "        UPDATE PlayerAccounts"
@@ -231,18 +155,17 @@ public class DatabaseManager {
                 + "    BEGIN "
                 + "        UPDATE Transactions"
                 + "        SET Passed = 1"
-                + "        WHERE TransactionID = @TransactionID"
+                + "        WHERE TransactionID = LAST_INSERT_ID()"
                 + "    COMMIT;"
-                + "END TRY"
                 + "BEGIN CATCH"
                 + "    ROLLBACK;"
-                + "    DECLARE @Reason varchar(32)"
-                + "    SET @Reason = CASE"
-                + "       WHEN ERROR_NUMBER() = 50001 THEN 'low_source_balance' ELSE 'unexpected_error' END);"
-                + "       END"
-                + "    INSERT INTO Transactions (TransactionID, TransactionType, Induce, Source, Destination, Amount, TransactionMessage)"
-                + "    VALUES (@TransactionID, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage);"
-                + "    THROW;"
+                + "    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();"
+                + "    DECLARE @ErrorSeverity INT = ERROR_SEVERITY();"
+                + "    DECLARE @ErrorState INT = ERROR_STATE();"
+                + "    INSERT INTO Transactions (TransactionDatetime, TransactionType, Induce, Source, Destination, Amount, TransactionMessage, Passed, PassedReason)"
+                + "    VALUES (@TransactionDatetime, @TransactType, @Induce, @Source, @Destination, @Amount, @TransactionMessage, 0, @ErrorMessage);"
+                + "    WHERE TransactionID = LAST_INSERT_ID()"
+                + "    RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);"
                 + "END CATCH;";
 
         try (Connection conn = getConnection();
@@ -255,14 +178,62 @@ public class DatabaseManager {
             pstmt.setString(6, transactionMessage);
 
             pstmt.executeUpdate();
-            plugin.getLogger().info("Transaction executed successfully");
+            plugin.getLogger().info("Transaction of " + amount + " executed successfully");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
         }
     }
 
+    private static void createTransactionsView(@NotNull String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+        String viewName = "vw_Transactions_" + trimmedUuid;
+        String databaseName = plugin.getConfig().getString("database.database");
+        String checkSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+
+        try (PreparedStatement preparedStatement = connection.prepareStatement(checkSQL)) {
+            preparedStatement.setString(1, viewName);
+            preparedStatement.setString(2, databaseName);
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next() && resultSet.getInt(1) > 0) {
+                    return;
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking for existing transaction view: " + e.getMessage());
+            return;
+        }
+
+        try (Statement statement = connection.createStatement()) {
+            String sql = "CREATE VIEW " + viewName + " AS "
+                    + "SELECT "
+                    + "    t.TransactionDatetime, "
+                    + "    t.Amount, "
+                    + "    sourcePlayer.PlayerName AS SourcePlayerName, "
+                    + "    destinationPlayer.PlayerName AS DestinationPlayerName, "
+                    + "    t.TransactionMessage AS Message, "
+                    + "    CASE "
+                    + "        WHEN t.Passed = 1 THEN 'Passed' "
+                    + "        ELSE 'Failed' "
+                    + "    END AS Passed, "
+                    + "    t.PassedReason "
+                    + "FROM Transactions t "
+                    + "LEFT JOIN PlayerAccounts sourcePlayer ON t.Source = sourcePlayer.UUID "
+                    + "LEFT JOIN PlayerAccounts destinationPlayer ON t.Destination = destinationPlayer.UUID "
+                    + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "' "
+                    + "ORDER BY t.TransactionDatetime DESC;";
+
+            statement.executeUpdate(sql);
+            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
+    }
+
     public static double displayBalance(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
         double balance = 0.0;
     
@@ -276,16 +247,27 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error viewing balance: " + e.getMessage());
+            plugin.getLogger().severe("Error viewing balance for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
-    
         return balance;
     }
 
-    public static List<Map<String, Object>> displayTransactionsView(@NotNull String uuid) {
+    public static List<Map<String, Object>> displayTransactionsView(@NotNull String uuid, Boolean displayPassed) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
-        String sql = "SELECT * FROM " + viewName + " ORDER BY TransactionDateTime DESC";
+
+        String sql;
+        if (displayPassed == null) {
+            // Display all transactions
+            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " ORDER BY TransactionDateTime DESC";
+        } else if (displayPassed) {
+            // Display only passed transactions
+            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " WHERE Passed = 1 ORDER BY TransactionDateTime DESC";
+        } else {
+            // Display only failed transactions
+            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC";
+        }
+
         List<Map<String, Object>> transactions = new ArrayList<>();
 
         try (Connection conn = getConnection();
@@ -295,6 +277,7 @@ public class DatabaseManager {
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
 
+            // Iterate over the result set
             while (rs.next()) {
                 Map<String, Object> transaction = new HashMap<>();
                 for (int i = 1; i <= columnCount; i++) {
@@ -312,7 +295,7 @@ public class DatabaseManager {
     }
 
     public static void addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
-                                  @NotNull double amount, @NotNull int inverseFrequency, @NotNull int endsAfter) {
+                                  double amount, int inverseFrequency, int endsAfter) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String trimmedDestination = TypeChecker.trimUUID(destination);
 
@@ -331,13 +314,14 @@ public class DatabaseManager {
 
         String sql = "DECLARE @AutopayName varchar(16) = ?;"
                 + "DECLARE @UUID char(32) = ?;"
+                + "AutopayDatetime DATETIME = NOW()"
                 + "DECLARE @Destination char(32) = ?;"
                 + "DECLARE @Amount float = ?;"
                 + "DECLARE @InverseFrequency int NOT NULL = ?;"
                 + "DECLARE @EndsAfter int NOT NULL = ?;"
                 + "BEGIN TRY"
                 + "    INSERT INTO Autopays ("
-                + "        Active, CreationDate, AutopayName, Source, Destination,"
+                + "        Active, AutopayDatetime, AutopayName, Source, Destination,"
                 + "        Amount, InverseFrequency, EndsAfter"
                 + "    )"
                 + "    VALUES ("
@@ -367,7 +351,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void stateChangeAutopay(@NotNull boolean activeState, @NotNull int autopayID, @NotNull String uuid) {
+    public static void stateChangeAutopay(boolean activeState, int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
 
@@ -389,7 +373,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void deleteAutopay(@NotNull int autopayID, @NotNull String uuid) {
+    public static void deleteAutopay(int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "DELETE FROM Autopays WHERE AutopayID = ? AND Source = ?;";
 
@@ -411,6 +395,7 @@ public class DatabaseManager {
 
     public static List<Map<String, Object>> viewAutopays(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String sql = "SELECT * FROM Autopays WHERE Source = ? ORDER BY AutopayID";
         List<Map<String, Object>> autopays = new ArrayList<>();
     
@@ -433,14 +418,13 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error viewing autopays for UUID " + uuid + ": " + e.getMessage());
+            plugin.getLogger().severe("Error viewing autopays for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
-    
         return autopays;
     }
 
     public static List<Map<String, Object>> listAllAccounts() {
-        String sql = "SELECT PlayerName, Balance, AccountCreationDate FROM PlayerAccounts ORDER BY AccountCreationDate";
+        String sql = "SELECT PlayerName, Balance, Change, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
         List<Map<String, Object>> accounts = new ArrayList<>();
 
         try (Connection conn = getConnection();
@@ -466,49 +450,63 @@ public class DatabaseManager {
         return accounts;
     }
 
-    public static void rollback(@NotNull Timestamp rollbackTime, @NotNull boolean keepTransactions) {
+    public static void rollback(@NotNull Timestamp rollbackTime, boolean keepTransactions) {
         String getBalances = "SELECT pa.UUID, pa.Balance, COALESCE(t.NewSourceBalance, t.NewDestinationBalance) AS RollbackBalance FROM PlayerAccounts pa LEFT JOIN (SELECT DISTINCT ON (Source) Source, NewSourceBalance FROM Transactions WHERE TransactionID <= ? ORDER BY Source, TransactionID DESC) t ON pa.UUID = t.Source";
-        String deleteTransactions = "DELETE FROM Transactions WHERE TransactionID > ?";
-        String getAutopays = "SELECT AutopayID, CreationDate, Source FROM Autopays";
+        String deleteTransactions = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
+        String getAutopays = "SELECT AutopayID, AutopayDatetime, Source FROM Autopays";
         String deactivateAutopays = "UPDATE Autopays SET Active = 0 WHERE CreationDate <= ?";
-        
+        String updateChangeToZero = "UPDATE PlayerAccounts SET Change = 0";
+
         try (Connection conn = getConnection();
              PreparedStatement pstmtGet = conn.prepareStatement(getBalances);
              PreparedStatement pstmtDelete = conn.prepareStatement(deleteTransactions);
              PreparedStatement pstmtGetAutopays = conn.prepareStatement(getAutopays);
-             PreparedStatement pstmtDeactivateAutopays = conn.prepareStatement(deactivateAutopays)) {
-            
+             PreparedStatement pstmtDeactivateAutopays = conn.prepareStatement(deactivateAutopays);
+             PreparedStatement pstmtUpdateChange = conn.prepareStatement(updateChangeToZero)) {
+
             conn.setAutoCommit(false);
-            
+
+            // Update Change to 0 for all player accounts
+            pstmtUpdateChange.executeUpdate();
+
+            // Get balances up to rollbackTime
             pstmtGet.setTimestamp(1, rollbackTime);
             ResultSet rs = pstmtGet.executeQuery();
+
             while (rs.next()) {
                 String uuid = rs.getString("UUID");
+                String trimmedUuid = TypeChecker.trimUUID(uuid);
                 double currentBalance = rs.getDouble("Balance");
                 double rollbackBalance = rs.getDouble("RollbackBalance");
                 double difference = rollbackBalance - currentBalance;
-                if (difference != 0) {
-                    executeTransaction("system", "command", null, uuid, difference, "Rollback adjustment");
+
+                if (!keepTransactions) {
+                    pstmtDelete.setTimestamp(1, rollbackTime);
+                    pstmtDelete.executeUpdate();
+
+                    // Set the player's balance to the rollback balance
+                    setPlayerBalance(trimmedUuid, rollbackBalance, 0);
+                } else {
+                    // Execute rollback adjustment
+                    if (difference != 0) {
+                        executeTransaction("system", "admin_command", null, trimmedUuid, difference, "Rollback adjustment");
+                    }
                 }
             }
-            
-            if (!keepTransactions) {
-                pstmtDelete.setTimestamp(1, rollbackTime);
-                pstmtDelete.executeUpdate();
-            }
-            
+
             ResultSet rsAutopays = pstmtGetAutopays.executeQuery();
             while (rsAutopays.next()) {
                 int autopayID = rsAutopays.getInt("AutopayID");
-                Timestamp creationDate = rsAutopays.getTimestamp("CreationDate");
+                Timestamp creationDate = rsAutopays.getTimestamp("AutopayDatetime");
                 String source = rsAutopays.getString("Source");
                 if (creationDate.after(rollbackTime)) {
                     deleteAutopay(autopayID, source);
                 }
             }
+
             pstmtDeactivateAutopays.setTimestamp(1, rollbackTime);
             pstmtDeactivateAutopays.executeUpdate();
-            
+
             conn.commit();
             plugin.getLogger().info("Rollback to " + rollbackTime + " completed successfully.");
         } catch (SQLException e) {
@@ -521,23 +519,27 @@ public class DatabaseManager {
         }
     }
 
-    public static void setPlayerBalance(@NotNull String uuid, @NotNull double balance) {
+
+
+    public static void setPlayerBalance(@NotNull String uuid, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "UPDATE PlayerAccounts SET Balance = ? WHERE UUID = ?;";
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET Balance = ?, Change = ? WHERE UUID = ?;";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setDouble(1, balance);
-            pstmt.setString(2, trimmedUuid);
+            pstmt.setDouble(1, change);
+            pstmt.setString(3, trimmedUuid);
             int rowsAffected = pstmt.executeUpdate();
 
             if (rowsAffected > 0) {
-                plugin.getLogger().info("Balance updated successfully for UUID: " + uuid);
+                plugin.getLogger().info("Balance updated successfully for UUID: " + untrimmedUuid);
             } else {
-                plugin.getLogger().info("No account found for UUID: " + uuid);
+                plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error updating balance for UUID " + uuid + ": " + e.getMessage());
+            plugin.getLogger().severe("Error updating balance for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
     }
 
@@ -546,12 +548,13 @@ public class DatabaseManager {
             FileConfiguration balanceConfig = BalanceFile.get();
             for (String key : balanceConfig.getKeys(false)) {
                 double balance = balanceConfig.getDouble(key + ".balance");
+                double change = balanceConfig.getDouble(key + ".change");
                 String trimmedUuid = TypeChecker.trimUUID(key);
 
                 if (!accountExists(trimmedUuid)) {
-                    addAccount(trimmedUuid, balanceConfig.getString(key + ".playerName"), balance);
+                    addAccount(trimmedUuid, balanceConfig.getString(key + ".playerName"), balance, change);
                 } else {
-                    setPlayerBalance(trimmedUuid, balance);
+                    setPlayerBalance(trimmedUuid, balance, change);
                 }
             }
             plugin.getLogger().info("Migration to database completed successfully.");

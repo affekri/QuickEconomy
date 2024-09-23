@@ -41,7 +41,7 @@ public class Balances {
     public static void setPlayerBalance(String uuid, float money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if (SQLMode) {
-            DatabaseManager.setPlayerBalance(uuid, money);
+            DatabaseManager.setPlayerBalance(uuid, money, 0);
             return;
         }
 

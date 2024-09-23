@@ -261,7 +261,7 @@ public class DatabaseManager {
                     + "ORDER BY t.TransactionDatetime DESC;";
 
             statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
+            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
         }
@@ -350,6 +350,7 @@ public class DatabaseManager {
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         String currentTimeString = sdf.format(currentTime);
+
         String sql = "DECLARE @AutopayName varchar(16) = ?;"
                 + "DECLARE @UUID char(32) = ?;"
                 + "AutopayDatetime DATETIME = ?;"

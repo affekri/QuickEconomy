@@ -21,8 +21,7 @@ public class PlayerJoinListener implements Listener {
         Translation.init(player);
         String uuid = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
         if (Main.SQLMode) {
-            DatabaseManager.addAccount(String.valueOf(player.getUniqueId()), player.getName(), 0);
-            // TODO Add balance change
+            DatabaseManager.addAccount(String.valueOf(player.getUniqueId()), player.getName(), 0, 0);
         } else {
             FileConfiguration file = BalanceFile.get();
             if (file == null) {

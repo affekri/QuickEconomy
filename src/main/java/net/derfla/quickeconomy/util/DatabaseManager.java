@@ -1,5 +1,7 @@
 package net.derfla.quickeconomy.util;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
@@ -15,13 +17,16 @@ import java.io.IOException;
 public class DatabaseManager {
 
     static Plugin plugin = Main.getInstance();
-    public static Connection connection;
+    private static HikariDataSource dataSource;
 
-    public static Connection getConnection() {
-        return connection;
+    public static Connection getConnection() throws SQLException {
+        return dataSource.getConnection(); // Get a connection from the pool
     }
 
-    public static void connectToDatabase() throws SQLException {
+
+    public static void connectToDatabase() {
+        HikariConfig config = new HikariConfig();
+
         String type = plugin.getConfig().getString("database.type");
         if ("mysql".equalsIgnoreCase(type)) {
             String host = plugin.getConfig().getString("database.host");
@@ -31,18 +36,36 @@ public class DatabaseManager {
             String password = plugin.getConfig().getString("database.password");
 
             String url = "jdbc:mysql://" + host + ":" + port + "/" + database;
-            connection = DriverManager.getConnection(url, user, password);
+
+            config.setJdbcUrl(url);
+            config.setUsername(user);
+            config.setPassword(password);
+
+            // Optional HikariCP settings
+            config.setMaximumPoolSize(10); // Max number of connections in the pool
+            config.setConnectionTimeout(30000); // 30 seconds timeout for getting a connection
+            config.setIdleTimeout(600000); // 10 minutes before an idle connection is closed
+            config.setMaxLifetime(1800000); // 30 minutes max lifetime for a connection
         } else if ("sqlite".equalsIgnoreCase(type)) {
             String filePath = plugin.getConfig().getString("database.file");
             String url = "jdbc:sqlite:" + filePath;
-            connection = DriverManager.getConnection(url);
+            config.setJdbcUrl(url);
         }
 
-        plugin.getLogger().info("Database connection established.");
+        dataSource = new HikariDataSource(config);
+        plugin.getLogger().info("Database connection pool established.");
+    }
+
+    public static void closePool() {
+        if (dataSource != null) {
+            dataSource.close(); // Close the pool when shutting down the plugin
+            plugin.getLogger().info("Database connection pool closed.");
+        }
     }
 
     public static void createTables() {
-        try (Statement statement = connection.createStatement()) {
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
             // Create PlayerAccounts table
             String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
                     + "  UUID char(32) NOT NULL,"
@@ -104,7 +127,8 @@ public class DatabaseManager {
         } else {
             String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, Change) "
                     + "VALUES (?, ?, ?, ?, ?)";
-            try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
                 insertPstmt.setTimestamp(2, currentTime);
                 insertPstmt.setString(3, playerName);
@@ -122,6 +146,7 @@ public class DatabaseManager {
 
         createTransactionsView(trimmedUuid);
     }
+
 
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                           String destination, double amount, String transactionMessage) {
@@ -231,7 +256,7 @@ public class DatabaseManager {
                     + "ORDER BY t.TransactionDatetime DESC;";
 
             statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
+            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
         }
@@ -526,11 +551,6 @@ public class DatabaseManager {
             plugin.getLogger().info("Rollback to " + rollbackTime + " completed successfully.");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error during rollback: " + e.getMessage());
-            try {
-                if (connection != null) connection.rollback();
-            } catch (SQLException ex) {
-                plugin.getLogger().severe("Error rolling back transaction: " + ex.getMessage());
-            }
         }
     }
 
@@ -606,15 +626,18 @@ public class DatabaseManager {
 
             while (rs.next()) {
                 String uuid = rs.getString("UUID");
+                String untrimmedUuid = TypeChecker.untrimUUID(uuid);
                 String playerName = rs.getString("PlayerName");
                 double balance = rs.getDouble("Balance");
+                double change = rs.getDouble("Change");
 
                 // Validate data before writing
                 if (uuid != null && playerName != null && balance >= 0) {
                     balanceConfig.set(uuid + ".playerName", playerName);
                     balanceConfig.set(uuid + ".balance", balance);
+                    balanceConfig.set(uuid + ".change", change);
                 } else {
-                    plugin.getLogger().warning("Invalid data for UUID: " + uuid);
+                    plugin.getLogger().warning("Invalid data for UUID: " + untrimmedUuid);
                 }
             }
 
@@ -647,7 +670,8 @@ public class DatabaseManager {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
     
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, playerName);
             pstmt.setString(2, trimmedUuid);
             int rowsUpdated = pstmt.executeUpdate();
@@ -668,10 +692,11 @@ public class DatabaseManager {
         String sqlAutopays = "SELECT * FROM Autopays";
         String csvFilePath = "QuickEconomyExport.csv"; // Path to save the CSV file
 
-        try (FileWriter csvWriter = new FileWriter(csvFilePath)) {
+        try (Connection conn = getConnection();
+             FileWriter csvWriter = new FileWriter(csvFilePath)) {
 
             // Export PlayerAccounts table
-            try (PreparedStatement pstmt = connection.prepareStatement(sqlAccounts);
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAccounts);
                  ResultSet rs = pstmt.executeQuery()) {
 
                 csvWriter.append("PlayerAccounts Table\n");
@@ -680,7 +705,7 @@ public class DatabaseManager {
             }
 
             // Export Transactions table
-            try (PreparedStatement pstmt = connection.prepareStatement(sqlTransactions);
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlTransactions);
                  ResultSet rs = pstmt.executeQuery()) {
 
                 csvWriter.append("Transactions Table\n");
@@ -689,7 +714,7 @@ public class DatabaseManager {
             }
 
             // Export Autopays table
-            try (PreparedStatement pstmt = connection.prepareStatement(sqlAutopays);
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAutopays);
                  ResultSet rs = pstmt.executeQuery()) {
 
                 csvWriter.append("Autopays Table\n");

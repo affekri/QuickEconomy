@@ -12,6 +12,9 @@ import org.jetbrains.annotations.NotNull;
 import java.sql.*;
 import java.util.*;
 
+import java.io.FileWriter;
+import java.io.IOException;
+
 public class DatabaseManager {
 
     static Plugin plugin = Main.getInstance();
@@ -103,7 +106,7 @@ public class DatabaseManager {
                     + "  Destination char(32),"
                     + "  Amount float NOT NULL,"
                     + "  InverseFrequency int NOT NULL,"
-                    + "  EndsAfter int NOT NULL,"
+                    + "  TimesLeft int,"
                     + "  PRIMARY KEY (AutopayID),"
                     + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
                     + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
@@ -118,18 +121,20 @@ public class DatabaseManager {
 
     public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
+        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
 
         if (accountExists(trimmedUuid)) {
             plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
         } else {
             String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, Change) "
-                    + "VALUES (?, NOW(), ?, ?, ?)";
+                    + "VALUES (?, ?, ?, ?, ?)";
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
-                insertPstmt.setString(2, playerName);
-                insertPstmt.setDouble(3, balance);
-                insertPstmt.setDouble(4, change);
+                insertPstmt.setTimestamp(2, currentTime);
+                insertPstmt.setString(3, playerName);
+                insertPstmt.setDouble(4, balance);
+                insertPstmt.setDouble(5, change);
                 int rowsInserted = insertPstmt.executeUpdate();
               
                 if (rowsInserted > 0) {
@@ -143,91 +148,12 @@ public class DatabaseManager {
         createTransactionsView(trimmedUuid);
     }
 
-
-
-
-    private static void createTransactionsView(@NotNull String uuid) {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String viewName = "vw_Transactions_" + trimmedUuid;
-        String databaseName = plugin.getConfig().getString("database.database");
-        String checksql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
-
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(checksql)) {
-            // Set the parameters for view name and database name
-            pstmt.setString(1, viewName);
-            pstmt.setString(2, databaseName);
-
-            // Execute the query and get the result
-            try (ResultSet resultSet = pstmt.executeQuery()) {
-                if (resultSet.next()) {
-                    // Return true if the view exists (COUNT > 0)
-                    if (resultSet.getInt(1) > 0) {
-                        return;
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
-        }
-
-        try (Connection conn = getConnection();
-             Statement statement = conn.createStatement()) {
-            String sql = "CREATE VIEW " + viewName + " AS "
-                    + "SELECT "
-                    + "    CAST(t.TransactionID AS DATETIME) AS TransactionDateTime, "
-                    + "    CASE "
-                    + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
-                    + "        ELSE t.Amount"
-                    + "    END AS Amount,"
-                    + "    pa.PlayerName, "
-                    + "    CASE "
-                    + "        WHEN t.Passed = 1 THEN 'Passed' "
-                    + "        WHEN t.Passed = 0 THEN 'Failed' "
-                    + "        ELSE 'Unknown' "
-                    + "    END AS Passed, "
-                    + "    CASE WHEN t.Passed != 1 THEN t.PassedReason ELSE NULL END AS PassedReason, "
-                    + "    CASE "
-                    + "        WHEN t.Source != '" + trimmedUuid + "' THEN "
-                    + "            CASE "
-                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                WHEN t.Induce = 'command' THEN COALESCE(NULLIF(t.TransactionMessage, ''), '-') "
-                    + "                ELSE '-' "
-                    + "            END "
-                    + "        ELSE "
-                    + "            CASE "
-                    + "                WHEN t.TransactionType = 'insert' THEN 'Bank deposit' "
-                    + "                WHEN t.TransactionType = 'withdraw' THEN 'Bank withdrawal' "
-                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                WHEN t.TransactionType = 'p2p' THEN CASE "
-                    + "                    WHEN t.Induce REGEXP '^[0-9]+$' THEN CONCAT('Autopay #', t.Induce) "
-                    + "                    WHEN t.Induce = 'command' THEN 'Command' "
-                    + "                    WHEN t.Induce = 'purchase' THEN 'Purchase' "
-                    + "                    ELSE 'Unknown' "
-                    + "                END "
-                    + "                WHEN t.TransactionType = 'system' THEN CASE "
-                    + "                    WHEN t.Induce = 'admin_command' THEN 'Admin command' "
-                    + "                    ELSE 'Unknown' "
-                    + "                END "
-                    + "                ELSE 'Unknown' "
-                    + "            END "
-                    + "    END AS Reason "
-                    + "FROM Transactions t "
-                    + "LEFT JOIN PlayerAccounts pa ON t.Destination = pa.UUID "
-                    + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "';";
-            
-            statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
-        }
-    }
-
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                           String destination, double amount, String transactionMessage) {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
-        String sql = "DECLARE @TransactionDatetime DATETIME = NOW();"
+        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+        String sql = "DECLARE @TransactionDatetime DATETIME = ?;"
                 + "DECLARE @TransactType varchar(16) = ?;"
                 + "DECLARE @Induce varchar(16) = ?;"
                 + "DECLARE @Source char(32) = ?;"
@@ -274,12 +200,13 @@ public class DatabaseManager {
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, transactType);
-            pstmt.setString(2, induce);
-            pstmt.setString(3, trimmedSource);
-            pstmt.setString(4, trimmedDestination);
-            pstmt.setDouble(5, amount);
-            pstmt.setString(6, transactionMessage);
+            pstmt.setTimestamp(1, currentTime);
+            pstmt.setString(2, transactType);
+            pstmt.setString(3, induce);
+            pstmt.setString(4, trimmedSource);
+            pstmt.setString(5, trimmedDestination);
+            pstmt.setDouble(6, amount);
+            pstmt.setString(7, transactionMessage);
 
             pstmt.executeUpdate();
             plugin.getLogger().info("Transaction of " + amount + " executed successfully");
@@ -329,7 +256,7 @@ public class DatabaseManager {
                     + "ORDER BY t.TransactionDatetime DESC;";
 
             statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
+            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
         }
@@ -415,10 +342,10 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error: EndsAfter must be 0 (for continuous) or greater.");
             return;
         }
-
+        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String sql = "DECLARE @AutopayName varchar(16) = ?;"
                 + "DECLARE @UUID char(32) = ?;"
-                + "AutopayDatetime DATETIME = NOW()"
+                + "AutopayDatetime DATETIME = ?;"
                 + "DECLARE @Destination char(32) = ?;"
                 + "DECLARE @Amount float = ?;"
                 + "DECLARE @InverseFrequency int NOT NULL = ?;"
@@ -443,10 +370,11 @@ public class DatabaseManager {
             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, autopayName);
             pstmt.setString(2, trimmedUuid);
-            pstmt.setString(3, trimmedDestination);
-            pstmt.setDouble(4, amount);
-            pstmt.setInt(5, inverseFrequency);
-            pstmt.setInt(6, endsAfter);
+            pstmt.setTimestamp(3, currentTime);
+            pstmt.setString(4, trimmedDestination);
+            pstmt.setDouble(5, amount);
+            pstmt.setInt(6, inverseFrequency);
+            pstmt.setInt(7, endsAfter);
 
             pstmt.executeUpdate();
             plugin.getLogger().info("Autopay added successfully");
@@ -500,17 +428,22 @@ public class DatabaseManager {
     public static List<Map<String, Object>> viewAutopays(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-        String sql = "SELECT * FROM Autopays WHERE Source = ? ORDER BY AutopayID";
+        String sql = "SELECT a.AutopayID, a.AutopayName, a.Amount, pa.PlayerName AS DestinationName, a.InverseFrequency, a.TimesLeft " +
+                "FROM Autopays a " +
+                "JOIN PlayerAccounts pa ON a.Destination = pa.UUID " +
+                "WHERE a.Source = ? " +
+                "ORDER BY a.AutopayDatetime DESC";
+
         List<Map<String, Object>> autopays = new ArrayList<>();
-    
+
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, trimmedUuid);
-    
+
             try (ResultSet rs = pstmt.executeQuery()) {
                 ResultSetMetaData metaData = rs.getMetaData();
                 int columnCount = metaData.getColumnCount();
-    
+
                 while (rs.next()) {
                     Map<String, Object> autopay = new HashMap<>();
                     for (int i = 1; i <= columnCount; i++) {
@@ -526,6 +459,7 @@ public class DatabaseManager {
         }
         return autopays;
     }
+
 
     public static List<Map<String, Object>> listAllAccounts() {
         String sql = "SELECT PlayerName, Balance, Change, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
@@ -588,12 +522,15 @@ public class DatabaseManager {
                     pstmtDelete.setTimestamp(1, rollbackTime);
                     pstmtDelete.executeUpdate();
 
-                    // Set the player's balance to the rollback balance
+                    // Set the player's balance to the rollback balance (without a transaction)
                     setPlayerBalance(trimmedUuid, rollbackBalance, 0);
                 } else {
-                    // Execute rollback adjustment
-                    if (difference != 0) {
+                    // Execute rollback adjustment (with transaction)
+                    if (difference > 0) {
                         executeTransaction("system", "admin_command", null, trimmedUuid, difference, "Rollback adjustment");
+                    } else if (difference < 0) {
+                        double negativeDifference = 0 - difference;
+                        executeTransaction("system", "admin_command", trimmedUuid, null, negativeDifference, "Rollback adjustment");
                     }
                 }
             }
@@ -601,9 +538,9 @@ public class DatabaseManager {
             ResultSet rsAutopays = pstmtGetAutopays.executeQuery();
             while (rsAutopays.next()) {
                 int autopayID = rsAutopays.getInt("AutopayID");
-                Timestamp creationDate = rsAutopays.getTimestamp("AutopayDatetime");
+                Timestamp creationDatetime = rsAutopays.getTimestamp("AutopayDatetime");
                 String source = rsAutopays.getString("Source");
-                if (creationDate.after(rollbackTime)) {
+                if (creationDatetime.after(rollbackTime)) {
                     deleteAutopay(autopayID, source);
                 }
             }
@@ -615,15 +552,8 @@ public class DatabaseManager {
             plugin.getLogger().info("Rollback to " + rollbackTime + " completed successfully.");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error during rollback: " + e.getMessage());
-            try {
-                // if (dataSource != null) dataSource.rollback();
-            } catch (Exception ex) {
-                plugin.getLogger().severe("Error rolling back transaction: " + ex.getMessage());
-            }
         }
     }
-
-
 
     public static void setPlayerBalance(@NotNull String uuid, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
@@ -697,15 +627,18 @@ public class DatabaseManager {
 
             while (rs.next()) {
                 String uuid = rs.getString("UUID");
+                String untrimmedUuid = TypeChecker.untrimUUID(uuid);
                 String playerName = rs.getString("PlayerName");
                 double balance = rs.getDouble("Balance");
+                double change = rs.getDouble("Change");
 
                 // Validate data before writing
                 if (uuid != null && playerName != null && balance >= 0) {
                     balanceConfig.set(uuid + ".playerName", playerName);
                     balanceConfig.set(uuid + ".balance", balance);
+                    balanceConfig.set(uuid + ".change", change);
                 } else {
-                    plugin.getLogger().warning("Invalid data for UUID: " + uuid);
+                    plugin.getLogger().warning("Invalid data for UUID: " + untrimmedUuid);
                 }
             }
 
@@ -753,5 +686,71 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error updating player name for UUID " + trimmedUuid + ": " + e.getMessage());
         }
     }
+
+    public static void exportDatabase() {
+        String sqlAccounts = "SELECT * FROM PlayerAccounts";
+        String sqlTransactions = "SELECT * FROM Transactions";
+        String sqlAutopays = "SELECT * FROM Autopays";
+        String csvFilePath = "QuickEconomyExport.csv"; // Path to save the CSV file
+
+        try (Connection conn = getConnection();
+             FileWriter csvWriter = new FileWriter(csvFilePath)) {
+
+            // Export PlayerAccounts table
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAccounts);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                csvWriter.append("PlayerAccounts Table\n");
+                writeResultSetToCSV(rs, csvWriter);
+                csvWriter.append("\n"); // Separate tables with a blank line
+            }
+
+            // Export Transactions table
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlTransactions);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                csvWriter.append("Transactions Table\n");
+                writeResultSetToCSV(rs, csvWriter);
+                csvWriter.append("\n"); // Separate tables with a blank line
+            }
+
+            // Export Autopays table
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlAutopays);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                csvWriter.append("Autopays Table\n");
+                writeResultSetToCSV(rs, csvWriter);
+                csvWriter.append("\n"); // Separate tables with a blank line
+            }
+
+            plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error exporting database: " + e.getMessage());
+        } catch (IOException e) {
+            plugin.getLogger().severe("Error writing CSV file: " + e.getMessage());
+        }
+    }
+
+    private static void writeResultSetToCSV(ResultSet rs, FileWriter csvWriter) throws SQLException, IOException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        // Write the header row
+        for (int i = 1; i <= columnCount; i++) {
+            csvWriter.append(metaData.getColumnName(i));
+            if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
+        }
+        csvWriter.append("\n");
+
+        // Write the data rows
+        while (rs.next()) {
+            for (int i = 1; i <= columnCount; i++) {
+                csvWriter.append(rs.getString(i));
+                if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
+            }
+            csvWriter.append("\n");
+        }
+    }
+
 
 }

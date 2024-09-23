@@ -1,5 +1,7 @@
 package net.derfla.quickeconomy.util;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
@@ -13,13 +15,16 @@ import java.util.*;
 public class DatabaseManager {
 
     static Plugin plugin = Main.getInstance();
-    public static Connection connection;
+    private static HikariDataSource dataSource;
 
-    public static Connection getConnection() {
-        return connection;
+    public static Connection getConnection() throws SQLException {
+        return dataSource.getConnection(); // Get a connection from the pool
     }
 
-    public static void connectToDatabase() throws SQLException {
+
+    public static void connectToDatabase() {
+        HikariConfig config = new HikariConfig();
+
         String type = plugin.getConfig().getString("database.type");
         if ("mysql".equalsIgnoreCase(type)) {
             String host = plugin.getConfig().getString("database.host");
@@ -29,18 +34,36 @@ public class DatabaseManager {
             String password = plugin.getConfig().getString("database.password");
 
             String url = "jdbc:mysql://" + host + ":" + port + "/" + database;
-            connection = DriverManager.getConnection(url, user, password);
+
+            config.setJdbcUrl(url);
+            config.setUsername(user);
+            config.setPassword(password);
+
+            // Optional HikariCP settings
+            config.setMaximumPoolSize(10); // Max number of connections in the pool
+            config.setConnectionTimeout(30000); // 30 seconds timeout for getting a connection
+            config.setIdleTimeout(600000); // 10 minutes before an idle connection is closed
+            config.setMaxLifetime(1800000); // 30 minutes max lifetime for a connection
         } else if ("sqlite".equalsIgnoreCase(type)) {
             String filePath = plugin.getConfig().getString("database.file");
             String url = "jdbc:sqlite:" + filePath;
-            connection = DriverManager.getConnection(url);
+            config.setJdbcUrl(url);
         }
 
-        plugin.getLogger().info("Database connection established.");
+        dataSource = new HikariDataSource(config);
+        plugin.getLogger().info("Database connection pool established.");
+    }
+
+    public static void closePool() {
+        if (dataSource != null) {
+            dataSource.close(); // Close the pool when shutting down the plugin
+            plugin.getLogger().info("Database connection pool closed.");
+        }
     }
 
     public static void createTables() {
-        try (Statement statement = connection.createStatement()) {
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
             // Create PlayerAccounts table
             String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
                     + "  UUID char(32) NOT NULL,"
@@ -101,13 +124,14 @@ public class DatabaseManager {
         } else {
             String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, Change) "
                     + "VALUES (?, NOW(), ?, ?, ?)";
-            try (PreparedStatement insertPstmt = connection.prepareStatement(insertSql)) {
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 insertPstmt.setString(1, trimmedUuid);
                 insertPstmt.setString(2, playerName);
                 insertPstmt.setDouble(3, balance);
                 insertPstmt.setDouble(4, change);
                 int rowsInserted = insertPstmt.executeUpdate();
-
+              
                 if (rowsInserted > 0) {
                     plugin.getLogger().info("New player account added successfully for " + playerName);
                 }
@@ -117,6 +141,86 @@ public class DatabaseManager {
         }
 
         createTransactionsView(trimmedUuid);
+    }
+
+
+
+
+    private static void createTransactionsView(@NotNull String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String viewName = "vw_Transactions_" + trimmedUuid;
+        String databaseName = plugin.getConfig().getString("database.database");
+        String checksql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(checksql)) {
+            // Set the parameters for view name and database name
+            pstmt.setString(1, viewName);
+            pstmt.setString(2, databaseName);
+
+            // Execute the query and get the result
+            try (ResultSet resultSet = pstmt.executeQuery()) {
+                if (resultSet.next()) {
+                    // Return true if the view exists (COUNT > 0)
+                    if (resultSet.getInt(1) > 0) {
+                        return;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
+
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
+            String sql = "CREATE VIEW " + viewName + " AS "
+                    + "SELECT "
+                    + "    CAST(t.TransactionID AS DATETIME) AS TransactionDateTime, "
+                    + "    CASE "
+                    + "        WHEN t.Source = '" + trimmedUuid + "' THEN SUM(0 - t.Amount)"
+                    + "        ELSE t.Amount"
+                    + "    END AS Amount,"
+                    + "    pa.PlayerName, "
+                    + "    CASE "
+                    + "        WHEN t.Passed = 1 THEN 'Passed' "
+                    + "        WHEN t.Passed = 0 THEN 'Failed' "
+                    + "        ELSE 'Unknown' "
+                    + "    END AS Passed, "
+                    + "    CASE WHEN t.Passed != 1 THEN t.PassedReason ELSE NULL END AS PassedReason, "
+                    + "    CASE "
+                    + "        WHEN t.Source != '" + trimmedUuid + "' THEN "
+                    + "            CASE "
+                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                WHEN t.Induce = 'command' THEN COALESCE(NULLIF(t.TransactionMessage, ''), '-') "
+                    + "                ELSE '-' "
+                    + "            END "
+                    + "        ELSE "
+                    + "            CASE "
+                    + "                WHEN t.TransactionType = 'insert' THEN 'Bank deposit' "
+                    + "                WHEN t.TransactionType = 'withdraw' THEN 'Bank withdrawal' "
+                    + "                WHEN t.TransactionType = 'autopay' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                WHEN t.TransactionType = 'p2p' THEN CASE "
+                    + "                    WHEN t.Induce REGEXP '^[0-9]+$' THEN CONCAT('Autopay #', t.Induce) "
+                    + "                    WHEN t.Induce = 'command' THEN 'Command' "
+                    + "                    WHEN t.Induce = 'purchase' THEN 'Purchase' "
+                    + "                    ELSE 'Unknown' "
+                    + "                END "
+                    + "                WHEN t.TransactionType = 'system' THEN CASE "
+                    + "                    WHEN t.Induce = 'admin_command' THEN 'Admin command' "
+                    + "                    ELSE 'Unknown' "
+                    + "                END "
+                    + "                ELSE 'Unknown' "
+                    + "            END "
+                    + "    END AS Reason "
+                    + "FROM Transactions t "
+                    + "LEFT JOIN PlayerAccounts pa ON t.Destination = pa.UUID "
+                    + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "';";
+            
+            statement.executeUpdate(sql);
+            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
     }
 
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
@@ -512,8 +616,8 @@ public class DatabaseManager {
         } catch (SQLException e) {
             plugin.getLogger().severe("Error during rollback: " + e.getMessage());
             try {
-                if (connection != null) connection.rollback();
-            } catch (SQLException ex) {
+                // if (dataSource != null) dataSource.rollback();
+            } catch (Exception ex) {
                 plugin.getLogger().severe("Error rolling back transaction: " + ex.getMessage());
             }
         }
@@ -634,7 +738,8 @@ public class DatabaseManager {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
     
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, playerName);
             pstmt.setString(2, trimmedUuid);
             int rowsUpdated = pstmt.executeUpdate();

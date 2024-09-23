@@ -9,11 +9,6 @@ import net.derfla.quickeconomy.util.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.sql.SQLException;
-
-import static net.derfla.quickeconomy.util.DatabaseManager.connection;
-
-
 public final class Main extends JavaPlugin {
 
 
@@ -90,7 +85,7 @@ public final class Main extends JavaPlugin {
                     getLogger().info("Migration unsuccessful. You can set balances manually with /bal set <playername>");
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
         }
@@ -99,13 +94,7 @@ public final class Main extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                getLogger().severe("Error closing the database connection: " + e.getMessage());
-            }
-        }
+        DatabaseManager.closePool();
     }
 
     public static Main getInstance() {

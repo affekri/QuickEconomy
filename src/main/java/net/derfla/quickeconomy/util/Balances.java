@@ -56,9 +56,7 @@ public class Balances {
 
     public static void addPlayerBalance(String uuid, float money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if (Bukkit.getPlayer(UUID.fromString(TypeChecker.untrimUUID(uuid))) == null){
-            addPlayerBalanceChange(trimmedUUID, money);
-        }
+        addPlayerBalanceChange(trimmedUUID, money);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) + money);
     }
 
@@ -68,6 +66,9 @@ public class Balances {
     }
 
     public static float getPlayerBalanceChange(String uuid) {
+        if(SQLMode)
+            return (float) DatabaseManager.getPlayerBalanceChange(uuid);
+
         FileConfiguration file = BalanceFile.get();
 
         if (file == null){
@@ -83,7 +84,13 @@ public class Balances {
         return fMoney / 100;
     }
     public static void setPlayerBalanceChange(String uuid, float money) {
+        if(SQLMode) {
+            DatabaseManager.setPlayerBalanceChange(uuid, money);
+            return;
+        }
+
         FileConfiguration file = BalanceFile.get();
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         if (file == null){
             plugin.getLogger().warning("balance.yml not found!");
@@ -92,7 +99,7 @@ public class Balances {
 
         float multMoney = money * 100;
         int intMoney = (int) multMoney;
-        file.set("players." + uuid + ".change", intMoney);
+        file.set("players." + trimmedUUID + ".change", intMoney);
         BalanceFile.save();
     }
 
@@ -102,8 +109,9 @@ public class Balances {
 
     public static boolean hasAccount(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if(SQLMode)
+        if(SQLMode) {
             return DatabaseManager.accountExists(trimmedUUID);
+        }
 
         FileConfiguration file = BalanceFile.get();
         return file.contains("players." + trimmedUUID);

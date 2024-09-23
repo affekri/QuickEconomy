@@ -37,12 +37,13 @@ public class PlayerJoinListener implements Listener {
             if (!(file.contains("players." + uuid + ".change"))) {
                 return;
             }
-            change = Balances.getPlayerBalanceChange(uuid);
-            if (change == 0.0f) {
-                return;
-            }
-            Balances.setPlayerBalanceChange(uuid, 0.0f);
         }
-        player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
+        if (change == 0.0f) {
+            return;
+        }
+        change = Balances.getPlayerBalanceChange(uuid);
+        Balances.setPlayerBalanceChange(uuid, 0.0f);
+        if (change != 0.0f)
+            player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
     }
 }

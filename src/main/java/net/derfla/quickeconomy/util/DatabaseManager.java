@@ -221,6 +221,7 @@ public class DatabaseManager {
 
             // Commit the transaction
             conn.commit();
+            Balances.addPlayerBalanceChange(trimmedDestination, (float) amount);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
         }
@@ -765,6 +766,42 @@ public class DatabaseManager {
                 if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
             }
             csvWriter.append("\n");
+        }
+    }
+
+    public static double getPlayerBalanceChange(String uuid){
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
+        Double change = 0.0;
+        String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, trimmedUUID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    change = rs.getDouble("BalChange");
+                }
+            }
+
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Could not get change for player: " + e.getMessage());
+        }
+        return change;
+    }
+
+    public static void setPlayerBalanceChange(@NotNull String uuid, double change) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET  BalChange = ? WHERE UUID = ?;";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, change);
+            pstmt.setString(2, trimmedUuid);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error updating change for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
     }
 

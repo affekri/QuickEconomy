@@ -297,46 +297,51 @@ public class DatabaseManager {
         return balance;
     }
 
-    public static List<Map<String, Object>> displayTransactionsView(@NotNull String uuid, Boolean displayPassed) {
+    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
+        StringBuilder transactions = new StringBuilder();
 
         String sql;
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime DESC";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " WHERE Passed = 1 ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime DESC";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, Source, Destination, TransactionMessage FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC";
         }
-
-        List<Map<String, Object>> transactions = new ArrayList<>();
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
 
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
             // Iterate over the result set
             while (rs.next()) {
-                Map<String, Object> transaction = new HashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = metaData.getColumnName(i);
-                    Object value = rs.getObject(i);
-                    transaction.put(columnName, value);
+                String dateTime = rs.getString("TransactionDateTime");
+                Double amount = rs.getDouble("Amount");
+                String source = rs.getString("SourcePlayerName");
+                String destination = rs.getString("DestinationPlayerName");
+                String transactionMessage = rs.getString("Message");
+
+                transactions.append(dateTime).append(" ").append(amount);
+                if (source.equalsIgnoreCase(playerName)) {
+                    transactions.append(" -> ").append(destination);
+                }else {
+                    transactions.append(" <- ").append(source);
                 }
-                transactions.add(transaction);
+                if(transactionMessage != null) {
+                    transactions.append(transactionMessage);
+                }
+                transactions.append("\n");
             }
         } catch (SQLException e) {
             plugin.getLogger().severe("Error viewing transactions for UUID " + uuid + ": " + e.getMessage());
         }
 
-        return transactions;
+        return transactions.toString();
     }
 
     public static void addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
@@ -478,31 +483,22 @@ public class DatabaseManager {
     }
 
 
-    public static List<Map<String, Object>> listAllAccounts() {
+    public static String listAllAccounts() {
         String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
-        List<Map<String, Object>> accounts = new ArrayList<>();
+        StringBuilder accounts = new StringBuilder();
 
         try (Connection conn = getConnection();
             PreparedStatement pstmt = conn.prepareStatement(sql);
             ResultSet rs = pstmt.executeQuery()) {
 
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
             while (rs.next()) {
-                Map<String, Object> account = new HashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = metaData.getColumnName(i);
-                    Object value = rs.getObject(i);
-                    account.put(columnName, value);
-                }
-                accounts.add(account);
+                accounts.append(rs.getString("PlayerName")).append(": ").append(rs.getDouble("Balance")).append("\n");
             }
         } catch (SQLException e) {
             plugin.getLogger().severe("Error listing all accounts: " + e.getMessage());
         }
 
-        return accounts;
+        return accounts.toString();
     }
 
     public static void rollback(@NotNull Timestamp rollbackTime, boolean keepTransactions) {

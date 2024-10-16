@@ -6,6 +6,7 @@ import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
 import net.derfla.quickeconomy.util.DatabaseManager;
+import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -18,6 +19,7 @@ public final class Main extends JavaPlugin {
     public void onEnable() {
         // Plugin startup logic
         getLogger().info("QuickEconomy has been enabled!");
+        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
 
         // Set command executors
         getCommand("balance").setExecutor(new BalanceCommand());
@@ -59,10 +61,11 @@ public final class Main extends JavaPlugin {
         Bukkit.getServer().getPluginManager().registerEvents(new HopperMoveItemEvent(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerCloseInventoryListener(), this);
         Bukkit.getServer().getPluginManager().registerEvents(new PlayerChangeSettingsListener(), this);
+        Bukkit.getServer().getPluginManager().registerEvents(new PlayerLeaveListener(), this);
     }
 
     private void setupFileMode() {
-        getLogger().info("Running in file mode. See config to enable SQL mode.");
+        getLogger().info("Running in file mode. See /quickeconomy migrate to enable SQL mode.");
         BalanceFile.setup();
         BalanceFile.get().options().copyDefaults(true);
         BalanceFile.save();
@@ -76,15 +79,6 @@ public final class Main extends JavaPlugin {
             DatabaseManager.connectToDatabase();
             SQLMode = true;
             DatabaseManager.createTables();
-            if (BalanceFile.get() != null) {
-                if (DatabaseManager.migrateToDatabase()) {
-                    if (BalanceFile.delete()) {
-                        getLogger().info("balance.yml has been removed after successful migration.");
-                    }
-                } else {
-                    getLogger().info("Migration unsuccessful. You can set balances manually with /bal set <playername>");
-                }
-            }
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);

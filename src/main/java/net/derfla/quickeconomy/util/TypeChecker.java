@@ -43,7 +43,7 @@ public class TypeChecker {
             return uuid;
         }
         else {
-            throw new IllegalArgumentException("Invalid UUID format");
+            throw new IllegalArgumentException("Invalid UUID format: " + uuid);
         }
     }
 
@@ -58,7 +58,7 @@ public class TypeChecker {
             return uuid;
         }
         else {
-            throw new IllegalArgumentException("Invalid UUID format");
+            throw new IllegalArgumentException("Invalid UUID format: " + uuid);
         }
     }
 }

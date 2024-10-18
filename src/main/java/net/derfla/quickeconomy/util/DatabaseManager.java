@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -593,13 +594,17 @@ public class DatabaseManager {
     public static boolean migrateToDatabase() {
         try {
             FileConfiguration balanceConfig = BalanceFile.get();
-            for (String key : balanceConfig.getKeys(false)) {
+            ConfigurationSection playersSection = balanceConfig.getConfigurationSection("players");
+            if (playersSection == null) {
+                plugin.getLogger().info("No player balances found. Migration complete.");
+            }
+            for (String key : playersSection.getKeys(false)) {
                 double balance = balanceConfig.getDouble(key + ".balance");
                 double change = balanceConfig.getDouble(key + ".change");
                 String trimmedUuid = TypeChecker.trimUUID(key);
 
                 if (!accountExists(trimmedUuid)) {
-                    addAccount(trimmedUuid, balanceConfig.getString(key + ".playerName"), balance, change);
+                    addAccount(trimmedUuid, balanceConfig.getString(key + ".name"), balance, change);
                 } else {
                     setPlayerBalance(trimmedUuid, balance, change);
                 }
@@ -614,7 +619,7 @@ public class DatabaseManager {
 
     public static void migrateToBalanceFile() {
         String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
-        String sql = "SELECT UUID, PlayerName, Balance FROM PlayerAccounts";
+        String sql = "SELECT * FROM PlayerAccounts";
 
         try (Connection conn = DatabaseManager.getConnection();
             PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
@@ -627,11 +632,10 @@ public class DatabaseManager {
                 playerCount = rsCount.getInt("playerCount");
             }
 
-            if (BalanceFile.get() == null) {
-                BalanceFile.setup();
-                BalanceFile.get().options().copyDefaults(true);
-                BalanceFile.save();
-            }
+            BalanceFile.setup();
+            BalanceFile.get().options().copyDefaults(true);
+            BalanceFile.save();
+
 
             FileConfiguration balanceConfig = BalanceFile.get();
             for (String key : balanceConfig.getKeys(false)) {
@@ -643,13 +647,13 @@ public class DatabaseManager {
                 String untrimmedUuid = TypeChecker.untrimUUID(uuid);
                 String playerName = rs.getString("PlayerName");
                 double balance = rs.getDouble("Balance");
-                double change = rs.getDouble("Change");
+                double change = rs.getDouble("BalChange");
 
                 // Validate data before writing
                 if (uuid != null && playerName != null && balance >= 0) {
-                    balanceConfig.set(uuid + ".playerName", playerName);
-                    balanceConfig.set(uuid + ".balance", balance);
-                    balanceConfig.set(uuid + ".change", change);
+                    balanceConfig.set("players." + uuid + ".name", playerName);
+                    balanceConfig.set("players." + uuid + ".balance", balance);
+                    balanceConfig.set("players." + uuid + ".change", change);
                 } else {
                     plugin.getLogger().warning("Invalid data for UUID: " + untrimmedUuid);
                 }

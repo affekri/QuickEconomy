@@ -502,70 +502,96 @@ public class DatabaseManager {
         return accounts.toString();
     }
 
-    public static void rollback(@NotNull Timestamp rollbackTime, boolean keepTransactions) {
-        String getBalances = "SELECT pa.UUID, pa.Balance, COALESCE(t.NewSourceBalance, t.NewDestinationBalance) AS RollbackBalance FROM PlayerAccounts pa LEFT JOIN (SELECT DISTINCT ON (Source) Source, NewSourceBalance FROM Transactions WHERE TransactionID <= ? ORDER BY Source, TransactionID DESC) t ON pa.UUID = t.Source";
-        String deleteTransactions = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
-        String getAutopays = "SELECT AutopayID, AutopayDatetime, Source FROM Autopays";
-        String deactivateAutopays = "UPDATE Autopays SET Active = 0 WHERE CreationDate <= ?";
-        String updateChangeToZero = "UPDATE PlayerAccounts SET BalChange = 0";
-
-        try (Connection conn = getConnection();
-             PreparedStatement pstmtGet = conn.prepareStatement(getBalances);
-             PreparedStatement pstmtDelete = conn.prepareStatement(deleteTransactions);
-             PreparedStatement pstmtGetAutopays = conn.prepareStatement(getAutopays);
-             PreparedStatement pstmtDeactivateAutopays = conn.prepareStatement(deactivateAutopays);
-             PreparedStatement pstmtUpdateChange = conn.prepareStatement(updateChangeToZero)) {
-
+    public static void rollback(String targetDateTime) {
+        try (Connection conn = getConnection()) {
+            // Disable auto-commit to ensure transaction consistency
             conn.setAutoCommit(false);
 
-            // Update Change to 0 for all player accounts
-            pstmtUpdateChange.executeUpdate();
+            try {
+                // 1. First, get all transactions after the target datetime that were successful
+                String getTransactionsSQL =
+                        "SELECT * FROM Transactions " +
+                                "WHERE TransactionDatetime > ? AND Passed = 1 " +
+                                "ORDER BY TransactionDatetime DESC";
 
-            // Get balances up to rollbackTime
-            pstmtGet.setTimestamp(1, rollbackTime);
-            ResultSet rs = pstmtGet.executeQuery();
+                try (PreparedStatement pstmt = conn.prepareStatement(getTransactionsSQL)) {
+                    pstmt.setString(1, targetDateTime);
+                    ResultSet rs = pstmt.executeQuery();
 
-            while (rs.next()) {
-                String uuid = rs.getString("UUID");
-                String trimmedUuid = TypeChecker.trimUUID(uuid);
-                double currentBalance = rs.getDouble("Balance");
-                double rollbackBalance = rs.getDouble("RollbackBalance");
-                double difference = rollbackBalance - currentBalance;
+                    // 2. Reverse each transaction
+                    while (rs.next()) {
+                        String source = rs.getString("Source");
+                        String destination = rs.getString("Destination");
+                        float amount = rs.getFloat("Amount");
+                        String transactionType = rs.getString("TransactionType");
 
-                if (!keepTransactions) {
-                    pstmtDelete.setTimestamp(1, rollbackTime);
-                    pstmtDelete.executeUpdate();
+                        // Update source balance if exists
+                        if (source != null) {
+                            String updateSourceSQL =
+                                    "UPDATE PlayerAccounts SET Balance = Balance + ?, " +
+                                            "BalChange = BalChange + ? " +
+                                            "WHERE UUID = ?";
+                            try (PreparedStatement updateSource = conn.prepareStatement(updateSourceSQL)) {
+                                updateSource.setFloat(1, amount);
+                                updateSource.setFloat(2, amount);
+                                updateSource.setString(3, source);
+                                updateSource.executeUpdate();
+                            }
+                        }
 
-                    // Set the player's balance to the rollback balance (without a transaction)
-                    setPlayerBalance(trimmedUuid, rollbackBalance, 0);
-                } else {
-                    // Execute rollback adjustment (with transaction)
-                    if (difference > 0) {
-                        executeTransaction("system", "admin_command", null, trimmedUuid, difference, "Rollback adjustment");
-                    } else if (difference < 0) {
-                        double negativeDifference = 0 - difference;
-                        executeTransaction("system", "admin_command", trimmedUuid, null, negativeDifference, "Rollback adjustment");
+                        // Update destination balance if exists
+                        if (destination != null) {
+                            String updateDestSQL =
+                                    "UPDATE PlayerAccounts SET Balance = Balance - ?, " +
+                                            "BalChange = BalChange - ? " +
+                                            "WHERE UUID = ?";
+                            try (PreparedStatement updateDest = conn.prepareStatement(updateDestSQL)) {
+                                updateDest.setFloat(1, amount);
+                                updateDest.setFloat(2, amount);
+                                updateDest.setString(3, destination);
+                                updateDest.executeUpdate();
+                            }
+                        }
                     }
                 }
-            }
 
-            ResultSet rsAutopays = pstmtGetAutopays.executeQuery();
-            while (rsAutopays.next()) {
-                int autopayID = rsAutopays.getInt("AutopayID");
-                Timestamp creationDatetime = rsAutopays.getTimestamp("AutopayDatetime");
-                String source = rsAutopays.getString("Source");
-                if (creationDatetime.after(rollbackTime)) {
-                    deleteAutopay(autopayID, source);
+                // 3. Delete transactions after target datetime
+                String deleteTransactionsSQL = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(deleteTransactionsSQL)) {
+                    pstmt.setString(1, targetDateTime);
+                    pstmt.executeUpdate();
                 }
+
+                // 4. Handle Autopays
+                // Option 1: Delete autopays created after target datetime
+                String deleteAutopaysSQL = "DELETE FROM Autopays WHERE AutopayDatetime > ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(deleteAutopaysSQL)) {
+                    pstmt.setString(1, targetDateTime);
+                    pstmt.executeUpdate();
+                }
+
+                // 5. Reset account creation dates that are after target datetime
+                String resetAccountsSQL =
+                        "UPDATE PlayerAccounts SET AccountDatetime = ? " +
+                                "WHERE AccountDatetime > ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(resetAccountsSQL)) {
+                    pstmt.setString(1, targetDateTime);
+                    pstmt.setString(2, targetDateTime);
+                    pstmt.executeUpdate();
+                }
+
+                // If everything succeeded, commit the transaction
+                conn.commit();
+                plugin.getLogger().info("Successfully rolled back database to " + targetDateTime);
+
+            } catch (SQLException e) {
+                // If anything fails, roll back all changes
+                conn.rollback();
+                plugin.getLogger().severe("Error during rollback, changes reverted: " + e.getMessage());
+                throw e;
             }
-
-            pstmtDeactivateAutopays.setTimestamp(1, rollbackTime);
-            pstmtDeactivateAutopays.executeUpdate();
-
-            conn.commit();
-            plugin.getLogger().info("Rollback to " + rollbackTime + " completed successfully.");
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error during rollback: " + e.getMessage());
+            plugin.getLogger().severe("Database rollback failed: " + e.getMessage());
         }
     }
 
@@ -597,14 +623,16 @@ public class DatabaseManager {
             ConfigurationSection playersSection = balanceConfig.getConfigurationSection("players");
             if (playersSection == null) {
                 plugin.getLogger().info("No player balances found. Migration complete.");
+                return true;
             }
             for (String key : playersSection.getKeys(false)) {
-                double balance = balanceConfig.getDouble(key + ".balance");
-                double change = balanceConfig.getDouble(key + ".change");
+                double balance = playersSection.getDouble(key + ".balance");
+                double change = playersSection.getDouble(key + ".change");
+                String playerName = playersSection.getString(key + ".name");
                 String trimmedUuid = TypeChecker.trimUUID(key);
 
                 if (!accountExists(trimmedUuid)) {
-                    addAccount(trimmedUuid, balanceConfig.getString(key + ".name"), balance, change);
+                    addAccount(trimmedUuid, playerName, balance, change);
                 } else {
                     setPlayerBalance(trimmedUuid, balance, change);
                 }
@@ -641,6 +669,8 @@ public class DatabaseManager {
             for (String key : balanceConfig.getKeys(false)) {
                 balanceConfig.set(key, null);
             }
+
+            balanceConfig.set("format", "uuid");
 
             while (rs.next()) {
                 String uuid = rs.getString("UUID");

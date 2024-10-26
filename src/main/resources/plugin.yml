@@ -66,3 +66,9 @@ permissions:
     children:
       - quickeconomy.bank
       - quickeconomy.bank.create
+  quickeconomy.rollback:
+    description: Allows the player to perform rollbacks on transactions.
+    default: false
+  quickeconomy.migrate:
+    description: Allows the player to migrate between file- and SQL-mode.
+    default: false

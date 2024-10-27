@@ -10,6 +10,6 @@ public class PlayerLeaveListener implements Listener {
     @EventHandler
     public void onPlayerLeave(PlayerQuitEvent event) {
         String uuid = event.getPlayer().getUniqueId().toString();
-        Balances.setPlayerBalance(uuid, 0);
+        Balances.setPlayerBalanceChange(uuid, 0);
     }
 }

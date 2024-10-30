@@ -40,7 +40,7 @@ public class DerflaAPI {
             JSONObject json = (JSONObject) parser.parse(jsonString);
             String latestVersion = (String) json.get("version");
 
-            return !CURRENT_VERSION.equalsIgnoreCase(latestVersion);
+            return TypeChecker.isNewerVersion(latestVersion, CURRENT_VERSION);
 
         } catch (Exception e) {
             plugin.getLogger().info("Error while checking for updates: " + e.getMessage());

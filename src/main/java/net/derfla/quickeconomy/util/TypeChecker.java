@@ -61,4 +61,29 @@ public class TypeChecker {
             throw new IllegalArgumentException("Invalid UUID format: " + uuid);
         }
     }
+
+    // Comparing version1 on to version2. Returns true if version1 is newer
+    public static boolean isNewerVersion(String version1, String version2) {
+        // Split by "-" and use only the main version part (before the dash)
+        String mainVersion1 = version1.split("-")[0];
+        String mainVersion2 = version2.split("-")[0];
+
+        String[] v1Parts = mainVersion1.split("\\.");
+        String[] v2Parts = mainVersion2.split("\\.");
+
+        int maxLength = Math.max(v1Parts.length, v2Parts.length);
+
+        for (int i = 0; i < maxLength; i++) {
+            int v1Part = i < v1Parts.length ? Integer.parseInt(v1Parts[i]) : 0;
+            int v2Part = i < v2Parts.length ? Integer.parseInt(v2Parts[i]) : 0;
+
+            if (v1Part > v2Part) {
+                return true;
+            } else if (v1Part < v2Part) {
+                return false;
+            }
+        }
+        return false;
+    }
+
 }

@@ -182,13 +182,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
+                if(strings.length < 2) {
+                    sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
+                    break;
+                }
                 if (strings[1].equalsIgnoreCase("all") && Main.SQLMode) {
                     sender.sendMessage(DatabaseManager.listAllAccounts());
                     break;
                 }
                 String checkPlayer;
                 if (Bukkit.getServer().getPlayerExact(strings[1]) != null) {
-                    checkPlayer = Bukkit.getServer().getPlayerExact(strings[0]).getUniqueId().toString();
+                    checkPlayer = Bukkit.getServer().getPlayerExact(strings[1]).getUniqueId().toString();
                 } else checkPlayer = MojangAPI.getUUID(strings[1]);
                 if (!Balances.hasAccount(checkPlayer)) {
                     sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])));
@@ -196,10 +200,10 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 float balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
                 if (balance == 0.0f) {
-                    sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[0])).style(Styles.ERRORSTYLE));
+                    sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[1])).style(Styles.ERRORSTYLE));
                     break;
                 }
-                sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[0]), Component.text(balance)).style(Styles.INFOSTYLE));
+                sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[1]), Component.text(balance)).style(Styles.INFOSTYLE));
                 break;
 
             default:

@@ -2,6 +2,7 @@ package net.derfla.quickeconomy.command;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.DatabaseManager;
+import net.derfla.quickeconomy.util.DerflaAPI;
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.Command;
@@ -37,7 +38,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         plugin.getConfig().set("database.enabled", false);
                         plugin.saveConfig();
                         Main.SQLMode = false;
-                        sender.sendMessage("Migrated to file mode. You should consider restarting the server.");
+                        sender.sendMessage("Migrated to file mode. You should consider restarting the server."); // TODO Add this string to translations
                         return true;
                     } else {
                         try{
@@ -46,9 +47,9 @@ public class QuickeconomyCommand implements TabExecutor {
                             Main.SQLMode = true;
                             plugin.getConfig().set("database.enabled", true);
                             plugin.saveConfig();
-                            sender.sendMessage("Migrated to database. You should consider restarting the server.");
+                            sender.sendMessage("Migrated to database. You should consider restarting the server."); // TODO Add this string to translations
                         } catch (Exception e) {
-                            sender.sendMessage("Failed to connect to database! \n See console for more info!");
+                            sender.sendMessage("Failed to connect to database! \n See console for more info!"); // TODO Add this string to translations
                             plugin.getLogger().warning("Failed to connect to database! " + e.getMessage());
                         }
                         DatabaseManager.migrateToDatabase();
@@ -68,18 +69,29 @@ public class QuickeconomyCommand implements TabExecutor {
                         timestampString = strings[1] + "-" + strings[2] + "-" + strings[3] + " " + strings[4];
                         rollbackTime = Timestamp.valueOf(timestampString);
                     }catch (Exception e){
-                        sender.sendMessage("Incorrect date format!");
+                        sender.sendMessage("Incorrect date format!"); // TODO Add this string to translations
                         plugin.getLogger().info("Rollback failed: " + e.getMessage());
                         return true;
                     }
                     try {
                         DatabaseManager.rollback(String.valueOf(rollbackTime));
-                        sender.sendMessage("Completed rollback!");
+                        sender.sendMessage("Completed rollback!"); // TODO Add this string to translations
                         plugin.getLogger().info("Rollback complete to " + timestampString);
                     } catch (Exception e){
-                        sender.sendMessage("Failed rollback!");
+                        sender.sendMessage("Failed rollback!"); // TODO Add this string to translations
                         plugin.getLogger().info("Rollback failed: " + e.getMessage());
                         return true;
+                    }
+                    return true;
+                case "setup":
+                    if(!sender.hasPermission("quickeconomy.setup") && sender instanceof Player) {
+                        break;
+                    }
+                    String storageMethod = Main.SQLMode ? "SQL Server" : "File";
+                    sender.sendMessage("Storage method: " + storageMethod);
+                    sender.sendMessage("Plugin version: " + plugin.getDescription().getVersion());
+                    if(DerflaAPI.updateAvailable()) {
+                        sender.sendMessage("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
                     }
                     return true;
             }
@@ -117,6 +129,9 @@ public class QuickeconomyCommand implements TabExecutor {
             }
             if(sender.hasPermission("quickeconomy.rollback") && Main.SQLMode){
                 returnList.add("rollback");
+            }
+            if(sender.hasPermission("quickeconomy.setup")) {
+                returnList.add("setup");
             }
             return returnList.stream()
                     .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[0]))

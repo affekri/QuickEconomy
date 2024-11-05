@@ -72,3 +72,6 @@ permissions:
   quickeconomy.migrate:
     description: Allows the player to migrate between file- and SQL-mode.
     default: false
+  quickeconomy.setup:
+    description: Allows the player to see the current plugin setup.
+    default: false

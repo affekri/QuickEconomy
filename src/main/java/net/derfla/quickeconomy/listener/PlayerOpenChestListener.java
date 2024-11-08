@@ -9,18 +9,19 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 public class PlayerOpenChestListener implements Listener {
 
     @EventHandler
-    public void onPlayerOpenChest(PlayerInteractEvent event){
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (!(event.getClickedBlock().getState() instanceof Chest)) return;
-        if (!event.getClickedBlock().getType().equals(Material.CHEST)) return;
-        Chest chest = (Chest) event.getClickedBlock().getState();
-        Player player = event.getPlayer();
+    public void onPlayerOpenChest(InventoryOpenEvent event){
+        if (!event.getInventory().getType().equals(InventoryType.CHEST)) return;
+        if (event.getInventory().getHolder() == null) return;
+        if (!(event.getInventory().getHolder() instanceof Chest)) return;
+        Chest chest = (Chest) event.getInventory().getHolder();
+        Player player = (Player) event.getPlayer();
         // Check if chest is locked
         if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
             player.sendMessage(Component.translatable("shop.locked.chest", Styles.ERRORSTYLE));

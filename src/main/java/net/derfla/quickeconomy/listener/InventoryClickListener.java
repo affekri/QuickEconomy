@@ -57,7 +57,6 @@ public class InventoryClickListener implements Listener {
             float cost = ShopInventory.getShopCost();
             // Sets owner variables
             String owner = ShopInventory.getShopOwner();
-            String ownerUUID = MojangAPI.getUUID(owner);
             String owner2 = ShopInventory.getShopOwner2();
             // Sets the chest variable
             Chest chest = ShopInventory.getShopChest();
@@ -81,10 +80,10 @@ public class InventoryClickListener implements Listener {
             }
             // Gives the paid coins to the shop owner or owners
             if (owner2.isEmpty()) {
-                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), ownerUUID, cost, "");
+                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost, "");
             }else  {
-                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), ownerUUID, cost/2, "");
-                Balances.executeTransaction("p2p", "purchase", String.valueOf(MojangAPI.getUUID(owner2)), ownerUUID, cost/2, "");
+                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost/2, "");
+                Balances.executeTransaction("p2p", "purchase", owner2, owner, cost/2, "");
             }
             player.getOpenInventory().getTopInventory().removeItem(boughtItem);
             chest.getBlockInventory().removeItem(boughtItem);

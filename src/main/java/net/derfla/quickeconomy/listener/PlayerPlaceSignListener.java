@@ -67,7 +67,7 @@ public class PlayerPlaceSignListener implements Listener {
             }
 
             // Check if chest is locked
-            if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
+            if (BlockOwner.isLockedForPlayer(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))) {
                 player.sendMessage(Component.translatable("shop.locked.chest", Styles.ERRORSTYLE));
                 event.setCancelled(true);
                 return;
@@ -122,12 +122,12 @@ public class PlayerPlaceSignListener implements Listener {
                     sign.update();
                     player.sendMessage(Component.translatable("shop.created.split", Component.text(line3)).style(Styles.INFOSTYLE));
                     // Lock chest to players
-                    BlockOwner.setPlayerLocked(chest, player.getName(), line3);
+                    BlockOwner.setPlayerLocked(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), MojangAPI.getUUID(line3));
                     return;
                 }
             }
             // Lock chest to player
-            BlockOwner.setPlayerLocked(chest, player.getName(), "");
+            BlockOwner.setPlayerLocked(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), "");
             sign.update();
             player.sendMessage(Component.translatable("shop.created", Styles.INFOSTYLE));
             return;

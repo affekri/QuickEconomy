@@ -17,7 +17,7 @@ public class ShopInventory implements InventoryHolder {
     private static String shopOwner;
     private static String shopOwner2;
     private static float shopCost;
-    private static  Chest shopChest;
+    private static Chest shopChest;
     private static boolean singleShopItem;
 
     private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Shop"));

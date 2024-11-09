@@ -2,6 +2,7 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.Styles;
+import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
@@ -22,8 +23,9 @@ public class PlayerOpenChestListener implements Listener {
         if (!(event.getInventory().getHolder() instanceof Chest)) return;
         Chest chest = (Chest) event.getInventory().getHolder();
         Player player = (Player) event.getPlayer();
+        BlockOwner.convertChestKeyToUUID(chest);
         // Check if chest is locked
-        if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
+        if (BlockOwner.isLockedForPlayer(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))) {
             player.sendMessage(Component.translatable("shop.locked.chest", Styles.ERRORSTYLE));
             event.setCancelled(true);
             return;

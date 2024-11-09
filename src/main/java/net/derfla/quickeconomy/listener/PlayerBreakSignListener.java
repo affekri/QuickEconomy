@@ -1,9 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.util.BlockOwner;
-import net.derfla.quickeconomy.util.FindChest;
-import net.derfla.quickeconomy.util.Styles;
-import net.derfla.quickeconomy.util.TypeChecker;
+import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
@@ -37,7 +34,8 @@ public class PlayerBreakSignListener implements Listener {
             if (player.hasPermission("quickeconomy.bank.destroy")) return;
         }
         if (listLines.get(0).equals(shopHeader)) {
-            if (player.hasPermission("quickeconomy.shop.destroyall") || TypeChecker.getRawString(listLines.get(2)).equals(player.getName())){
+            if (player.hasPermission("quickeconomy.shop.destroyall") ||
+                    MojangAPI.getUUID(TypeChecker.getRawString(listLines.get(2))).equals(TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))){
                 if (FindChest.get(sign) == null) return;
                 Chest chest = FindChest.get(sign);
                 BlockOwner.unlockFromPlayer(chest, player.getName());

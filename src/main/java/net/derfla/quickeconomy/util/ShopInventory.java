@@ -28,8 +28,13 @@ public class ShopInventory implements InventoryHolder {
         this.target = player;
         // Check if shop is empty
         if (chest.getBlockInventory().isEmpty()) {
-            player.sendMessage(Component.translatable("shop.inventory.empty", Styles.INFOSTYLE));
-            // TODO Add message to owner
+            player.sendMessage(Component.translatable("shop.inventory.empty.player", Styles.INFOSTYLE));
+            if (owner != null) {
+                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE, Component.text(owner)));
+            }
+            if (owner2 != null) {
+                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE, Component.text(owner2)));
+            }
             return;
         }
         // Check if the player inventory is full

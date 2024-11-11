@@ -35,8 +35,14 @@ public class ShopInventory implements InventoryHolder {
             if (owner2 != null) {
                 player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE, Component.text(owner2)));
             }
+
+            // Store empty shop details in the database
+            String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
+            DatabaseManager.insertEmptyShop(coordinates, owner, owner2);
+            
             return;
         }
+
         // Check if the player inventory is full
         if (player.getInventory().firstEmpty() == -1) {
             player.sendMessage(Component.translatable("shop.inventory.full", Styles.ERRORSTYLE));
@@ -85,11 +91,13 @@ public class ShopInventory implements InventoryHolder {
     }
 
     public static String getShopOwner() {
-        return shopOwner;
+        String trimmedShopOwner = TypeChecker.trimUUID(shopOwner);
+        return trimmedShopOwner;
     }
 
     public static String getShopOwner2() {
-        return shopOwner2;
+        String trimmedShopOwner2 = TypeChecker.trimUUID(shopOwner2);
+        return trimmedShopOwner2;
     }
 
     public static boolean isSingleItem() {return singleShopItem;}

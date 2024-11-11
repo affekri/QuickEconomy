@@ -4,6 +4,9 @@ import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
+
+import java.util.List;
+
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -23,6 +26,13 @@ public class PlayerJoinListener implements Listener {
         if (Main.SQLMode) {
             if (!DatabaseManager.accountExists(uuid)) {
                 DatabaseManager.addAccount(String.valueOf(player.getUniqueId()), player.getName(), 0, 0);
+            } else {
+                // Check for empty shops and notify the player
+                List<String> emptyShops = DatabaseManager.displayEmptyShopsView(uuid);
+                if (emptyShops != null && !emptyShops.isEmpty()) {
+                    int emptyShopCount = emptyShops.size();
+                    player.sendMessage(Component.translatable("shop.inventory.empty.list", Component.text(emptyShopCount), Component.text(String.join(", ", emptyShops))).style(Styles.INFOSTYLE));
+                }
             }
         } else {
             FileConfiguration file = BalanceFile.get();

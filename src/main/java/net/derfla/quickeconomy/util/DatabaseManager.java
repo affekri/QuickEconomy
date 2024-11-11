@@ -115,6 +115,14 @@ public class DatabaseManager {
                     + ");";
             statement.executeUpdate(sqlAutopays);
 
+            String sqlEmptyShops = "CREATE TABLE IF NOT EXISTS EmptyShops ("
+                + "  Coordinates varchar(32) NOT NULL,"
+                + "  Owner1 char(32),"
+                + "  Owner2 char(32),"
+                + "  PRIMARY KEY (Coordinates)"
+                + ");";
+            statement.executeUpdate(sqlEmptyShops);
+
             plugin.getLogger().info("Tables created or already exist.");
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating tables: " + e.getMessage());
@@ -150,6 +158,25 @@ public class DatabaseManager {
         }
 
         createTransactionsView(trimmedUuid);
+    }
+
+    public static void insertEmptyShop(String coordinates, String owner1, String owner2) {
+        String sql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, coordinates);
+            pstmt.setString(2, owner1);
+            pstmt.setString(3, owner2);
+            pstmt.executeUpdate();
+            plugin.getLogger().info("Empty shop recorded at " + coordinates);
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
+        }
+
+        createEmptyShopsView(owner1);
+        if (owner2 != null) {
+            createEmptyShopsView(owner2);
+        }
     }
 
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
@@ -242,7 +269,7 @@ public class DatabaseManager {
 
             try (ResultSet resultSet = preparedStatement.executeQuery()) {
                 if (resultSet.next() && resultSet.getInt(1) > 0) {
-                    return;
+                    return; // Exit if the view for that player already exists
                 }
             }
         } catch (SQLException e) {
@@ -271,9 +298,51 @@ public class DatabaseManager {
                     + "ORDER BY t.TransactionDatetime DESC;";
 
             statement.executeUpdate(sql);
-            plugin.getLogger().info("Transaction view created for UUID: " + uuid);
+            plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+        }
+    }
+
+    private static void createEmptyShopsView(@NotNull String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+        String viewName = "vw_EmptyShops_" + trimmedUuid;
+        String databaseName = plugin.getConfig().getString("database.database");
+        String checkSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement preparedStatement = conn.prepareStatement(checkSQL)) {
+            preparedStatement.setString(1, viewName);
+            preparedStatement.setString(2, databaseName);
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next() && resultSet.getInt(1) > 0) {
+                    return; // Exit if the view for that player already exists
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking for existing empty shops view: " + e.getMessage());
+            return;
+        }
+
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
+            String sql = "CREATE VIEW " + viewName + " AS "
+                    + "SELECT "
+                    + "    e.Coordinates "
+                    + "FROM EmptyShops e "
+                    + "WHERE Owner1 = ? OR Owner2 = ?;";
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, trimmedUuid);
+                pstmt.setString(2, trimmedUuid);
+                pstmt.executeUpdate();
+            }
+            
+            plugin.getLogger().info("Empty shops view created for UUID: " + untrimmedUuid);
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error creating empty shops view: " + e.getMessage());
         }
     }
 
@@ -343,6 +412,52 @@ public class DatabaseManager {
         }
 
         return transactions.toString();
+    }
+
+    public static List<String> displayEmptyShopsView(@NotNull String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String viewName = "vw_EmptyShops_" + trimmedUuid;
+        List<String> emptyShops = new ArrayList<>();
+
+        // Check if the view for that player exists
+        String checkViewSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+        String databaseName = plugin.getConfig().getString("database.database");
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(checkViewSQL)) {
+            pstmt.setString(1, viewName);
+            pstmt.setString(2, databaseName);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    return null; // Return null if the view does not exist
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking for empty shops view: " + e.getMessage());
+            return null;
+        }
+
+        // If the view exists, proceed to retrieve the coordinates
+        String sql = "SELECT Coordinates FROM " + viewName + ";";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while (rs.next()) {
+                String coordinates = rs.getString("Coordinates");
+                emptyShops.add(coordinates);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error retrieving empty shops for UUID " + trimmedUuid + ": " + e.getMessage());
+        }
+
+        if (emptyShops.isEmpty()) {
+            return null;
+        }
+
+        return emptyShops;
     }
 
     public static void addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
@@ -832,6 +947,22 @@ public class DatabaseManager {
             pstmt.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().severe("Error updating change for UUID " + untrimmedUuid + ": " + e.getMessage());
+        }
+    }
+
+    public static void removeEmptyShop(String coordinates) {
+        String sql = "DELETE FROM EmptyShops WHERE Coordinates = ?;";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, coordinates);
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                plugin.getLogger().info("Empty shop at " + coordinates + " removed from the database.");
+            } else {
+                plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error removing empty shop: " + e.getMessage());
         }
     }
 

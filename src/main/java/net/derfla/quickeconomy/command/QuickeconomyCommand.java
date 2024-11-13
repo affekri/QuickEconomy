@@ -5,6 +5,7 @@ import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
@@ -38,7 +39,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         plugin.getConfig().set("database.enabled", false);
                         plugin.saveConfig();
                         Main.SQLMode = false;
-                        sender.sendMessage("Migrated to file mode. You should consider restarting the server."); // TODO Add this string to translations
+                        sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
                         return true;
                     } else {
                         try{
@@ -47,9 +48,9 @@ public class QuickeconomyCommand implements TabExecutor {
                             Main.SQLMode = true;
                             plugin.getConfig().set("database.enabled", true);
                             plugin.saveConfig();
-                            sender.sendMessage("Migrated to database. You should consider restarting the server."); // TODO Add this string to translations
+                            sender.sendMessage(Component.translatable("qecommand.migrate.database").style(Styles.INFOSTYLE));
                         } catch (Exception e) {
-                            sender.sendMessage("Failed to connect to database! \n See console for more info!"); // TODO Add this string to translations
+                            sender.sendMessage(Component.translatable("qecommand.migrate.database.fail").style(Styles.ERRORSTYLE));
                             plugin.getLogger().warning("Failed to connect to database! " + e.getMessage());
                         }
                         DatabaseManager.migrateToDatabase();
@@ -69,16 +70,16 @@ public class QuickeconomyCommand implements TabExecutor {
                         timestampString = strings[1] + "-" + strings[2] + "-" + strings[3] + " " + strings[4];
                         rollbackTime = Timestamp.valueOf(timestampString);
                     }catch (Exception e){
-                        sender.sendMessage("Incorrect date format!"); // TODO Add this string to translations
+                        sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
                         plugin.getLogger().info("Rollback failed: " + e.getMessage());
                         return true;
                     }
                     try {
                         DatabaseManager.rollback(String.valueOf(rollbackTime));
-                        sender.sendMessage("Completed rollback!"); // TODO Add this string to translations
+                        sender.sendMessage(Component.translatable("qecommand.rollback.success").style(Styles.INFOSTYLE));
                         plugin.getLogger().info("Rollback complete to " + timestampString);
                     } catch (Exception e){
-                        sender.sendMessage("Failed rollback!"); // TODO Add this string to translations
+                        sender.sendMessage(Component.translatable("qecommand.rollback.fail", Styles.INFOSTYLE));
                         plugin.getLogger().info("Rollback failed: " + e.getMessage());
                         return true;
                     }
@@ -88,10 +89,9 @@ public class QuickeconomyCommand implements TabExecutor {
                         break;
                     }
                     String storageMethod = Main.SQLMode ? "SQL Server" : "File";
-                    sender.sendMessage("Storage method: " + storageMethod);
-                    sender.sendMessage("Plugin version: " + plugin.getDescription().getVersion());
+                    sender.sendMessage(Component.translatable("qecommand.setup", Component.text(storageMethod), Component.text(plugin.getDescription().getVersion())).style(Styles.INFOSTYLE));
                     if(DerflaAPI.updateAvailable()) {
-                        sender.sendMessage("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
+                        sender.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
                     }
                     return true;
             }
@@ -115,6 +115,15 @@ public class QuickeconomyCommand implements TabExecutor {
         }
         if (sender.hasPermission("quickeconomy.bank.create")) {
             sender.sendMessage(Component.translatable("qecommand.bank.create", Styles.INFOSTYLE));
+        }
+        if (sender.hasPermission("quickeconomy.migrate")) {
+            sender.sendMessage(Component.translatable("qecommand.migrate.info", Styles.INFOSTYLE));
+        }
+        if (sender.hasPermission("quickeconomy.rollback")) {
+            sender.sendMessage(Component.translatable("qecommand.rollback.info", Styles.INFOSTYLE));
+        }
+        if (sender.hasPermission("quickeconomy.setup")) {
+            sender.sendMessage(Component.translatable("qecommand.setup.info", Styles.INFOSTYLE));
         }
         return true;
 

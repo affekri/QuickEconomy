@@ -172,7 +172,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 String transactions = DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), transactionsPlayer.getName(), true);
                 if(transactions.isEmpty()){
-                    transactionsPlayer.sendMessage("You do not have any transactions."); // TODO Add this string to translations
+                    transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
                     break;
                 }
                 transactionsPlayer.sendMessage(transactions);

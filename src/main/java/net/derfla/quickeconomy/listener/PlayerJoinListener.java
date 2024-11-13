@@ -4,6 +4,7 @@ import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 
 import java.util.List;
 
@@ -22,11 +23,15 @@ public class PlayerJoinListener implements Listener {
     public void onPlayerJoin (PlayerJoinEvent event) {
         Player player = event.getPlayer();
         Translation.init(player);
+        if(player.isOp() && DerflaAPI.updateAvailable()){
+            player.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
+        }
         String uuid = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
         if (Main.SQLMode) {
             if (!DatabaseManager.accountExists(uuid)) {
                 DatabaseManager.addAccount(String.valueOf(player.getUniqueId()), player.getName(), 0, 0);
             } else {
+                DatabaseManager.updatePlayerName(player.getUniqueId().toString(), player.getName());
                 // Check for empty shops and notify the player
                 List<String> emptyShops = DatabaseManager.displayEmptyShopsView(uuid);
                 if (emptyShops != null && !emptyShops.isEmpty()) {
@@ -42,6 +47,7 @@ public class PlayerJoinListener implements Listener {
             }
             if (!Balances.hasAccount(uuid)) {
                 file.set("players." + uuid + ".name", player.getName());
+                BalanceFile.save();
                 return;
             }
             if (!(file.contains("players." + uuid + ".change"))) {

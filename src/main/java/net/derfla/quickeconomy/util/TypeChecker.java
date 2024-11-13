@@ -2,6 +2,11 @@ package net.derfla.quickeconomy.util;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 
 public class TypeChecker {
@@ -85,5 +90,26 @@ public class TypeChecker {
         }
         return false;
     }
+
+    public static String convertToUTC(String dateString) {
+        // Parse the input date string to LocalDateTime
+        LocalDateTime localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        // Convert LocalDateTime to ZonedDateTime in UTC
+        ZonedDateTime utcDateTime = localDateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC);
+        // Format the UTC date-time to a string
+        return utcDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
+    public static String convertToLocalTime(String dateString) {
+        // Parse the input date string to LocalDateTime
+        LocalDateTime localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        // Convert LocalDateTime to ZonedDateTime in UTC
+        ZonedDateTime utcDateTime = localDateTime.atZone(ZoneOffset.UTC);
+        // Convert UTC ZonedDateTime to the system's default time zone
+        ZonedDateTime localDateTimeZone = utcDateTime.withZoneSameInstant(ZoneId.systemDefault());
+        // Format the local date-time to a string
+        return localDateTimeZone.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
 
 }

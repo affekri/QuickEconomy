@@ -11,7 +11,10 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 import java.io.FileWriter;
@@ -23,9 +26,11 @@ public class DatabaseManager {
     private static HikariDataSource dataSource;
 
     public static Connection getConnection() throws SQLException {
-        return dataSource.getConnection(); // Get a connection from the pool
+        if (dataSource == null) {
+            throw new IllegalStateException("DataSource is not initialized. Call connectToDatabase() first.");
+        }
+        return dataSource.getConnection();
     }
-
 
     public static void connectToDatabase() {
         HikariConfig config = new HikariConfig();
@@ -66,64 +71,87 @@ public class DatabaseManager {
         }
     }
 
-    public static void createTables() {
+    private static boolean tableExists(@NotNull String tableName) {
+        // Check if table exists and return true if it does, false otherwise
         try (Connection conn = getConnection();
-             Statement statement = conn.createStatement()) {
-            // Create PlayerAccounts table
-            String sqlPlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
-                    + "  UUID char(32) NOT NULL,"
-                    + "  AccountDatetime varchar(23) NOT NULL,"
-                    + "  PlayerName varchar(16) NOT NULL,"
-                    + "  Balance float NOT NULL DEFAULT 0,"
-                    + "  BalChange float NOT NULL DEFAULT 0,"
-                    + "  PRIMARY KEY (UUID)"
-                    + ");";
-            statement.executeUpdate(sqlPlayerAccounts);
+             PreparedStatement pstmt = conn.prepareStatement("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
+            pstmt.setString(1, tableName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+        }
+        return false;
+    }
 
-            String sqlTransactions = "CREATE TABLE IF NOT EXISTS Transactions ("
-                    + "  TransactionID bigint NOT NULL AUTO_INCREMENT,"
-                    + "  TransactionDatetime varchar(23) NOT NULL,"
-                    + "  TransactionType varchar(16) NOT NULL,"
-                    + "  Induce varchar(16) NOT NULL,"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  NewSourceBalance float,"
-                    + "  NewDestinationBalance float,"
-                    + "  Amount float NOT NULL,"
-                    + "  Passed tinyint(1),"
-                    + "  PassedReason varchar(16) DEFAULT NULL,"
-                    + "  TransactionMessage varchar(32),"
-                    + "  PRIMARY KEY (TransactionID),"
-                    + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
-                    + ");";
-            statement.executeUpdate(sqlTransactions);
+    public static void createTables() {
+        List<String> tableCreationQueries = new ArrayList<>();
 
-            String sqlAutopays = "CREATE TABLE IF NOT EXISTS Autopays ("
-                    + "  AutopayID bigint NOT NULL AUTO_INCREMENT,"
-                    + "  AutopayDatetime DATETIME NOT NULL,"
-                    + "  Active tinyint(1) NOT NULL DEFAULT 1,"
-                    + "  AutopayName varchar(16),"
-                    + "  Source char(32),"
-                    + "  Destination char(32),"
-                    + "  Amount float NOT NULL,"
-                    + "  InverseFrequency int NOT NULL,"
-                    + "  TimesLeft int,"
-                    + "  PRIMARY KEY (AutopayID),"
-                    + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                    + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
-                    + ");";
-            statement.executeUpdate(sqlAutopays);
+        String PlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
+                + "  UUID char(32) NOT NULL,"
+                + "  AccountDatetime varchar(23) NOT NULL,"
+                + "  PlayerName varchar(16) NOT NULL,"
+                + "  Balance float NOT NULL DEFAULT 0,"
+                + "  BalChange float NOT NULL DEFAULT 0,"
+                + "  PRIMARY KEY (UUID)"
+                + ");";
+        tableCreationQueries.add(PlayerAccounts);
 
-            String sqlEmptyShops = "CREATE TABLE IF NOT EXISTS EmptyShops ("
+        String Transactions = "CREATE TABLE IF NOT EXISTS Transactions ("
+                + "  TransactionID bigint NOT NULL AUTO_INCREMENT,"
+                + "  TransactionDatetime varchar(23) NOT NULL,"
+                + "  TransactionType varchar(16) NOT NULL,"
+                + "  Induce varchar(16) NOT NULL,"
+                + "  Source char(32),"
+                + "  Destination char(32),"
+                + "  NewSourceBalance float,"
+                + "  NewDestinationBalance float,"
+                + "  Amount float NOT NULL,"
+                + "  Passed tinyint(1),"
+                + "  PassedReason varchar(16) DEFAULT NULL,"
+                + "  TransactionMessage varchar(32),"
+                + "  PRIMARY KEY (TransactionID),"
+                + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
+                + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
+                + ");";
+        tableCreationQueries.add(Transactions);
+
+        String Autopays = "CREATE TABLE IF NOT EXISTS Autopays ("
+                + "  AutopayID bigint NOT NULL AUTO_INCREMENT,"
+                + "  AutopayDatetime DATETIME NOT NULL,"
+                + "  Active tinyint(1) NOT NULL DEFAULT 1,"
+                + "  AutopayName varchar(16),"
+                + "  Source char(32),"
+                + "  Destination char(32),"
+                + "  Amount float NOT NULL,"
+                + "  InverseFrequency int NOT NULL,"
+                + "  TimesLeft int,"
+                + "  PRIMARY KEY (AutopayID),"
+                + "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
+                + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)"
+                + ");";
+        tableCreationQueries.add(Autopays);
+
+        String EmptyShops = "CREATE TABLE IF NOT EXISTS EmptyShops ("
                 + "  Coordinates varchar(32) NOT NULL,"
                 + "  Owner1 char(32),"
                 + "  Owner2 char(32),"
                 + "  PRIMARY KEY (Coordinates)"
                 + ");";
-            statement.executeUpdate(sqlEmptyShops);
+        tableCreationQueries.add(EmptyShops);
 
-            plugin.getLogger().info("Tables created or already exist.");
+        // Execute the SQL statements to create tables
+        try (Connection conn = getConnection();
+             Statement statement = conn.createStatement()) {
+            for (String query : tableCreationQueries) {
+                if (!tableExists(query)) {
+                    statement.executeUpdate(query); // Execute table creation query
+                } else {
+                    plugin.getLogger().info("Table " + query + " already exists in database.");
+                }
+            }
         } catch (SQLException e) {
             plugin.getLogger().severe("Error creating tables: " + e.getMessage());
         }
@@ -131,9 +159,8 @@ public class DatabaseManager {
 
     public static void addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
-        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String currentTimeString = sdf.format(currentTime);
+        Instant currentTime = Instant.now(); // Use Instant for UTC time
+        String currentTimeString = TypeChecker.convertToUTC(currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))); 
 
         if (accountExists(trimmedUuid)) {
             plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
@@ -143,7 +170,7 @@ public class DatabaseManager {
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 pstmt.setString(1, trimmedUuid);
-                pstmt.setString(2, currentTimeString);
+                pstmt.setString(2, currentTimeString); // Use the converted UTC time
                 pstmt.setString(3, playerName);
                 pstmt.setDouble(4, balance);
                 pstmt.setDouble(5, change);
@@ -156,11 +183,10 @@ public class DatabaseManager {
                 plugin.getLogger().severe("Error adding player account: " + e.getMessage());
             }
         }
-
         createTransactionsView(trimmedUuid);
     }
 
-    public static void insertEmptyShop(String coordinates, String owner1, String owner2) {
+    public static void insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
         String sql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -168,7 +194,7 @@ public class DatabaseManager {
             pstmt.setString(2, owner1);
             pstmt.setString(3, owner2);
             pstmt.executeUpdate();
-            plugin.getLogger().info("Empty shop recorded at " + coordinates);
+            plugin.getLogger().info("Empty shop registered at " + coordinates);
         } catch (SQLException e) {
             plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
         }
@@ -183,7 +209,7 @@ public class DatabaseManager {
                                           String destination, double amount, String transactionMessage) {
         String trimmedSource = TypeChecker.trimUUID(source);
         String trimmedDestination = TypeChecker.trimUUID(destination);
-        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+        Instant currentTime = Instant.now(); // Use Instant for UTC time
 
         // SQL to handle the transaction
         String sqlUpdateSource = "UPDATE PlayerAccounts SET Balance = Balance - ? WHERE UUID = ?";
@@ -232,9 +258,11 @@ public class DatabaseManager {
                 }
             }
 
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC); // Move this line here
+        
             // Insert into Transactions table
             try (PreparedStatement pstmtInsertTransaction = conn.prepareStatement(sqlInsertTransaction)) {
-                pstmtInsertTransaction.setString(1, currentTime.toString());         // TransactionDatetime
+                pstmtInsertTransaction.setString(1, TypeChecker.convertToUTC(formatter.format(currentTime))); // Updated to use convertToUTC
                 pstmtInsertTransaction.setString(2, transactType);                   // TransactionType
                 pstmtInsertTransaction.setString(3, induce);                         // Induce
                 pstmtInsertTransaction.setString(4, trimmedSource);                  // Source
@@ -242,7 +270,7 @@ public class DatabaseManager {
                 pstmtInsertTransaction.setObject(6, newSourceBalance);               // NewSourceBalance (nullable)
                 pstmtInsertTransaction.setObject(7, newDestinationBalance);          // NewDestinationBalance (nullable)
                 pstmtInsertTransaction.setDouble(8, amount);                         // Amount
-                pstmtInsertTransaction.setInt(9, 1);                              // Passed (always 1 if successful)
+                pstmtInsertTransaction.setInt(9, 1);                               // Passed (always 1 if successful)
                 pstmtInsertTransaction.setString(10, transactionMessage);            // TransactionMessage
                 pstmtInsertTransaction.executeUpdate();
             }
@@ -251,7 +279,15 @@ public class DatabaseManager {
             conn.commit();
             Balances.addPlayerBalanceChange(trimmedDestination, (float) amount);
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
+            if(trimmedDestination != null && trimmedSource != null) {
+                plugin.getLogger().severe("Error executing transaction from " + trimmedSource + " to " + trimmedDestination + ": " + e.getMessage());
+            } else if (trimmedSource != null) {
+                plugin.getLogger().severe("Error executing transaction from " + trimmedSource + ": " + e.getMessage());
+            } else if (trimmedDestination != null) {
+                plugin.getLogger().severe("Error executing transaction to " + trimmedDestination + ": " + e.getMessage());
+            } else {
+                plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
+            }
         }
     }
 
@@ -367,48 +403,55 @@ public class DatabaseManager {
         return balance;
     }
 
-    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed) {
+    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed, int page, int pageSize) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
         StringBuilder transactions = new StringBuilder();
+
+        // Calculate the offset for pagination
+        int offset = (page - 1) * pageSize;
 
         String sql;
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
         }
 
         try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, pageSize); // Set the page size
+            pstmt.setInt(2, offset); // Set the offset for pagination
+            ResultSet rs = pstmt.executeQuery();
 
             // Iterate over the result set
             while (rs.next()) {
-                String dateTime = rs.getString("TransactionDateTime");
+                String dateTimeUTC = rs.getString("TransactionDateTime");
+                String dateTimeLocal = TypeChecker.convertToLocalTime(dateTimeUTC); // Convert to local time
                 Double amount = rs.getDouble("Amount");
                 String source = rs.getString("SourcePlayerName");
                 String destination = rs.getString("DestinationPlayerName");
                 String transactionMessage = rs.getString("Message");
 
-                transactions.append(dateTime).append(" ").append(amount);
+                transactions.append(dateTimeLocal).append(" ").append(amount);
                 if (source.equalsIgnoreCase(playerName)) {
                     transactions.append(" -> ").append(destination);
-                }else {
+                } else {
                     transactions.append(" <- ").append(source);
                 }
-                if(transactionMessage != null) {
-                    transactions.append(transactionMessage);
+                if (transactionMessage != null) {
+                    transactions.append(" ").append(transactionMessage);
                 }
                 transactions.append("\n");
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error viewing transactions for UUID " + uuid + ": " + e.getMessage());
+            plugin.getLogger().severe("Error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
 
         return transactions.toString();
@@ -416,6 +459,7 @@ public class DatabaseManager {
 
     public static List<String> displayEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String viewName = "vw_EmptyShops_" + trimmedUuid;
         List<String> emptyShops = new ArrayList<>();
 
@@ -450,7 +494,7 @@ public class DatabaseManager {
                 emptyShops.add(coordinates);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error retrieving empty shops for UUID " + trimmedUuid + ": " + e.getMessage());
+            plugin.getLogger().severe("Error retrieving empty shops for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
 
         if (emptyShops.isEmpty()) {
@@ -477,42 +521,25 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error: EndsAfter must be 0 (for continuous) or greater.");
             return;
         }
-        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String currentTimeString = sdf.format(currentTime);
+        
+        Instant currentTime = Instant.now(); // Use Instant for UTC time
+        String currentTimeUTC = TypeChecker.convertToUTC(currentTime.toString()); // Convert to UTC using TypeChecker
 
-        String sql = "DECLARE @AutopayName varchar(16) = ?;"
-                + "DECLARE @UUID char(32) = ?;"
-                + "AutopayDatetime DATETIME = ?;"
-                + "DECLARE @Destination char(32) = ?;"
-                + "DECLARE @Amount float = ?;"
-                + "DECLARE @InverseFrequency int NOT NULL = ?;"
-                + "DECLARE @EndsAfter int NOT NULL = ?;"
-                + "BEGIN TRY"
-                + "    INSERT INTO Autopays ("
-                + "        Active, AutopayDatetime, AutopayName, Source, Destination,"
-                + "        Amount, InverseFrequency, EndsAfter"
-                + "    )"
-                + "    VALUES ("
-                + "        1, GETDATE(), @AutopayName, @UUID, @Destination,"
-                + "        @Amount, @InverseFrequency, @EndsAfter"
-                + "    );"
-                + "    PRINT 'Autopay created successfully.';"
-                + "END TRY"
-                + "BEGIN CATCH"
-                + "    PRINT 'Error occurred while creating autopay:';"
-                + "    PRINT ERROR_MESSAGE();"
-                + "END CATCH;";
+        String sql = "INSERT INTO Autopays (" +
+                "    Active, AutopayDatetime, AutopayName, Source, Destination," +
+                "    Amount, InverseFrequency, EndsAfter" +
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
 
         try (Connection conn = getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, autopayName);
-            pstmt.setString(2, trimmedUuid);
-            pstmt.setString(3, currentTimeString);
-            pstmt.setString(4, trimmedDestination);
-            pstmt.setDouble(5, amount);
-            pstmt.setInt(6, inverseFrequency);
-            pstmt.setInt(7, endsAfter);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, 1); // Active
+            pstmt.setString(2, currentTimeUTC); // AutopayDatetime converted to UTC
+            pstmt.setString(3, autopayName); // AutopayName
+            pstmt.setString(4, trimmedUuid); // Source
+            pstmt.setString(5, trimmedDestination); // Destination
+            pstmt.setDouble(6, amount); // Amount
+            pstmt.setInt(7, inverseFrequency); // InverseFrequency
+            pstmt.setInt(8, endsAfter); // EndsAfter
 
             pstmt.executeUpdate();
             plugin.getLogger().info("Autopay added successfully");
@@ -599,99 +626,145 @@ public class DatabaseManager {
     }
 
 
-    public static String listAllAccounts() {
+    public static List<String> listAllAccounts() {
         String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
-        StringBuilder accounts = new StringBuilder();
+        List<String> accounts = new ArrayList<>();
 
         try (Connection conn = getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql);
-            ResultSet rs = pstmt.executeQuery()) {
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
-                accounts.append(rs.getString("PlayerName")).append(": ").append(rs.getDouble("Balance")).append("\n");
+                String playerName = rs.getString("PlayerName");
+                double balance = rs.getDouble("Balance");
+                String accountDatetimeUTC = rs.getString("Created"); // Get the UTC datetime
+                String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC); // Convert to local time
+
+                String accountInfo = playerName + ": " + balance + " (Created: " + accountDatetimeLocal + ")";
+                accounts.add(accountInfo);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error listing all accounts: " + e.getMessage());
+            plugin.getLogger().severe("Error listing accounts: " + e.getMessage());
         }
 
-        return accounts.toString();
+        return accounts;
     }
 
+    private static boolean validateRollbackInput(String targetDateTime) {
+        // Validate targetDateTime
+        try {
+            // Convert the targetDateTime to UTC format
+            String targetDateTimeUTC = TypeChecker.convertToUTC(targetDateTime); // Use convertToUTC method
+
+            // Check if there are any transactions to roll back
+            String checkTransactionsSQL = "SELECT COUNT(*) FROM Transactions WHERE TransactionDatetime > ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(checkTransactionsSQL)) {
+                pstmt.setString(1, targetDateTimeUTC); // Use the converted UTC time
+                ResultSet rs = pstmt.executeQuery();
+                
+                if (rs.next() && rs.getInt(1) == 0) {
+                    plugin.getLogger().info("No transactions found to roll back after " + targetDateTime);
+                    return false; // Exit the method if no transactions are found
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Error checking for transactions: " + e.getMessage());
+                return false; // Exit the method if there's an error checking transactions
+            }
+        } catch (DateTimeParseException e) {
+            plugin.getLogger().severe("Invalid targetDateTime format: " + targetDateTime);
+            return false; // Exit the method if the format is invalid
+        }
+        
+        return true;
+    }
+    
     public static void rollback(String targetDateTime) {
+        // Validate input
+        if (!validateRollbackInput(targetDateTime)) {
+            return;
+        }
+
         try (Connection conn = getConnection()) {
             // Disable auto-commit to ensure transaction consistency
             conn.setAutoCommit(false);
 
             try {
-                // 1. First, get all transactions after the target datetime that were successful
+                // 1. Get all successful transactions after the target datetime
                 String getTransactionsSQL =
                         "SELECT * FROM Transactions " +
-                                "WHERE TransactionDatetime > ? AND Passed = 1 " +
-                                "ORDER BY TransactionDatetime DESC";
+                        "WHERE TransactionDatetime > ? AND Passed = 1 " +
+                        "ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?"; // Add LIMIT and OFFSET
 
-                try (PreparedStatement pstmt = conn.prepareStatement(getTransactionsSQL)) {
-                    pstmt.setString(1, targetDateTime);
-                    ResultSet rs = pstmt.executeQuery();
+                // Convert targetDateTime to UTC
+                String targetDateTimeUTC = TypeChecker.convertToUTC(targetDateTime);
 
-                    // 2. Reverse each transaction
-                    while (rs.next()) {
-                        String source = rs.getString("Source");
-                        String destination = rs.getString("Destination");
-                        float amount = rs.getFloat("Amount");
-                        String transactionType = rs.getString("TransactionType");
+                int batchSize = 100; // Define a suitable batch size
+                int offset = 0; // Initialize offset
+                boolean hasMoreRows = true;
 
-                        // Update source balance if exists
-                        if (source != null) {
-                            String updateSourceSQL =
-                                    "UPDATE PlayerAccounts SET Balance = Balance + ?, " +
-                                            "BalChange = BalChange + ? " +
-                                            "WHERE UUID = ?";
-                            try (PreparedStatement updateSource = conn.prepareStatement(updateSourceSQL)) {
-                                updateSource.setFloat(1, amount);
-                                updateSource.setFloat(2, amount);
-                                updateSource.setString(3, source);
-                                updateSource.executeUpdate();
+                while (hasMoreRows) {
+                    try (PreparedStatement pstmt = conn.prepareStatement(getTransactionsSQL)) {
+                        pstmt.setString(1, targetDateTimeUTC); // Set target datetime
+                        pstmt.setInt(2, batchSize); // Set limit
+                        pstmt.setInt(3, offset); // Set offset
+                        ResultSet rs = pstmt.executeQuery();
+
+                        int processedRows = 0; // Count processed rows in this batch
+
+                        // 2. Reverse each transaction in the batch
+                        while (rs.next() && processedRows < batchSize) {
+                            String source = rs.getString("Source");
+                            String destination = rs.getString("Destination");
+                            float amount = rs.getFloat("Amount");
+
+                            // Update source balance if exists
+                            if (source != null) {
+                                Double newBalance = displayBalance(source) + amount;
+                                Double newChange = getPlayerBalanceChange(source) + amount;
+                                setPlayerBalance(source, newBalance, newChange);
                             }
+
+                            // Update destination balance if exists
+                            if (destination != null) {
+                                Double newBalance = displayBalance(destination) - amount;
+                                Double newChange = getPlayerBalanceChange(destination) - amount;
+                                setPlayerBalance(destination, newBalance, newChange);
+                            }
+
+                            processedRows++;
                         }
 
-                        // Update destination balance if exists
-                        if (destination != null) {
-                            String updateDestSQL =
-                                    "UPDATE PlayerAccounts SET Balance = Balance - ?, " +
-                                            "BalChange = BalChange - ? " +
-                                            "WHERE UUID = ?";
-                            try (PreparedStatement updateDest = conn.prepareStatement(updateDestSQL)) {
-                                updateDest.setFloat(1, amount);
-                                updateDest.setFloat(2, amount);
-                                updateDest.setString(3, destination);
-                                updateDest.executeUpdate();
-                            }
+                        // Check if we processed fewer rows than the batch size
+                        if (processedRows < batchSize) {
+                            hasMoreRows = false; // No more rows to process
                         }
                     }
+                    offset += batchSize; // Increment the offset for the next batch
                 }
 
                 // 3. Delete transactions after target datetime
                 String deleteTransactionsSQL = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
                 try (PreparedStatement pstmt = conn.prepareStatement(deleteTransactionsSQL)) {
-                    pstmt.setString(1, targetDateTime);
-                    pstmt.executeUpdate();
+                    pstmt.setString(1, targetDateTimeUTC);
+                    int rowsDeleted = pstmt.executeUpdate(); // Store the number of deleted rows
+                    plugin.getLogger().info(rowsDeleted + " transactions deleted after " + targetDateTime); // Log the count
                 }
 
-                // 4. Handle Autopays
-                // Option 1: Delete autopays created after target datetime
+                // 4. Delete autopays created after target datetime
                 String deleteAutopaysSQL = "DELETE FROM Autopays WHERE AutopayDatetime > ?";
                 try (PreparedStatement pstmt = conn.prepareStatement(deleteAutopaysSQL)) {
-                    pstmt.setString(1, targetDateTime);
+                    pstmt.setString(1, targetDateTimeUTC);
                     pstmt.executeUpdate();
                 }
 
                 // 5. Reset account creation dates that are after target datetime
                 String resetAccountsSQL =
                         "UPDATE PlayerAccounts SET AccountDatetime = ? " +
-                                "WHERE AccountDatetime > ?";
+                        "WHERE AccountDatetime > ?";
                 try (PreparedStatement pstmt = conn.prepareStatement(resetAccountsSQL)) {
-                    pstmt.setString(1, targetDateTime);
-                    pstmt.setString(2, targetDateTime);
+                    pstmt.setString(1, targetDateTimeUTC);
+                    pstmt.setString(2, targetDateTimeUTC);
                     pstmt.executeUpdate();
                 }
 
@@ -703,7 +776,7 @@ public class DatabaseManager {
                 // If anything fails, roll back all changes
                 conn.rollback();
                 plugin.getLogger().severe("Error during rollback, changes reverted: " + e.getMessage());
-                throw e;
+                throw e; // Rethrow to handle it at a higher level
             }
         } catch (SQLException e) {
             plugin.getLogger().severe("Database rollback failed: " + e.getMessage());
@@ -740,7 +813,13 @@ public class DatabaseManager {
                 plugin.getLogger().info("No player balances found. Migration complete.");
                 return true;
             }
-            for (String key : playersSection.getKeys(false)) {
+
+            int batchSize = 100; // Define a suitable batch size
+            List<String> keys = new ArrayList<>(playersSection.getKeys(false));
+            int totalKeys = keys.size();
+
+            for (int i = 0; i < totalKeys; i++) {
+                String key = keys.get(i);
                 double balance = playersSection.getDouble(key + ".balance");
                 double change = playersSection.getDouble(key + ".change");
                 String playerName = playersSection.getString(key + ".name");
@@ -751,7 +830,13 @@ public class DatabaseManager {
                 } else {
                     setPlayerBalance(trimmedUuid, balance, change);
                 }
+
+                // Commit in batches
+                if ((i + 1) % batchSize == 0 || i == totalKeys - 1) {
+                    plugin.getLogger().info("Processed " + (i + 1) + " player accounts.");
+                }
             }
+
             plugin.getLogger().info("Migration to database completed successfully.");
             return true;
         } catch (Exception e) {
@@ -762,15 +847,16 @@ public class DatabaseManager {
 
     public static void migrateToBalanceFile() {
         String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
-        String sql = "SELECT * FROM PlayerAccounts";
+        String sql = "SELECT * FROM PlayerAccounts LIMIT ? OFFSET ?"; // Use LIMIT and OFFSET for pagination
+
+        int batchSize = 100; // Define the batch size
+        int offset = 0; // Initialize offset
+        int playerCount = 0;
 
         try (Connection conn = DatabaseManager.getConnection();
-            PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
-            ResultSet rsCount = pstmtCount.executeQuery();
-            PreparedStatement pstmt = conn.prepareStatement(sql);
-            ResultSet rs = pstmt.executeQuery()) {
+             PreparedStatement pstmtCount = conn.prepareStatement(sqlCount);
+             ResultSet rsCount = pstmtCount.executeQuery()) {
 
-            int playerCount = 0;
             if (rsCount.next()) {
                 playerCount = rsCount.getInt("playerCount");
             }
@@ -779,7 +865,6 @@ public class DatabaseManager {
             BalanceFile.get().options().copyDefaults(true);
             BalanceFile.save();
 
-
             FileConfiguration balanceConfig = BalanceFile.get();
             for (String key : balanceConfig.getKeys(false)) {
                 balanceConfig.set(key, null);
@@ -787,21 +872,33 @@ public class DatabaseManager {
 
             balanceConfig.set("format", "uuid");
 
-            while (rs.next()) {
-                String uuid = rs.getString("UUID");
-                String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-                String playerName = rs.getString("PlayerName");
-                double balance = rs.getDouble("Balance");
-                double change = rs.getDouble("BalChange");
+            // Loop to fetch and process records in batches
+            while (offset < playerCount) {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setInt(1, batchSize); // Set the batch size
+                    pstmt.setInt(2, offset); // Set the current offset
+                    ResultSet rs = pstmt.executeQuery();
 
-                // Validate data before writing
-                if (uuid != null && playerName != null && balance >= 0) {
-                    balanceConfig.set("players." + uuid + ".name", playerName);
-                    balanceConfig.set("players." + uuid + ".balance", balance);
-                    balanceConfig.set("players." + uuid + ".change", change);
-                } else {
-                    plugin.getLogger().warning("Invalid data for UUID: " + untrimmedUuid);
+                    while (rs.next()) {
+                        String uuid = rs.getString("UUID");
+                        String trimmedUuid = TypeChecker.trimUUID(uuid);
+                        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+                        String playerName = rs.getString("PlayerName");
+                        double balance = rs.getDouble("Balance");
+                        double change = rs.getDouble("BalChange");
+
+                        // Validate data before writing
+                        if (uuid != null && playerName != null && balance >= 0) {
+                            balanceConfig.set("players." + trimmedUuid + ".name", playerName);
+                            balanceConfig.set("players." + trimmedUuid + ".balance", balance);
+                            balanceConfig.set("players." + trimmedUuid + ".change", change);
+                        } else {
+                            plugin.getLogger().warning("Invalid data for UUID: " + untrimmedUuid);
+                        }
+                    }
                 }
+
+                offset += batchSize; // Increment the offset for the next batch
             }
 
             // Save the updated configuration to balance.yml
@@ -815,23 +912,26 @@ public class DatabaseManager {
 
     public static boolean accountExists(@NotNull String uuid) {
         String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, TypeChecker.trimUUID(uuid));
+            pstmt.setString(1, trimmedUuid);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1) > 0; // Return true if count is greater than 0
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error checking account existence: " + e.getMessage());
+            plugin.getLogger().severe("Error checking account existence for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
         return false;
     }
 
     public static void updatePlayerName(String uuid, String playerName) {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
     
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -840,12 +940,12 @@ public class DatabaseManager {
             int rowsUpdated = pstmt.executeUpdate();
     
             if (rowsUpdated > 0) {
-                plugin.getLogger().info("Player name updated successfully for UUID: " + trimmedUuid);
+                plugin.getLogger().info("Player name updated successfully for UUID: " + untrimmedUuid);
             } else {
-                plugin.getLogger().info("No account found for UUID: " + trimmedUuid);
+                plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error updating player name for UUID " + trimmedUuid + ": " + e.getMessage());
+            plugin.getLogger().severe("Error updating player name for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
     }
 
@@ -853,37 +953,20 @@ public class DatabaseManager {
         String sqlAccounts = "SELECT * FROM PlayerAccounts";
         String sqlTransactions = "SELECT * FROM Transactions";
         String sqlAutopays = "SELECT * FROM Autopays";
-        String csvFilePath = "QuickEconomyExport.csv"; // Path to save the CSV file
+        String csvFilePath = "QE_DatabaseExport.csv"; // Path to save the CSV file
+        int batchSize = 100; // Define a suitable batch size
 
         try (Connection conn = getConnection();
              FileWriter csvWriter = new FileWriter(csvFilePath)) {
 
             // Export PlayerAccounts table
-            try (PreparedStatement pstmt = conn.prepareStatement(sqlAccounts);
-                 ResultSet rs = pstmt.executeQuery()) {
-
-                csvWriter.append("PlayerAccounts Table\n");
-                writeResultSetToCSV(rs, csvWriter);
-                csvWriter.append("\n"); // Separate tables with a blank line
-            }
-
+            exportTableToCSV(conn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize);
+            
             // Export Transactions table
-            try (PreparedStatement pstmt = conn.prepareStatement(sqlTransactions);
-                 ResultSet rs = pstmt.executeQuery()) {
-
-                csvWriter.append("Transactions Table\n");
-                writeResultSetToCSV(rs, csvWriter);
-                csvWriter.append("\n"); // Separate tables with a blank line
-            }
-
+            exportTableToCSV(conn, sqlTransactions, "Transactions Table", csvWriter, batchSize);
+            
             // Export Autopays table
-            try (PreparedStatement pstmt = conn.prepareStatement(sqlAutopays);
-                 ResultSet rs = pstmt.executeQuery()) {
-
-                csvWriter.append("Autopays Table\n");
-                writeResultSetToCSV(rs, csvWriter);
-                csvWriter.append("\n"); // Separate tables with a blank line
-            }
+            exportTableToCSV(conn, sqlAutopays, "Autopays Table", csvWriter, batchSize);
 
             plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
         } catch (SQLException e) {
@@ -893,24 +976,70 @@ public class DatabaseManager {
         }
     }
 
+    private static void exportTableToCSV(Connection conn, String sql, String tableName, FileWriter csvWriter, int batchSize) throws SQLException, IOException {
+        csvWriter.append(tableName + "\n");
+        
+        int offset = 0;
+        boolean hasMoreRows = true;
+
+        while (hasMoreRows) {
+            try (PreparedStatement pstmt = conn.prepareStatement(sql + " LIMIT ? OFFSET ?")) {
+                pstmt.setInt(1, batchSize);
+                pstmt.setInt(2, offset);
+                ResultSet rs = pstmt.executeQuery();
+
+                // Write the result set to CSV
+                if (!rs.isBeforeFirst()) { // Check if the result set is empty
+                    hasMoreRows = false; // No more rows to process
+                    break;
+                }
+
+                writeResultSetToCSV(rs, csvWriter);
+                offset += batchSize; // Increment the offset for the next batch
+                csvWriter.append("\n"); // Separate batches with a blank line
+                
+            } catch (SQLException e) {
+                plugin.getLogger().severe("SQL error while exporting table '" + tableName + "' at offset " + offset + ": " + e.getMessage());
+                throw e; // Rethrow the exception to handle it at a higher level
+            } catch (IOException e) {
+                plugin.getLogger().severe("IO error while writing to CSV for table '" + tableName + "' at offset " + offset + ": " + e.getMessage());
+                throw e; // Rethrow the exception to handle it at a higher level
+            } catch (Exception e) {
+                plugin.getLogger().severe("Unexpected error while exporting table '" + tableName + "' at offset " + offset + ": " + e.getMessage());
+                throw e; // Rethrow the exception to handle it at a higher level
+            }
+        }
+    }
+
     private static void writeResultSetToCSV(ResultSet rs, FileWriter csvWriter) throws SQLException, IOException {
         ResultSetMetaData metaData = rs.getMetaData();
         int columnCount = metaData.getColumnCount();
 
         // Write the header row
-        for (int i = 1; i <= columnCount; i++) {
-            csvWriter.append(metaData.getColumnName(i));
-            if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
-        }
-        csvWriter.append("\n");
-
-        // Write the data rows
-        while (rs.next()) {
+        try {
             for (int i = 1; i <= columnCount; i++) {
-                csvWriter.append(rs.getString(i));
+                csvWriter.append(metaData.getColumnName(i));
                 if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
             }
             csvWriter.append("\n");
+
+            // Write the data rows
+            while (rs.next()) {
+                for (int i = 1; i <= columnCount; i++) {
+                    csvWriter.append(rs.getString(i));
+                    if (i < columnCount) csvWriter.append(","); // Separate columns with a comma
+                }
+                csvWriter.append("\n");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("SQL error while writing result set to CSV: " + e.getMessage());
+            throw e; // Rethrow the exception to handle it at a higher level
+        } catch (IOException e) {
+            plugin.getLogger().severe("IO error while writing to CSV: " + e.getMessage());
+            throw e; // Rethrow the exception to handle it at a higher level
+        } catch (Exception e) {
+            plugin.getLogger().severe("Unexpected error while writing result set to CSV: " + e.getMessage());
+            throw e; // Rethrow the exception to handle it at a higher level
         }
     }
 

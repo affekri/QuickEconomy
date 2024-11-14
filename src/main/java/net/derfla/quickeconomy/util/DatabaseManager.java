@@ -186,23 +186,58 @@ public class DatabaseManager {
         createTransactionsView(trimmedUuid);
     }
 
-    public static void insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
-        String sql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, coordinates);
-            pstmt.setString(2, owner1);
-            pstmt.setString(3, owner2);
-            pstmt.executeUpdate();
-            plugin.getLogger().info("Empty shop registered at " + coordinates);
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
+    public static boolean insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
+        // Return true if a new empty shop was created, false if an existing shop was updated
+        if (emptyShopExists(coordinates)) {
+            // Update the owners of the existing shop
+            String updateSql = "UPDATE EmptyShops SET Owner1 = ?, Owner2 = ? WHERE Coordinates = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+                pstmt.setString(1, owner1);
+                pstmt.setString(2, owner2);
+                pstmt.setString(3, coordinates);
+                pstmt.executeUpdate();
+                plugin.getLogger().info("Empty shop at " + coordinates + " updated with new owners.");
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Error updating empty shop: " + e.getMessage());
+            }
+            return false;
+        } else {
+            // Insert a new empty shop
+            String insertSql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
+            try (Connection conn = getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+                pstmt.setString(1, coordinates);
+                pstmt.setString(2, owner1);
+                pstmt.setString(3, owner2);
+                pstmt.executeUpdate();
+                plugin.getLogger().info("Empty shop registered at " + coordinates);
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
+            }
         }
 
         createEmptyShopsView(owner1);
         if (owner2 != null) {
             createEmptyShopsView(owner2);
         }
+
+        return true;
+    }
+
+    private static boolean emptyShopExists(@NotNull String coordinates) {
+        String sql = "SELECT COUNT(*) FROM EmptyShops WHERE Coordinates = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, coordinates);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0; // Return true if the shop exists
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Error checking for empty shop: " + e.getMessage());
+        }
+        return false; // Return false if the shop does not exist or an error occurred
     }
 
     public static void executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
@@ -953,20 +988,17 @@ public class DatabaseManager {
         String sqlAccounts = "SELECT * FROM PlayerAccounts";
         String sqlTransactions = "SELECT * FROM Transactions";
         String sqlAutopays = "SELECT * FROM Autopays";
+        String sqlEmptyShops = "SELECT * FROM EmptyShops";
         String csvFilePath = "QE_DatabaseExport.csv"; // Path to save the CSV file
         int batchSize = 100; // Define a suitable batch size
 
         try (Connection conn = getConnection();
              FileWriter csvWriter = new FileWriter(csvFilePath)) {
 
-            // Export PlayerAccounts table
             exportTableToCSV(conn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize);
-            
-            // Export Transactions table
             exportTableToCSV(conn, sqlTransactions, "Transactions Table", csvWriter, batchSize);
-            
-            // Export Autopays table
             exportTableToCSV(conn, sqlAutopays, "Autopays Table", csvWriter, batchSize);
+            exportTableToCSV(conn, sqlEmptyShops, "EmptyShops Table", csvWriter, batchSize);
 
             plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
         } catch (SQLException e) {

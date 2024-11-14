@@ -29,16 +29,16 @@ public class ShopInventory implements InventoryHolder {
         // Check if shop is empty
         if (chest.getBlockInventory().isEmpty()) {
             player.sendMessage(Component.translatable("shop.inventory.empty.player", Styles.INFOSTYLE));
-            if (owner != null) {
-                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE, Component.text(owner)));
-            }
-            if (owner2 != null) {
-                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE, Component.text(owner2)));
-            }
 
             // Store empty shop details in the database
             String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
-            DatabaseManager.insertEmptyShop(coordinates, owner, owner2);
+            
+            // If a new empty shop was created, send a message to owner
+            if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
+                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+            } else {
+                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+            }
             
             return;
         }

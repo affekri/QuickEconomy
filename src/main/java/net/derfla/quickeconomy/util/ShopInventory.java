@@ -35,11 +35,17 @@ public class ShopInventory implements InventoryHolder {
             
             // If a new empty shop was created, send a message to owner
             if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
-                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
-            } else {
-                player.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                
+                if (owner != null) {
+                    Player shopOwnerPlayer = Bukkit.getPlayer(owner);
+                    shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                }
+                if (owner2 != null) {
+                    Player shopOwnerPlayer2 = Bukkit.getPlayer(owner2);
+                    shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                }
             }
-            
+
             return;
         }
 

@@ -9,3 +9,13 @@ database:
   database: minecraft_db
   username: user
   password: pass
+# Shops
+shop:
+  emptyShopOwnerMessage: true
+  emptyShopListJoin: true
+# Players
+player:
+  welcomeMessage: true
+  op:
+    updateMessage: true
+

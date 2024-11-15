@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.util;
 
+import net.derfla.quickeconomy.Main;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -30,19 +31,33 @@ public class ShopInventory implements InventoryHolder {
         if (chest.getBlockInventory().isEmpty()) {
             player.sendMessage(Component.translatable("shop.inventory.empty.player", Styles.INFOSTYLE));
 
-            // Store empty shop details in the database
-            String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
-            
-            // If a new empty shop was created, send a message to owner
-            if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
-                
-                if (owner != null) {
-                    Player shopOwnerPlayer = Bukkit.getPlayer(owner);
-                    shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+            if (Main.SQLMode) {
+                // Store empty shop details in the database
+                String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
+                if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
+                    // Notify the shop owners
+                    if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
+                        if (owner != null) {
+                            Player shopOwnerPlayer = Bukkit.getPlayer(owner);
+                            shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                        }
+                        if (owner2 != null) {
+                            Player shopOwnerPlayer2 = Bukkit.getPlayer(owner2);
+                            shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                        }
+                    }
                 }
-                if (owner2 != null) {
-                    Player shopOwnerPlayer2 = Bukkit.getPlayer(owner2);
-                    shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+            } else {
+                // Notify the shop owners
+                if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
+                    if (owner != null) {
+                        Player shopOwnerPlayer = Bukkit.getPlayer(owner);
+                        shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                    }
+                    if (owner2 != null) {
+                        Player shopOwnerPlayer2 = Bukkit.getPlayer(owner2);
+                        shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                    }
                 }
             }
 

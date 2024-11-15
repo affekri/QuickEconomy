@@ -23,20 +23,32 @@ public class PlayerJoinListener implements Listener {
     public void onPlayerJoin (PlayerJoinEvent event) {
         Player player = event.getPlayer();
         Translation.init(player);
-        if(player.isOp() && DerflaAPI.updateAvailable()){
-            player.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
-        }
         String uuid = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+        if (Main.getInstance().getConfig().getBoolean("player.op.updateMessage")) {
+            if(player.isOp() && DerflaAPI.updateAvailable()){
+                player.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
+            }
+        }
         if (Main.SQLMode) {
             if (!DatabaseManager.accountExists(uuid)) {
                 DatabaseManager.addAccount(String.valueOf(player.getUniqueId()), player.getName(), 0, 0);
             } else {
                 DatabaseManager.updatePlayerName(player.getUniqueId().toString(), player.getName());
+                // Check for change and send welcome message
+                if (Main.getInstance().getConfig().getBoolean("player.welcomeMessage")) {
+                    double change = DatabaseManager.getPlayerBalanceChange(uuid);
+                    if (change != 0.0f) {
+                        player.sendMessage(Component.translatable("player.welcome", Component.text(change)).style(Styles.INFOSTYLE));
+                        DatabaseManager.setPlayerBalanceChange(uuid, 0.0f);
+                    }
+                }
                 // Check for empty shops and notify the player
-                List<String> emptyShops = DatabaseManager.displayEmptyShopsView(uuid);
-                if (emptyShops != null && !emptyShops.isEmpty()) {
-                    int emptyShopCount = emptyShops.size();
-                    player.sendMessage(Component.translatable("shop.inventory.empty.list", Component.text(emptyShopCount), Component.text(String.join(", ", emptyShops))).style(Styles.INFOSTYLE));
+                if (Main.getInstance().getConfig().getBoolean("shop.emptyShopListJoin")) {
+                    List<String> emptyShops = DatabaseManager.displayEmptyShopsView(uuid);
+                    if (emptyShops != null && !emptyShops.isEmpty()) {
+                        int emptyShopCount = emptyShops.size();
+                        player.sendMessage(Component.translatable("shop.inventory.empty.list", Component.text(emptyShopCount), Component.text(String.join(", ", emptyShops))).style(Styles.INFOSTYLE));
+                    }
                 }
             }
         } else {
@@ -53,13 +65,15 @@ public class PlayerJoinListener implements Listener {
             if (!(file.contains("players." + uuid + ".change"))) {
                 return;
             }
+            // Check for change and send welcome message
+            if (Main.getInstance().getConfig().getBoolean("player.welcomeMessage")) {
+                change = Balances.getPlayerBalanceChange(uuid);
+                if (change == 0.0f) {
+                    return;
+                }
+                player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
+            }
+            Balances.setPlayerBalanceChange(uuid, 0.0f);
         }
-        if (change == 0.0f) {
-            return;
-        }
-        change = Balances.getPlayerBalanceChange(uuid);
-        Balances.setPlayerBalanceChange(uuid, 0.0f);
-        if (change != 0.0f)
-            player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
     }
 }

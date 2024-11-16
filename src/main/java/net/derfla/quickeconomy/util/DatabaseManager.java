@@ -438,11 +438,12 @@ public class DatabaseManager {
         return balance;
     }
 
-    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed, int page, int pageSize) {
+    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed, int page) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
         StringBuilder transactions = new StringBuilder();
+        int pageSize = 10;
 
         // Calculate the offset for pagination
         int offset = (page - 1) * pageSize;
@@ -450,13 +451,13 @@ public class DatabaseManager {
         String sql;
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime DESC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
         }
 
         try (Connection conn = getConnection();
@@ -475,7 +476,13 @@ public class DatabaseManager {
                 String transactionMessage = rs.getString("Message");
 
                 transactions.append(dateTimeLocal).append(" ").append(amount);
-                if (source.equalsIgnoreCase(playerName)) {
+                if (source == null){
+                    // Deposit to bank
+                    transactions.append(" -> ").append("[BANK]");
+                } else if (destination == null) {
+                    // Withdraw from bank
+                    transactions.append(" <- ").append("[BANK]");
+                } else if (source.equalsIgnoreCase(playerName)) {
                     transactions.append(" -> ").append(destination);
                 } else {
                     transactions.append(" <- ").append(source);
@@ -485,7 +492,7 @@ public class DatabaseManager {
                 }
                 transactions.append("\n");
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             plugin.getLogger().severe("Error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
         }
 
@@ -841,6 +848,7 @@ public class DatabaseManager {
     }
 
     public static boolean migrateToDatabase() {
+        int failedCounter = 0;
         try {
             FileConfiguration balanceConfig = BalanceFile.get();
             ConfigurationSection playersSection = balanceConfig.getConfigurationSection("players");
@@ -855,24 +863,34 @@ public class DatabaseManager {
 
             for (int i = 0; i < totalKeys; i++) {
                 String key = keys.get(i);
-                double balance = playersSection.getDouble(key + ".balance");
-                double change = playersSection.getDouble(key + ".change");
-                String playerName = playersSection.getString(key + ".name");
-                String trimmedUuid = TypeChecker.trimUUID(key);
+                if (key.length() == 32) {
+                    double balance = playersSection.getDouble(key + ".balance");
+                    double change = playersSection.getDouble(key + ".change");
+                    String playerName = playersSection.getString(key + ".name");
+                    String trimmedUuid = TypeChecker.trimUUID(key);
 
-                if (!accountExists(trimmedUuid)) {
-                    addAccount(trimmedUuid, playerName, balance, change);
-                } else {
-                    setPlayerBalance(trimmedUuid, balance, change);
+                    if (!accountExists(trimmedUuid)) {
+                        addAccount(trimmedUuid, playerName, balance, change);
+                    } else {
+                        setPlayerBalance(trimmedUuid, balance, change);
+                    }
+
+                    // Commit in batches
+                    if ((i + 1) % batchSize == 0 || i == totalKeys - 1) {
+                        plugin.getLogger().info("Processed " + (i + 1) + " player accounts.");
+                    }
+                }else{
+                    plugin.getLogger().warning("Invalid UUID for: " + key);
+                    failedCounter += 1;
                 }
 
-                // Commit in batches
-                if ((i + 1) % batchSize == 0 || i == totalKeys - 1) {
-                    plugin.getLogger().info("Processed " + (i + 1) + " player accounts.");
-                }
+
             }
 
-            plugin.getLogger().info("Migration to database completed successfully.");
+            plugin.getLogger().info("Migration to database completed.");
+            if (failedCounter != 0){
+                plugin.getLogger().warning("Skipped " + failedCounter + " accounts! Due to incorrect UUID format, check balance.yml");
+            }
             return true;
         } catch (Exception e) {
             plugin.getLogger().severe("Error during migration to database: " + e.getMessage());

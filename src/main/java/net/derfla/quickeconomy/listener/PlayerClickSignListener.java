@@ -53,7 +53,9 @@ public class PlayerClickSignListener implements Listener {
             List<String> owners = BlockOwner.getChestOwner(chest);
             assert owners != null;
             String seller = owners.getFirst();
-            String seller2 = owners.getLast();
+            String seller2 = "";
+            if(owners.size() == 2) seller2 = owners.getLast();
+
             // Makes owners unable to open their own shop
             if (seller.equals(playerUUID) || seller2.equals(playerUUID)) {
                 player.sendMessage(Component.translatable("shop.open.own", Styles.ERRORSTYLE));

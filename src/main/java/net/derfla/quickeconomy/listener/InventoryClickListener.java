@@ -89,17 +89,6 @@ public class InventoryClickListener implements Listener {
             chest.getBlockInventory().removeItem(boughtItem);
             // Adds the bought item to the player inventory
             player.getInventory().addItem(boughtItem);
-
-            // Checks if the owner is refilling the shop
-            if (player.getUniqueId().toString().equals(owner) || player.getUniqueId().toString().equals(owner2)) {
-                // Check if the shop chest has items
-                if (!chest.getBlockInventory().isEmpty()) {
-                    String coordinates = chest.getLocation().getBlockX() + "," +
-                                         chest.getLocation().getBlockY() + "," +
-                                         chest.getLocation().getBlockZ();
-                    DatabaseManager.removeEmptyShop(coordinates);
-                }
-            }
         }
     }
 }

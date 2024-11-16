@@ -101,7 +101,6 @@ public class BlockOwner {
             return List.of(key.split(" "));
         }
         owner.add(key);
-        owner.add(" ");
         return owner;
     }
 

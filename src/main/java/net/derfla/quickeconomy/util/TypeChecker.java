@@ -56,6 +56,9 @@ public class TypeChecker {
         if (uuid == null) {
             return null;
         }
+        if(uuid.isEmpty()){
+            return null;
+        }
         if (uuid.length() == 32) {
             return uuid.replaceAll("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5");
         } 

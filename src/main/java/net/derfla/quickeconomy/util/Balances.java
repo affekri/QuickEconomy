@@ -83,9 +83,9 @@ public class Balances {
         float fMoney = (float) playerBalanceChange;
         return fMoney / 100;
     }
-    public static void setPlayerBalanceChange(String uuid, float money) {
+    public static void setPlayerBalanceChange(String uuid, float moneyChange) {
         if(SQLMode) {
-            DatabaseManager.setPlayerBalanceChange(uuid, money);
+            DatabaseManager.setPlayerBalanceChange(uuid, moneyChange);
             return;
         }
 
@@ -97,7 +97,7 @@ public class Balances {
             return;
         }
 
-        float multMoney = money * 100;
+        float multMoney = moneyChange * 100;
         int intMoney = (int) multMoney;
         file.set("players." + trimmedUUID + ".change", intMoney);
         BalanceFile.save();
@@ -128,5 +128,35 @@ public class Balances {
         if (destination != null)
             addPlayerBalance(destination, (float) amount);
 
+    }
+
+    public static void updatePlayerName(String uuid, String name) {
+        if (SQLMode) {
+            DatabaseManager.updatePlayerName(uuid, name);
+        }
+        FileConfiguration file = BalanceFile.get();
+
+        if (file == null){
+            plugin.getLogger().severe("balance.yml not found!");
+            return;
+        }
+        file.set("players." + uuid + ".name", name);
+        BalanceFile.save();
+    }
+
+    public static void addAccount(String uuid, String name) {
+        if (SQLMode) {
+            DatabaseManager.addAccount(uuid, name, 0, 0);
+        }
+        FileConfiguration file = BalanceFile.get();
+
+        if (file == null){
+            plugin.getLogger().severe("balance.yml not found!");
+            return;
+        }
+        file.set("players." + uuid + ".name", name);
+        file.set("players." + uuid + ".balance", 0.0f);
+        file.set("players." + uuid + ".change", 0.0f);
+        BalanceFile.save();
     }
 }

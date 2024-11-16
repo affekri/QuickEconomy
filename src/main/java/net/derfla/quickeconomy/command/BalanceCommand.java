@@ -170,7 +170,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
-                String transactions = DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), transactionsPlayer.getName(), true);
+                String transactions = DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), transactionsPlayer.getName(), true, 1);
                 if(transactions.isEmpty()){
                     transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
                     break;
@@ -187,7 +187,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     break;
                 }
                 if (strings[1].equalsIgnoreCase("all") && Main.SQLMode) {
-                    sender.sendMessage(DatabaseManager.listAllAccounts());
+                    sender.sendMessage(DatabaseManager.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
                     break;
                 }
                 String checkPlayer;

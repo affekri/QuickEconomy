@@ -187,14 +187,16 @@ public class DatabaseManager {
     }
 
     public static boolean insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
+        String Owner1 = TypeChecker.trimUUID(owner1);
+        String Owner2 = TypeChecker.trimUUID(owner2);
         // Return true if a new empty shop was created, false if an existing shop was updated
         if (emptyShopExists(coordinates)) {
             // Update the owners of the existing shop
             String updateSql = "UPDATE EmptyShops SET Owner1 = ?, Owner2 = ? WHERE Coordinates = ?";
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
-                pstmt.setString(1, owner1);
-                pstmt.setString(2, owner2);
+                pstmt.setString(1, Owner1);
+                pstmt.setString(2, Owner2);
                 pstmt.setString(3, coordinates);
                 pstmt.executeUpdate();
                 plugin.getLogger().info("Empty shop at " + coordinates + " updated with new owners.");
@@ -208,8 +210,8 @@ public class DatabaseManager {
             try (Connection conn = getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 pstmt.setString(1, coordinates);
-                pstmt.setString(2, owner1);
-                pstmt.setString(3, owner2);
+                pstmt.setString(2, Owner1);
+                pstmt.setString(3, Owner2);
                 pstmt.executeUpdate();
                 plugin.getLogger().info("Empty shop registered at " + coordinates);
             } catch (SQLException e) {
@@ -486,10 +488,11 @@ public class DatabaseManager {
                 } else if (destinationPlayerName == null) {
                     // Withdraw from bank
                     transactions.append(" <- ").append("[BANK]");
-                } else if (sourceUUID.equalsIgnoreCase(untrimmedUuid)) {
+                } else if (sourceUUID.equalsIgnoreCase(trimmedUuid)) {
                     transactions.append(" -> ").append(destinationPlayerName);
-                } else if (destinationUUID.equalsIgnoreCase(untrimmedUuid)) {
+                } else if (destinationUUID.equalsIgnoreCase(trimmedUuid)) {
                     transactions.append(" <- ").append(sourcePlayerName);
+                }
                 if (message != null) {
                     transactions.append(" ").append(message);
                 }

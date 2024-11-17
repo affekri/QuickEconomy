@@ -354,8 +354,10 @@ public class DatabaseManager {
                     + "SELECT "
                     + "    t.TransactionDatetime, "
                     + "    t.Amount, "
-                    + "    sourcePlayer.PlayerName AS SourcePlayerName, "
-                    + "    destinationPlayer.PlayerName AS DestinationPlayerName, "
+                    + "    t.Source AS SourceUUID, "
+                    + "    t.Destination AS DestinationUUID, "
+                    + "    pa.PlayerName AS SourcePlayerName, "
+                    + "    pa2.PlayerName AS DestinationPlayerName, "
                     + "    t.TransactionMessage AS Message, "
                     + "    CASE "
                     + "        WHEN t.Passed = 1 THEN 'Passed' "
@@ -363,10 +365,10 @@ public class DatabaseManager {
                     + "    END AS Passed, "
                     + "    t.PassedReason "
                     + "FROM Transactions t "
-                    + "LEFT JOIN PlayerAccounts sourcePlayer ON t.Source = sourcePlayer.UUID "
-                    + "LEFT JOIN PlayerAccounts destinationPlayer ON t.Destination = destinationPlayer.UUID "
+                    + "LEFT JOIN PlayerAccounts pa ON t.Source = pa.UUID "
+                    + "LEFT JOIN PlayerAccounts pa2 ON t.Destination = pa2.UUID "
                     + "WHERE t.Source = '" + trimmedUuid + "' OR t.Destination = '" + trimmedUuid + "' "
-                    + "ORDER BY t.TransactionDatetime DESC;";
+                    + "ORDER BY t.TransactionDatetime ASC;";
 
             statement.executeUpdate(sql);
             plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
@@ -438,7 +440,7 @@ public class DatabaseManager {
         return balance;
     }
 
-    public static String displayTransactionsView(@NotNull String uuid, String playerName, Boolean displayPassed, int page) {
+    public static String displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
@@ -451,13 +453,13 @@ public class DatabaseManager {
         String sql;
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 0 ORDER BY TransactionDateTime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
         }
 
         try (Connection conn = getConnection();
@@ -468,30 +470,33 @@ public class DatabaseManager {
 
             // Iterate over the result set
             while (rs.next()) {
-                String dateTimeUTC = rs.getString("TransactionDateTime");
+                String dateTimeUTC = rs.getString("TransactionDatetime");
                 String dateTimeLocal = TypeChecker.convertToLocalTime(dateTimeUTC); // Convert to local time
                 Double amount = rs.getDouble("Amount");
-                String source = rs.getString("SourcePlayerName");
-                String destination = rs.getString("DestinationPlayerName");
-                String transactionMessage = rs.getString("Message");
+                String sourceUUID = rs.getString("SourceUUID");
+                String destinationUUID = rs.getString("DestinationUUID");
+                String sourcePlayerName = rs.getString("SourcePlayerName");
+                String destinationPlayerName = rs.getString("DestinationPlayerName");
+                String message = rs.getString("Message");
 
                 transactions.append(dateTimeLocal).append(" ").append(amount);
-                if (source == null){
+                if (sourcePlayerName == null) {
                     // Deposit to bank
                     transactions.append(" -> ").append("[BANK]");
-                } else if (destination == null) {
+                } else if (destinationPlayerName == null) {
                     // Withdraw from bank
                     transactions.append(" <- ").append("[BANK]");
-                } else if (source.equalsIgnoreCase(playerName)) {
-                    transactions.append(" -> ").append(destination);
-                } else {
-                    transactions.append(" <- ").append(source);
-                }
-                if (transactionMessage != null) {
-                    transactions.append(" ").append(transactionMessage);
+                } else if (sourceUUID.equalsIgnoreCase(untrimmedUuid)) {
+                    transactions.append(" -> ").append(destinationPlayerName);
+                } else if (destinationUUID.equalsIgnoreCase(untrimmedUuid)) {
+                    transactions.append(" <- ").append(sourcePlayerName);
+                if (message != null) {
+                    transactions.append(" ").append(message);
                 }
                 transactions.append("\n");
             }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("SQL error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
         } catch (Exception e) {
             plugin.getLogger().severe("Error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
         }

@@ -4,7 +4,7 @@
 
 A lightweight economy plugin for Minecraft servers running PaperMC.  
 **Update 1.1 is live!**  
-[Upgrade guide](https://docs.derfla.net/quickeconomy/usage/upgrade/to_1_1/)
+[Upgrade guide](https://docs.derfla.net/quickeconomy/usage/upgrade/to_1_1/)  
 
 [![GitHub issues](https://img.shields.io/github/issues-raw/affekri/QuickEconomy)](https://github.com/affekri/QuickEconomy/issues)
 [![Modrinth Downloads](https://img.shields.io/modrinth/dt/TT2OA0w5)](https://modrinth.com/plugin/quickeconomy/versions)
@@ -20,19 +20,20 @@ Commands featured in this plugin:
 
 ### Balance  
 
-The /balance command shows the player's balance.  
+The `/balance` command shows the player's balance.  
 Using subcommand send, players can send coins to other players.  
-Players who are server operators can use subcommand set, add och subtract to  
-modify the balance of themselves or any other specified player. Or do "/bal player" to  
-see any players balance.  
+Players with the corresponding permissions can use subcommand set, add och subtract to  
+modify the balance of themselves or any other specified player. Or do `/bal list player` to  
+see any players balance. When using SQL as storage method players can use the command `/balance transactions`  
+to see their past transactions.  
 
 ### Bal  
 
-The /bal command has the same functionality as /balance.  
+The `/bal` command has the same functionality as `/balance`.  
 
 ### QuickEconomy  
 
-The /quickeconomy command displays helpful information about the plugin.
+The `/quickeconomy` command displays helpful information about the plugin. The subcommand 
 
 ## Signs  
 
@@ -40,12 +41,12 @@ This plugin modifies the behavior of the different signs.
 
 ### Bank  
 
-As a server operator placing or editing a sign that says  
-[BANK] on the first line creates a modified sign that functions as a bank.  
+With the corresponding permission placing or editing a sign that says  
+`[BANK]` on the first line creates a modified sign that functions as a bank.  
 
 ### Shop  
 
-Any player can make a shop by writing [SHOP] on the first line of a sign  
+Any player can make a shop by writing `[SHOP]` on the first line of a sign  
 that is placed on the side of a (non shop) chest. On the second line, first  
 write the prize for the shop, followed by a "/" and then what kind of shop it is.  
 There is two kind of shops, Item or Stack. In item shop you can only buy one  

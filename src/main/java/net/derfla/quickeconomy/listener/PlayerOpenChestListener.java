@@ -1,7 +1,10 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.BlockOwner;
+import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.Styles;
+import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
@@ -9,20 +12,22 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 public class PlayerOpenChestListener implements Listener {
 
     @EventHandler
-    public void onPlayerOpenChest(PlayerInteractEvent event){
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (!(event.getClickedBlock().getState() instanceof Chest)) return;
-        if (!event.getClickedBlock().getType().equals(Material.CHEST)) return;
-        Chest chest = (Chest) event.getClickedBlock().getState();
-        Player player = event.getPlayer();
+    public void onPlayerOpenChest(InventoryOpenEvent event){
+        if (!event.getInventory().getType().equals(InventoryType.CHEST)) return;
+        if (event.getInventory().getHolder() == null) return;
+        if (!(event.getInventory().getHolder() instanceof Chest)) return;
+        Chest chest = (Chest) event.getInventory().getHolder();
+        Player player = (Player) event.getPlayer();
+        BlockOwner.convertChestKeyToUUID(chest);
         // Check if chest is locked
-        if (BlockOwner.isLockedForPlayer(chest, player.getName())) {
+        if (BlockOwner.isLockedForPlayer(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))) {
             player.sendMessage(Component.translatable("shop.locked.chest", Styles.ERRORSTYLE));
             event.setCancelled(true);
             return;
@@ -34,6 +39,12 @@ public class PlayerOpenChestListener implements Listener {
         }
         if (BlockOwner.isShop(chest)) {
             BlockOwner.setShopOpen(chest, true);
+            if(Main.SQLMode){
+                String coordinates = chest.getLocation().getBlockX() + "," +
+                        chest.getLocation().getBlockY() + "," +
+                        chest.getLocation().getBlockZ();
+                DatabaseManager.removeEmptyShop(coordinates);
+            }
         }
     }
 }

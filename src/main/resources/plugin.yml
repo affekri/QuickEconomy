@@ -16,6 +16,10 @@ commands:
     usage: /<command>
     description: Misc
     permission: quickeconomy.help
+  bank:
+    usage: /<command>
+    description: Open the bank.
+    permission: quickeconomy.bank.command
 permissions:
   quickeconomy.balance:
     description: Allows the player to use the balance command and see their own balance.
@@ -40,7 +44,7 @@ permissions:
     children:
       - quickeconomy.shop
   quickeconomy.shop.destroyall:
-    description: Allows the player to remove all shop, not exclusively theirs.
+    description: Allows the player to remove all shops, not exclusively theirs.
     default: false
     children:
       - quickeconomy.shop
@@ -48,6 +52,9 @@ permissions:
   quickeconomy.bank:
     description: Allows the player to use banks.
     default: true
+  quickeconomy.bank.command:
+    description: Allows the player to open a bank with a command.
+    default: false
   quickeconomy.bank.create:
     description: Allows the player to create banks.
     default: false
@@ -59,4 +66,12 @@ permissions:
     children:
       - quickeconomy.bank
       - quickeconomy.bank.create
-
+  quickeconomy.rollback:
+    description: Allows the player to perform rollbacks on transactions.
+    default: false
+  quickeconomy.migrate:
+    description: Allows the player to migrate between file- and SQL-mode.
+    default: false
+  quickeconomy.setup:
+    description: Allows the player to see the current plugin setup.
+    default: false

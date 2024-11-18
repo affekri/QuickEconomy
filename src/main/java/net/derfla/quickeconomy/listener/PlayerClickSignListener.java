@@ -2,8 +2,6 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.Style;
-import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.block.sign.Side;
@@ -20,6 +18,7 @@ public class PlayerClickSignListener implements Listener {
     @EventHandler
     public void onPlayerClickSign(PlayerInteractEvent event){
         Player player = event.getPlayer();
+        String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
 
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (event.getClickedBlock() == null) return;
@@ -35,23 +34,31 @@ public class PlayerClickSignListener implements Listener {
             if (!player.hasPermission("quickeconomy.bank")) return;
             new BankInventory(player);
         } else if (listLines.get(0).equals(shopHeader)) {
-            String seller = TypeChecker.getRawString(listLines.get(2));
-            String seller2 = TypeChecker.getRawString(listLines.get(3));
-            event.setCancelled(true);
-            // Makes owners unable to open their own shop
-            if (seller.equals(player.getName()) || seller2.equals(player.getName())) {
-                player.sendMessage(Component.translatable("shop.open.own", Styles.ERRORSTYLE));
-                return;
-            }
             if (!player.hasPermission("quickeconomy.shop")) return;
+            event.setCancelled(true);
             if (FindChest.get(sign) == null) {
                 player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
             Chest chest = FindChest.get(sign);
             if (chest == null) return;
+
+            // Update chest NBT tag to UUID
+            BlockOwner.convertChestKeyToUUID(chest);
+
             if (BlockOwner.isShopOpen(chest)) {
                 player.sendMessage(Component.translatable("shop.locked.shopper", Styles.INFOSTYLE));
+                return;
+            }
+            List<String> owners = BlockOwner.getChestOwner(chest);
+            assert owners != null;
+            String seller = owners.getFirst();
+            String seller2 = "";
+            if(owners.size() == 2) seller2 = owners.getLast();
+
+            // Makes owners unable to open their own shop
+            if (seller.equals(playerUUID) || seller2.equals(playerUUID)) {
+                player.sendMessage(Component.translatable("shop.open.own", Styles.ERRORSTYLE));
                 return;
             }
             String line1 = TypeChecker.getRawString(listLines.get(1));

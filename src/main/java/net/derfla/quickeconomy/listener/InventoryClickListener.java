@@ -1,9 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.util.ShopInventory;
-import net.derfla.quickeconomy.util.Balances;
-import net.derfla.quickeconomy.util.BankInventory;
-import net.derfla.quickeconomy.util.Styles;
+import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.Style;
@@ -66,7 +63,7 @@ public class InventoryClickListener implements Listener {
             // Sets the singleItem variable
             boolean singleItem = ShopInventory.isSingleItem();
             // Checks if the player have enough coins
-            if (cost > Balances.getPlayerBalance(player.getName())) {
+            if (cost > Balances.getPlayerBalance(String.valueOf(player.getUniqueId()))) {
                 player.sendMessage(Component.translatable("balance.notenough", errorStyle));
                 return;
             }
@@ -76,19 +73,17 @@ public class InventoryClickListener implements Listener {
             } else {
                 boughtItem = event.getCurrentItem();
             }
-            // Cancels the purchase if it is diamonds see #21
+            // Cancels the purchase if it is diamonds; see #21
             if (boughtItem.getType().equals(Material.DIAMOND) || boughtItem.getType().equals(Material.DIAMOND_BLOCK)) {
                 player.sendMessage(Component.translatable("shop.buy.diamond", errorStyle));
                 return;
             }
-            // Removes the cost from the buying player
-            Balances.subPlayerBalance(player.getName(), cost);
             // Gives the paid coins to the shop owner or owners
             if (owner2.isEmpty()) {
-                Balances.addPlayerBalance(owner, cost);
+                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost, "");
             }else  {
-                Balances.addPlayerBalance(owner, cost / 2);
-                Balances.addPlayerBalance(owner2, cost / 2);
+                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost/2, "");
+                Balances.executeTransaction("p2p", "purchase", owner2, owner, cost/2, "");
             }
             player.getOpenInventory().getTopInventory().removeItem(boughtItem);
             chest.getBlockInventory().removeItem(boughtItem);

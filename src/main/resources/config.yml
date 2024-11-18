@@ -1,1 +1,22 @@
 exchangeRate: 10 # Coins/diamond
+
+# Database
+database:
+  enabled: false
+  type: mysql
+  host: localhost
+  port: 3306
+  database: minecraft_db
+  username: user
+  password: pass
+  file:
+# Shops
+shop:
+  emptyShopOwnerMessage: true
+  emptyShopListJoin: true
+# Players
+player:
+  welcomeMessage: true
+  op:
+    updateMessage: true
+

@@ -21,8 +21,8 @@ import java.util.List;
 
 public class BankInventory implements InventoryHolder {
 
-    private Inventory inventory = Bukkit.createInventory(this, 3 * 9, "Bank");
-    private Player target;
+    private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Bank"));
+    private final Player target;
 
     static Plugin plugin = Main.getInstance();
 
@@ -92,11 +92,11 @@ public class BankInventory implements InventoryHolder {
                     int diamondAmount;
                     if (clickType.isLeftClick()) diamondAmount = 64;
                     else diamondAmount = 1;
-                    if (Balances.getPlayerBalance(target.getName()) < exchangeRate * diamondAmount){
+                    if (Balances.getPlayerBalance(String.valueOf(target.getUniqueId())) < exchangeRate * diamondAmount){
                         target.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                         return true;
                     }
-                    Balances.subPlayerBalance(target.getName(), exchangeRate * diamondAmount);
+                    Balances.executeTransaction("withdrawal", "bank", String.valueOf(target.getUniqueId()), null, exchangeRate * diamondAmount, "");
                     target.getInventory().addItem(new ItemStack(Material.DIAMOND, diamondAmount));
                     return true;
                 case GOLD_INGOT:
@@ -106,7 +106,7 @@ public class BankInventory implements InventoryHolder {
                 case GOLD_BLOCK:
                     // Check balance logic
                     target.closeInventory();
-                    target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(target.getName()))).style(Styles.INFOSTYLE));
+                    target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(target.getUniqueId())))).style(Styles.INFOSTYLE));
                     return true;
             }
         }
@@ -120,7 +120,7 @@ public class BankInventory implements InventoryHolder {
             itemAmount = 1;
             target.getInventory().removeItem(new ItemStack(itemStack.getType(), 1));
         }
-        Balances.addPlayerBalance(target.getName(), itemAmount * exchangeRate);
+        Balances.executeTransaction("deposit", "bank", null, String.valueOf(target.getUniqueId()), itemAmount * exchangeRate, "");
         return true;
 
 

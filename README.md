@@ -3,6 +3,8 @@
 # QuickEconomy
 
 A lightweight economy plugin for Minecraft servers running PaperMC.  
+**Update 1.1 is live!**  
+[Upgrade guide](https://docs.derfla.net/quickeconomy/usage/upgrade/to_1_1/)
 
 [![GitHub issues](https://img.shields.io/github/issues-raw/affekri/QuickEconomy)](https://github.com/affekri/QuickEconomy/issues)
 [![Modrinth Downloads](https://img.shields.io/modrinth/dt/TT2OA0w5)](https://modrinth.com/plugin/quickeconomy/versions)

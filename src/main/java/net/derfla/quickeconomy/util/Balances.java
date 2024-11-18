@@ -79,9 +79,7 @@ public class Balances {
             return 0.0f;
         }
 
-        int playerBalanceChange = file.getInt("players." + uuid + ".change");
-        float fMoney = (float) playerBalanceChange;
-        return fMoney / 100;
+        return (float) file.getDouble("players." + uuid + ".change");
     }
     public static void setPlayerBalanceChange(String uuid, float moneyChange) {
         if(SQLMode) {
@@ -97,9 +95,7 @@ public class Balances {
             return;
         }
 
-        float multMoney = moneyChange * 100;
-        int intMoney = (int) multMoney;
-        file.set("players." + trimmedUUID + ".change", intMoney);
+        file.set("players." + trimmedUUID + ".change", moneyChange);
         BalanceFile.save();
     }
 
@@ -133,6 +129,7 @@ public class Balances {
     public static void updatePlayerName(String uuid, String name) {
         if (SQLMode) {
             DatabaseManager.updatePlayerName(uuid, name);
+            return;
         }
         FileConfiguration file = BalanceFile.get();
 
@@ -147,6 +144,7 @@ public class Balances {
     public static void addAccount(String uuid, String name) {
         if (SQLMode) {
             DatabaseManager.addAccount(uuid, name, 0, 0);
+            return;
         }
         FileConfiguration file = BalanceFile.get();
 

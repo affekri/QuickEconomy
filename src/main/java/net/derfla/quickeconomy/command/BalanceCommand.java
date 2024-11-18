@@ -170,7 +170,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
-                String transactions = DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), transactionsPlayer.getName(), true, 1);
+                String transactions = DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, 1);
                 if(transactions.isEmpty()){
                     transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
                     break;

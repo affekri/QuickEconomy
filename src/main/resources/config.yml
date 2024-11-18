@@ -9,6 +9,7 @@ database:
   database: minecraft_db
   username: user
   password: pass
+  file:
 # Shops
 shop:
   emptyShopOwnerMessage: true

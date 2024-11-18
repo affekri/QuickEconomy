@@ -36,7 +36,8 @@ public class PlayerJoinListener implements Listener {
         }
 
         if (Main.getInstance().getConfig().getBoolean("player.welcomeMessage")) {
-            if (Balances.getPlayerBalanceChange(uuid) <= 0) {
+            change = Balances.getPlayerBalanceChange(uuid);
+            if (change > 0) {
                 player.sendMessage(Component.translatable("player.welcomeback", Component.text(change)).style(Styles.INFOSTYLE));
             }
         }

@@ -88,6 +88,7 @@ public final class Main extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
         DatabaseManager.closePool();
+        DatabaseManager.shutdownExecutorService(); // Shutdown async thread handler (for database operations)
     }
 
     public static Main getInstance() {

@@ -41,25 +41,27 @@ public class ShopInventory implements InventoryHolder {
             if (Main.SQLMode) {
                 // Store empty shop details in the database
                 String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
-                if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
-                    // Notify the shop owners
-                    if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
-                        if (!owner.isEmpty()) {
-                            UUID shopOwnerUUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner));
-                            if(Bukkit.getPlayer(shopOwnerUUID) != null) {
-                                Player shopOwnerPlayer = Bukkit.getPlayer(shopOwnerUUID);
-                                shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                DatabaseManager.insertEmptyShop(coordinates, owner, owner2).thenAccept(success -> {
+                    if (success) {
+                        // Notify the shop owners
+                        if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
+                            if (!owner.isEmpty()) {
+                                UUID shopOwnerUUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner));
+                                if(Bukkit.getPlayer(shopOwnerUUID) != null) {
+                                    Player shopOwnerPlayer = Bukkit.getPlayer(shopOwnerUUID);
+                                    shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                                }
                             }
-                        }
-                        if (!owner2.isEmpty()) {
-                            UUID shopOwner2UUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner2));
-                            if(Bukkit.getPlayer(shopOwner2UUID) != null) {
-                                Player shopOwnerPlayer2 = Bukkit.getPlayer(shopOwner2UUID);
-                                shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                            if (!owner2.isEmpty()) {
+                                UUID shopOwner2UUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner2));
+                                if(Bukkit.getPlayer(shopOwner2UUID) != null) {
+                                    Player shopOwnerPlayer2 = Bukkit.getPlayer(shopOwner2UUID);
+                                    shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
+                                }
                             }
                         }
                     }
-                }
+                });
             } else {
                 // Notify the shop owners
                 if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {

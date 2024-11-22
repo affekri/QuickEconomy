@@ -17,7 +17,8 @@ public class Balances {
     public static float getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if (SQLMode) {
-            return (float) DatabaseManager.displayBalance(trimmedUUID);
+            double balance = DatabaseManager.displayBalance(trimmedUUID).join();
+            return (float) balance;
         }
 
         FileConfiguration file = BalanceFile.get();
@@ -66,8 +67,11 @@ public class Balances {
     }
 
     public static float getPlayerBalanceChange(String uuid) {
-        if(SQLMode)
-            return (float) DatabaseManager.getPlayerBalanceChange(uuid);
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
+        if(SQLMode) {
+            double change = DatabaseManager.getPlayerBalanceChange(trimmedUUID).join();
+            return (float) change;
+        }
 
         FileConfiguration file = BalanceFile.get();
 
@@ -75,20 +79,21 @@ public class Balances {
             plugin.getLogger().warning("balance.yml not found!");
             return 0.0f;
         }
-        if (!(file.contains("players." + uuid + ".change"))) {
+        if (!(file.contains("players." + trimmedUUID + ".change"))) {
             return 0.0f;
         }
 
-        return (float) file.getDouble("players." + uuid + ".change");
+        return (float) file.getDouble("players." + trimmedUUID + ".change");
     }
+
     public static void setPlayerBalanceChange(String uuid, float moneyChange) {
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
         if(SQLMode) {
-            DatabaseManager.setPlayerBalanceChange(uuid, moneyChange);
+            DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange);
             return;
         }
 
         FileConfiguration file = BalanceFile.get();
-        String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         if (file == null){
             plugin.getLogger().warning("balance.yml not found!");
@@ -106,7 +111,7 @@ public class Balances {
     public static boolean hasAccount(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if(SQLMode) {
-            return DatabaseManager.accountExists(trimmedUUID);
+            return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
         }
 
         FileConfiguration file = BalanceFile.get();

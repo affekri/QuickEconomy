@@ -1,15 +1,12 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
 import java.util.List;
 
-import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -44,7 +41,7 @@ public class PlayerJoinListener implements Listener {
         Balances.setPlayerBalanceChange(uuid, 0.0f);
         if (!Main.SQLMode) return;
         if (!Main.getInstance().getConfig().getBoolean("shop.emptyShopListJoin")) return;
-        List<String> emptyShops = DatabaseManager.displayEmptyShopsView(uuid);
+        List<String> emptyShops = (List<String>) DatabaseManager.displayEmptyShopsView(uuid);
         if (emptyShops == null || emptyShops.isEmpty()) return;
         int emptyShopCount = emptyShops.size();
         player.sendMessage(Component.translatable("shop.inventory.empty.list", Component.text(emptyShopCount), Component.text(String.join(", ", emptyShops))).style(Styles.INFOSTYLE));

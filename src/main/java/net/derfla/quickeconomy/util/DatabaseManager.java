@@ -423,6 +423,71 @@ public class DatabaseManager {
         });
     }
 
+    public static CompletableFuture<String> displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
+        return CompletableFuture.supplyAsync(() -> {
+            String trimmedUuid = TypeChecker.trimUUID(uuid);
+            String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+            String viewName = "vw_Transactions_" + trimmedUuid;
+            StringBuilder transactions = new StringBuilder();
+            int pageSize = 10;
+            // Calculate the offset for pagination
+            int offset = (page - 1) * pageSize;
+            String sql;
+            if (displayPassed == null) {
+                // Display all transactions
+                sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            } else if (displayPassed) {
+                // Display only passed transactions
+                sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            } else {
+                // Display only failed transactions
+                sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            }
+
+            return getConnectionAsync().thenApply(conn -> {
+                try (
+                        PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setInt(1, pageSize); // Set the page size
+                    pstmt.setInt(2, offset); // Set the offset for pagination
+                    ResultSet rs = pstmt.executeQuery();
+
+                    // Iterate over the result set
+                    while (rs.next()) {
+                        String dateTimeUTC = rs.getString("TransactionDatetime");
+                        String dateTimeLocal = TypeChecker.convertToLocalTime(dateTimeUTC); // Convert to local time
+                        Double amount = rs.getDouble("Amount");
+                        String sourceUUID = rs.getString("SourceUUID");
+                        String destinationUUID = rs.getString("DestinationUUID");
+                        String sourcePlayerName = rs.getString("SourcePlayerName");
+                        String destinationPlayerName = rs.getString("DestinationPlayerName");
+                        String message = rs.getString("Message");
+                        transactions.append(dateTimeLocal).append(" ").append(amount);
+                        if (sourcePlayerName == null) {
+                            // Deposit to bank
+                            transactions.append(" -> ").append("[BANK]");
+                        } else if (destinationPlayerName == null) {
+                            // Withdraw from bank
+                            transactions.append(" <- ").append("[BANK]");
+                        } else if (sourceUUID.equalsIgnoreCase(trimmedUuid)) {
+                            transactions.append(" -> ").append(destinationPlayerName);
+                        } else if (destinationUUID.equalsIgnoreCase(trimmedUuid)) {
+                            transactions.append(" <- ").append(sourcePlayerName);
+                        }
+                        if (message != null) {
+                            transactions.append(" ").append(message);
+                        }
+                        transactions.append("\n");
+                    }
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("SQL error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } catch (Exception e) {
+                    plugin.getLogger().severe("Error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
+                }
+                return transactions.toString();
+            }).join();
+        }, executorService);
+    }
+
     private static void createEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);

@@ -37,23 +37,22 @@ public class ShopInventory implements InventoryHolder {
         // Check if shop is empty
         if (chest.getBlockInventory().isEmpty()) {
             player.sendMessage(Component.translatable("shop.inventory.empty.player", Styles.INFOSTYLE));
-
             if (Main.SQLMode) {
                 // Store empty shop details in the database
                 String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
-                if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2)) {
+                if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2).join()) {
                     // Notify the shop owners
                     if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
                         if (!owner.isEmpty()) {
                             UUID shopOwnerUUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner));
-                            if(Bukkit.getPlayer(shopOwnerUUID) != null) {
+                            if (Bukkit.getPlayer(shopOwnerUUID) != null) {
                                 Player shopOwnerPlayer = Bukkit.getPlayer(shopOwnerUUID);
                                 shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
                             }
                         }
                         if (!owner2.isEmpty()) {
                             UUID shopOwner2UUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner2));
-                            if(Bukkit.getPlayer(shopOwner2UUID) != null) {
+                            if (Bukkit.getPlayer(shopOwner2UUID) != null) {
                                 Player shopOwnerPlayer2 = Bukkit.getPlayer(shopOwner2UUID);
                                 shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
                             }
@@ -65,14 +64,14 @@ public class ShopInventory implements InventoryHolder {
                 if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
                     if (!owner.isEmpty()) {
                         UUID shopOwnerUUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner));
-                        if(Bukkit.getPlayer(shopOwnerUUID) != null) {
+                        if (Bukkit.getPlayer(shopOwnerUUID) != null) {
                             Player shopOwnerPlayer = Bukkit.getPlayer(shopOwnerUUID);
                             shopOwnerPlayer.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
                         }
                     }
                     if (!owner2.isEmpty()) {
                         UUID shopOwner2UUID = UUID.fromString(TypeChecker.untrimUUID(shopOwner2));
-                        if(Bukkit.getPlayer(shopOwner2UUID) != null) {
+                        if (Bukkit.getPlayer(shopOwner2UUID) != null) {
                             Player shopOwnerPlayer2 = Bukkit.getPlayer(shopOwner2UUID);
                             shopOwnerPlayer2.sendMessage(Component.translatable("shop.inventory.empty.owner", Styles.INFOSTYLE));
                         }
@@ -92,7 +91,7 @@ public class ShopInventory implements InventoryHolder {
         // Sorts the chest inventory
         ItemStack[] chestContent = chest.getBlockInventory().getContents();
         List<ItemStack> newChestContent = new ArrayList<>();
-        for (ItemStack item : chestContent){
+        for (ItemStack item : chestContent) {
             if (item != null) newChestContent.add(item);
         }
         ItemStack[] filteredChestContent = new ItemStack[chestContent.length];
@@ -120,8 +119,11 @@ public class ShopInventory implements InventoryHolder {
         return this.inventory;
     }
 
-    public static Chest getShopChest() {return shopChest; }
-    public static float getShopCost(){
+    public static Chest getShopChest() {
+        return shopChest;
+    }
+
+    public static float getShopCost() {
         return shopCost;
     }
 
@@ -133,5 +135,7 @@ public class ShopInventory implements InventoryHolder {
         return shopOwner2;
     }
 
-    public static boolean isSingleItem() {return singleShopItem;}
+    public static boolean isSingleItem() {
+        return singleShopItem;
+    }
 }

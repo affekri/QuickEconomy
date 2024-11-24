@@ -35,7 +35,7 @@ public class PlayerBreakSignListener implements Listener {
         }
         if (listLines.get(0).equals(shopHeader)) {
             if (player.hasPermission("quickeconomy.shop.destroyall") ||
-                    MojangAPI.getUUID(TypeChecker.getRawString(listLines.get(2))).equals(TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))){
+                    Balances.getUUID(TypeChecker.getRawString(listLines.get(2))).equals(TypeChecker.trimUUID(String.valueOf(player.getUniqueId())))){
                 if (FindChest.get(sign) == null) return;
                 Chest chest = FindChest.get(sign);
                 BlockOwner.unlockFromPlayer(chest, player.getName());

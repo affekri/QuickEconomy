@@ -108,7 +108,7 @@ public class BalanceFile {
                 String key = keys.get(i);
                 double balance = playersSection.getDouble(key + ".balance");
                 double change = playersSection.getDouble(key + ".change");
-                String trimmedUuid = MojangAPI.getUUID(key);
+                String trimmedUuid = MojangAPI.getUUID(key).join();
 
                 if(trimmedUuid == null) {
                     plugin.getLogger().warning("Failed to retrieve UUID for player: " + key);

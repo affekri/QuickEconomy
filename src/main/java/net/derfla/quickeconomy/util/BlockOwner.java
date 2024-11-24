@@ -83,9 +83,9 @@ public class BlockOwner {
         String newKey;
         if(oldKey.contains(" ")) {
             String[] splitOldKey = oldKey.split(" ");
-            newKey = MojangAPI.getUUID(splitOldKey[0]) + " " + MojangAPI.getUUID(splitOldKey[1]);
+            newKey = Balances.getUUID(splitOldKey[0]) + " " + Balances.getUUID(splitOldKey[1]);
         } else {
-            newKey = MojangAPI.getUUID(oldKey);
+            newKey = Balances.getUUID(oldKey);
         }
         assert newKey != null;
         chest.getPersistentDataContainer().set(lockedKey, PersistentDataType.STRING, newKey);

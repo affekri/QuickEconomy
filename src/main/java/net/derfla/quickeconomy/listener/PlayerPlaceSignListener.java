@@ -111,7 +111,7 @@ public class PlayerPlaceSignListener implements Listener {
             event.line(2, Component.text(player.getName()).style(Styles.BODY));
             String line3 = TypeChecker.getRawString(event.line(3));
             if (!line3.isEmpty()) {
-                if (!Balances.hasAccount(MojangAPI.getUUID(line3)) && Bukkit.getPlayer(line3) == null) {
+                if (!Balances.hasAccount(Balances.getUUID(line3)) && Bukkit.getPlayer(line3) == null) {
                     event.line(3, Component.empty());
                     player.sendMessage(Component.translatable("player.notexists", Styles.ERRORSTYLE));
                 } else if (line3.equals(player.getName())) {
@@ -122,7 +122,7 @@ public class PlayerPlaceSignListener implements Listener {
                     sign.update();
                     player.sendMessage(Component.translatable("shop.created.split", Component.text(line3)).style(Styles.INFOSTYLE));
                     // Lock chest to players
-                    BlockOwner.setPlayerLocked(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), MojangAPI.getUUID(line3));
+                    BlockOwner.setPlayerLocked(chest, TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), Balances.getUUID(line3));
                     return;
                 }
             }

@@ -10,6 +10,7 @@ database:
   username: user
   password: pass
   file:
+  poolSize: 10
 # Shops
 shop:
   emptyShopOwnerMessage: true

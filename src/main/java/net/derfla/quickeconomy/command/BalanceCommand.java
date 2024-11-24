@@ -64,7 +64,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
                     break;
                 }
-                Balances.setPlayerBalance(MojangAPI.getUUID(strings[2]), money);
+                Balances.setPlayerBalance(Balances.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.set", Component.text(strings[2]), Component.text(money)).style(Styles.INFOSTYLE));
                 break;
 
@@ -89,7 +89,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.addPlayerBalance(MojangAPI.getUUID(strings[2]), money);
+                Balances.addPlayerBalance(Balances.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -112,7 +112,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.subPlayerBalance(MojangAPI.getUUID(strings[2]), money);
+                Balances.subPlayerBalance(Balances.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -137,7 +137,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
                     break;
                 }
-                String targetUUID = MojangAPI.getUUID(strings[2]);
+                String targetUUID = Balances.getUUID(strings[2]);
 
                 if (!Balances.hasAccount(targetUUID)) {
                     sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[2])));
@@ -149,7 +149,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
-                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), MojangAPI.getUUID(strings[2]), money, null);
+                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), targetUUID, money, null);
 
                 player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {
@@ -170,7 +170,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
                     break;
                 }
-                String transactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, 1));
+                String transactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, 1).join());
                 if(transactions.isEmpty()){
                     transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
                     break;
@@ -183,17 +183,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     break;
                 }
                 if(strings.length < 2) {
-                    sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (strings[1].equalsIgnoreCase("all") && Main.SQLMode) {
-                    sender.sendMessage(DatabaseManager.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                    if(Main.SQLMode) {
+                        sender.sendMessage(DatabaseManager.listAllAccounts().join().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                    } else {
+                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
+                    }
                     break;
                 }
                 String checkPlayer;
                 if (Bukkit.getServer().getPlayerExact(strings[1]) != null) {
                     checkPlayer = Bukkit.getServer().getPlayerExact(strings[1]).getUniqueId().toString();
-                } else checkPlayer = MojangAPI.getUUID(strings[1]);
+                } else checkPlayer = Balances.getUUID(strings[1]);
                 if (!Balances.hasAccount(checkPlayer)) {
                     sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])));
                     break;

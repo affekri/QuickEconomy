@@ -1,13 +1,13 @@
 package net.derfla.quickeconomy.util;
 
-
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
-import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Balances {
 
@@ -29,11 +29,11 @@ public class Balances {
         }
 
         if (!(file.contains("players." + trimmedUUID + ".balance"))) {
-            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID));
+            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID).join());
             return 0.0f;
         }
         if (file.get("players." + trimmedUUID + ".balance") == null) {
-            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID));
+            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID).join());
             return 0.0f;
         }
         return (float) file.getDouble("players." + trimmedUUID + ".balance");
@@ -42,7 +42,7 @@ public class Balances {
     public static void setPlayerBalance(String uuid, float money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if (SQLMode) {
-            DatabaseManager.setPlayerBalance(uuid, money, 0);
+            DatabaseManager.setPlayerBalance(uuid, money, 0).join();
             return;
         }
 
@@ -89,7 +89,7 @@ public class Balances {
     public static void setPlayerBalanceChange(String uuid, float moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if(SQLMode) {
-            DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange);
+            DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
         }
 
@@ -121,7 +121,7 @@ public class Balances {
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
         if(SQLMode) {
-            DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage);
+            DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
             return;
         }
         if (source != null)
@@ -133,7 +133,7 @@ public class Balances {
 
     public static void updatePlayerName(String uuid, String name) {
         if (SQLMode) {
-            DatabaseManager.updatePlayerName(uuid, name);
+            DatabaseManager.updatePlayerName(uuid, name).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();
@@ -148,7 +148,7 @@ public class Balances {
 
     public static void addAccount(String uuid, String name) {
         if (SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0, 0);
+            DatabaseManager.addAccount(uuid, name, 0, 0).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();
@@ -161,5 +161,28 @@ public class Balances {
         file.set("players." + uuid + ".balance", 0.0f);
         file.set("players." + uuid + ".change", 0.0f);
         BalanceFile.save();
+    }
+
+    public static String getUUID(String playerName) {
+        if (SQLMode) {
+            return DatabaseManager.getUUID(playerName).join();
+        }
+        FileConfiguration file = BalanceFile.get();
+
+        if (file == null){
+            plugin.getLogger().severe("balance.yml not found!");
+            return "";
+        }
+        ConfigurationSection players = file.getConfigurationSection("players");
+        List<String> keys = new ArrayList<>(players.getKeys(false));
+        int totalKeys = keys.size();
+        for(int i = 0; i < totalKeys;i++) {
+            String key = keys.get(i);
+            if(players.getString(key + ".name").toLowerCase().equals(playerName.toLowerCase())) {
+                return key;
+            }
+        }
+        plugin.getLogger().warning("Failed to get UUID for player: " + playerName);
+        return "";
     }
 }

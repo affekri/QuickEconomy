@@ -10,16 +10,17 @@ import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public final class Main extends JavaPlugin {
 
 
     public static boolean SQLMode = false;
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     @Override
     public void onEnable() {
-        // Plugin startup logic
-        getLogger().info("QuickEconomy has been enabled!");
-        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
 
         // Set command executors
         getCommand("balance").setExecutor(new BalanceCommand());
@@ -46,6 +47,10 @@ public final class Main extends JavaPlugin {
         metrics.addCustomChart(new Metrics.SimplePie("sql_mode", () -> {
             return SQLMode ? "SQL-mode" : "File-mode";
         }));
+
+        // Plugin startup logic
+        getLogger().info("QuickEconomy has been enabled!");
+        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
     }
 
     private void registerEvents() {
@@ -93,5 +98,9 @@ public final class Main extends JavaPlugin {
 
     public static Main getInstance() {
         return getPlugin(Main.class);
+    }
+
+    public static ExecutorService getExecutorService() {
+        return executorService;
     }
 }

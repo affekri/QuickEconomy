@@ -18,7 +18,6 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import java.io.FileWriter;
@@ -27,8 +26,8 @@ import java.io.IOException;
 public class DatabaseManager {
 
     static Plugin plugin = Main.getInstance();
-    private static HikariDataSource dataSource;
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(5); // Number of threads for async operations
+    public static HikariDataSource dataSource;
+    private static final ExecutorService executorService = Main.getExecutorService();
     
     public static CompletableFuture<Connection> getConnectionAsync() {
         return CompletableFuture.supplyAsync(() -> {
@@ -60,8 +59,10 @@ public class DatabaseManager {
             config.setUsername(user);
             config.setPassword(password);
 
+            int poolSize = plugin.getConfig().getInt("poolSize");
+            if (poolSize < 1 || poolSize > 50) poolSize = 10;
             // Optional HikariCP settings
-            config.setMaximumPoolSize(10); // Max number of connections in the pool
+            config.setMaximumPoolSize(poolSize); // Max number of connections in the pool
             config.setConnectionTimeout(30000); // 30 seconds timeout for getting a connection
             config.setIdleTimeout(600000); // 10 minutes before an idle connection is closed
             config.setMaxLifetime(1800000); // 30 minutes max lifetime for a connection
@@ -97,6 +98,12 @@ public class DatabaseManager {
                 }
             } catch (SQLException e) {
                 plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+            } finally {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                }
             }
             return false;
         });
@@ -159,24 +166,26 @@ public class DatabaseManager {
                     + ");";
             tableCreationQueries.add(EmptyShops);
 
-            // Execute the SQL statements to create tables
-            try (Statement statement = conn.createStatement()) {
                 for (String query : tableCreationQueries) {
                     tableExists(query).thenAccept(exists -> {
                         if (!exists) {
-                            try {
+                            try (Statement statement = conn.createStatement()) {
                                 statement.executeUpdate(query);
                             } catch (SQLException e) {
-                                plugin.getLogger().severe("Error executing query: " + e.getMessage());
+                                plugin.getLogger().severe("Error creating table: " + (query) + e.getMessage());
+                            } finally {
+                                try {
+                                    conn.close();
+                                } catch (SQLException e) {
+                                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                                }
                             }
                         } else {
                             plugin.getLogger().info("Table " + query + " already exists in database.");
                         }
                     });
                 }
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Error creating tables: " + e.getMessage());
-            }
+
         });
     }
 
@@ -206,6 +215,12 @@ public class DatabaseManager {
                             }
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error adding player account: " + e.getMessage());
+                        } finally {
+                            try {
+                                conn.close();
+                            } catch (SQLException e) {
+                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                            }
                         }
                     });
                 }
@@ -216,7 +231,9 @@ public class DatabaseManager {
 
     public static CompletableFuture<Boolean> insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
         String Owner1 = TypeChecker.trimUUID(owner1);
-        String Owner2 = TypeChecker.trimUUID(owner2);
+        String Owner2 = "";
+        final boolean[] alreadyExists = {false};
+        if (!owner2.isEmpty()) TypeChecker.trimUUID(owner2);
 
         // Return a CompletableFuture
         return CompletableFuture.supplyAsync(() -> {
@@ -232,12 +249,20 @@ public class DatabaseManager {
                             pstmt.setString(3, coordinates);
                             pstmt.executeUpdate();
                             plugin.getLogger().info("Empty shop at " + coordinates + " updated with new owners.");
+                            alreadyExists[0] = true;
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error updating empty shop: " + e.getMessage());
+                        } finally {
+                            try {
+                                conn.close();
+                            } catch (SQLException e) {
+                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                            }
                         }
                     });
                 } else {
                     // Insert a new empty shop
+                    alreadyExists[0] = false;
                     String insertSql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
                     getConnectionAsync().thenAccept(conn -> {
                         try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
@@ -248,17 +273,22 @@ public class DatabaseManager {
                             plugin.getLogger().info("Empty shop registered at " + coordinates);
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
+                        } finally {
+                            try {
+                                conn.close();
+                            } catch (SQLException e) {
+                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                            }
                         }
                     });
+                    createEmptyShopsView(owner1);
+                    if (!owner2.isEmpty()) {
+                        createEmptyShopsView(owner2);
+                    }
                 }
             });
 
-            createEmptyShopsView(owner1);
-            if (owner2 != null) {
-                createEmptyShopsView(owner2);
-            }
-
-            return true; // New shop created
+            return alreadyExists[0];
         }, executorService); // Use the executorService for async execution
     }
 
@@ -274,6 +304,12 @@ public class DatabaseManager {
                 }
             } catch (SQLException e) {
                 plugin.getLogger().severe("Error checking for empty shop: " + e.getMessage());
+            } finally {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                }
             }
             return false; // Return false if the shop does not exist or an error occurred
         });
@@ -365,6 +401,12 @@ public class DatabaseManager {
                     } else {
                         plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
                     }
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -419,6 +461,12 @@ public class DatabaseManager {
                 plugin.getLogger().info("Transaction view created for UUID: " + untrimmedUuid);
             } catch (SQLException e) {
                 plugin.getLogger().severe("Error creating transaction view: " + e.getMessage());
+            } finally {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                }
             }
         });
     }
@@ -482,6 +530,12 @@ public class DatabaseManager {
                     plugin.getLogger().severe("SQL error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
                 } catch (Exception e) {
                     plugin.getLogger().severe("Error viewing transactions for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
                 return transactions.toString();
             }).join();
@@ -528,6 +582,12 @@ public class DatabaseManager {
                 plugin.getLogger().info("Empty shops view created for UUID: " + untrimmedUuid);
             } catch (SQLException e) {
                 plugin.getLogger().severe("Error creating empty shops view: " + e.getMessage());
+            } finally {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                }
             }
         });
     }
@@ -571,6 +631,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error retrieving empty shops for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
 
                 if (emptyShops.isEmpty()) {
@@ -601,6 +667,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error viewing balance for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
                 return balance[0]; // Return the value from the array
             }).join(); // Wait for the CompletableFuture to complete
@@ -640,6 +712,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error viewing autopays for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
                 return autopays;
             }).join(); // Wait for the CompletableFuture to complete
@@ -689,6 +767,12 @@ public class DatabaseManager {
                     plugin.getLogger().info("Autopay added successfully");
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error adding autopay: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -715,6 +799,12 @@ public class DatabaseManager {
                 } catch (SQLException e) {
                     String action = activeState ? "activating" : "deactivating";
                     plugin.getLogger().severe("Error " + action + " autopay: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -739,6 +829,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error deleting autopay: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -765,6 +861,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error listing accounts: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
 
                 return accounts;
@@ -793,6 +895,12 @@ public class DatabaseManager {
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error checking for transactions: " + e.getMessage());
                     return false; // Exit the method if there's an error checking transactions
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
                 return true; // Return true if transactions exist
             }).join(); // Wait for the CompletableFuture to complete
@@ -912,6 +1020,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Database rollback failed: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -938,6 +1052,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error updating balance for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -1061,6 +1181,12 @@ public class DatabaseManager {
 
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error migrating to balance.yml: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -1083,8 +1209,15 @@ public class DatabaseManager {
                         }
                     } catch (SQLException e) {
                         plugin.getLogger().severe("Error checking account existence for UUID " + untrimmedUuid + ": " + e.getMessage());
+                    } finally {
+                        try {
+                            conn.close();
+                        } catch (SQLException e) {
+                            plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                        }
                     }
                     return false;
+
                 }).join(); // Wait for the CompletableFuture to complete
             } catch (Exception e) {
                 plugin.getLogger().severe("Error checking account existence for UUID " + untrimmedUuid + ": " + e.getMessage());
@@ -1104,15 +1237,15 @@ public class DatabaseManager {
                 try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                     pstmt.setString(1, playerName);
                     pstmt.setString(2, trimmedUuid);
-                    int rowsUpdated = pstmt.executeUpdate();
-        
-                    if (rowsUpdated > 0) {
-                        plugin.getLogger().info("Player name updated successfully for UUID: " + untrimmedUuid);
-                    } else {
-                        plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
-                    }
+
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error updating player name for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -1138,6 +1271,12 @@ public class DatabaseManager {
                     plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
                 } catch (IOException e) {
                     plugin.getLogger().severe("Error writing CSV file: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -1182,6 +1321,12 @@ public class DatabaseManager {
                 plugin.getLogger().severe("Error getting connection for exporting table '" + tableName + "': " + e.getMessage());
             } catch (IOException e) {
                 plugin.getLogger().severe("IO error while writing to CSV for table '" + tableName + "': " + e.getMessage());
+            } finally {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                }
             }
         }, executorService); // Use the executorService for async execution
     }
@@ -1236,6 +1381,12 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Could not get change for player: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
                 return change[0]; // Return the value from the array
             }).join(); // Wait for the CompletableFuture to complete
@@ -1256,6 +1407,12 @@ public class DatabaseManager {
                     pstmt.executeUpdate();
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error updating change for UUID " + untrimmedUuid + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
         }, executorService); // Use the executorService for async execution
@@ -1276,8 +1433,40 @@ public class DatabaseManager {
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error removing empty shop: " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
                 }
             });
+        }, executorService); // Use the executorService for async execution
+    }
+
+    public static CompletableFuture<String> getUUID(String playerName) {
+        String sql = "SELECT UUID FROM PlayerAccounts WHERE PlayerName = ?";
+        return CompletableFuture.supplyAsync(() -> {
+            String[] uuidHolder = new String[1]; // Use an array to hold the UUID
+            getConnectionAsync().thenAccept(conn -> {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setString(1, playerName);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            uuidHolder[0] = rs.getString("UUID"); // Store the UUID
+                        }
+                    }
+                } catch (SQLException e) {
+                    plugin.getLogger().warning("Error retrieving UUID for player " + playerName + ": " + e.getMessage());
+                } finally {
+                    try {
+                        conn.close();
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                    }
+                }
+            }).join(); // Wait for the connection to complete
+            return uuidHolder[0]; // Return the UUID or null if not found
         }, executorService); // Use the executorService for async execution
     }
 

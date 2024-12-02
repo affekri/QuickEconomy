@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.function.Consumer;
 
 public class DatabaseManager {
 
@@ -37,9 +38,10 @@ public class DatabaseManager {
             try {
                 return dataSource.getConnection();
             } catch (SQLException e) {
-                throw new RuntimeException("Failed to get connection", e);
+                plugin.getLogger().warning("Failed to get connection: " + e.getMessage());
+                return null;
             }
-        }, executorService); // Use the executorService for async execution
+        }, executorService);
     }
 
     public static void connectToDatabase() {
@@ -48,7 +50,10 @@ public class DatabaseManager {
         String type = plugin.getConfig().getString("database.type");
         if ("mysql".equalsIgnoreCase(type)) {
             String host = plugin.getConfig().getString("database.host");
-            int port = plugin.getConfig().getInt("database.port");
+            int port = plugin.getConfig().getInt("database.port");if (port < 1 || port > 65535) {
+                port = 3306;
+                plugin.getLogger().warning("Database port must be between 1 and 65535, using default (3306).");
+            }
             String database = plugin.getConfig().getString("database.database");
             String user = plugin.getConfig().getString("database.username");
             String password = plugin.getConfig().getString("database.password");
@@ -60,7 +65,10 @@ public class DatabaseManager {
             config.setPassword(password);
 
             int poolSize = plugin.getConfig().getInt("poolSize");
-            if (poolSize < 1 || poolSize > 50) poolSize = 10;
+            if (poolSize < 1 || poolSize > 50) {
+                poolSize = 10;
+                plugin.getLogger().warning("Database pool size must be between 1 and 50, using default (10).");
+            }
             // Optional HikariCP settings
             config.setMaximumPoolSize(poolSize); // Max number of connections in the pool
             config.setConnectionTimeout(30000); // 30 seconds timeout for getting a connection
@@ -89,23 +97,23 @@ public class DatabaseManager {
 
     private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
         // Check if table exists and return true if it does, false otherwise
-        return getConnectionAsync().thenApply(conn -> {
+        return getConnectionAsync().thenCompose(conn -> {
             try (PreparedStatement pstmt = conn.prepareStatement("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
                 pstmt.setString(1, tableName);
-                ResultSet rs = pstmt.executeQuery();
-                if (rs.next()) {
-                    return rs.getInt(1) > 0;
-                }
+                return CompletableFuture.supplyAsync(() -> {
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            return rs.getInt(1) > 0;
+                        }
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+                    }
+                    return false;
+                }, executorService);
             } catch (SQLException e) {
-                plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
-            } finally {
-                try {
-                    conn.close();
-                } catch (SQLException e) {
-                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                }
+                plugin.getLogger().severe("Error preparing statement for table check: " + e.getMessage());
+                return CompletableFuture.completedFuture(false);
             }
-            return false;
         });
     }
 
@@ -171,14 +179,9 @@ public class DatabaseManager {
                         if (!exists) {
                             try (Statement statement = conn.createStatement()) {
                                 statement.executeUpdate(query);
+                                plugin.getLogger().info("Table created: " + query);
                             } catch (SQLException e) {
-                                plugin.getLogger().severe("Error creating table: " + (query) + e.getMessage());
-                            } finally {
-                                try {
-                                    conn.close();
-                                } catch (SQLException e) {
-                                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                                }
+                                plugin.getLogger().severe("Error creating table: " + query + " " + e.getMessage());
                             }
                         } else {
                             plugin.getLogger().info("Table " + query + " already exists in database.");
@@ -189,19 +192,20 @@ public class DatabaseManager {
         });
     }
 
-    public static CompletableFuture<Void> addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change) {
+    public static CompletableFuture<Void> addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change, Consumer<Void> callback) {
         return CompletableFuture.runAsync(() -> {
             String trimmedUuid = TypeChecker.trimUUID(uuid);
-            Instant currentTime = Instant.now(); // Use Instant for UTC time
-            String currentTimeString = TypeChecker.convertToUTC(currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))); 
+            Instant currentTime = Instant.now();
+            String currentTimeString = TypeChecker.convertToUTC(currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
-            accountExists(trimmedUuid).thenAccept(exists -> {
+            accountExists(trimmedUuid).thenCompose(exists -> {
                 if (exists) {
                     plugin.getLogger().info("Account already exists for player with UUID: " + trimmedUuid);
+                    return CompletableFuture.completedFuture(null);
                 } else {
                     String insertSql = "INSERT INTO PlayerAccounts (UUID, AccountDatetime, PlayerName, Balance, BalChange) "
                             + "VALUES (?, ?, ?, ?, ?)";
-                    getConnectionAsync().thenAccept(conn -> {
+                    return getConnectionAsync().thenAccept(conn -> {
                         try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                             pstmt.setString(1, trimmedUuid);
                             pstmt.setString(2, currentTimeString); // Use the converted UTC time
@@ -215,32 +219,21 @@ public class DatabaseManager {
                             }
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error adding player account: " + e.getMessage());
-                        } finally {
-                            try {
-                                conn.close();
-                            } catch (SQLException e) {
-                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                            }
                         }
                     });
                 }
-            });
-            createTransactionsView(trimmedUuid);
+            }).thenRun(() -> createTransactionsView(trimmedUuid)); // Ensure createTransactionsView is called after the account is added
         }, executorService); // Use the executorService for async execution
     }
 
-    public static CompletableFuture<Boolean> insertEmptyShop(@NotNull String coordinates, String owner1, String owner2) {
+    public static CompletableFuture<Boolean> insertEmptyShop(@NotNull String coordinates, @NotNull String owner1, String owner2) {
         String Owner1 = TypeChecker.trimUUID(owner1);
-        String Owner2 = "";
-        final boolean[] alreadyExists = {false};
-        if (!owner2.isEmpty()) TypeChecker.trimUUID(owner2);
+        final String Owner2 = !owner2.isEmpty() ? TypeChecker.trimUUID(owner2) : "";
 
-        // Return a CompletableFuture
         return CompletableFuture.supplyAsync(() -> {
-            // Return true if a new empty shop was created, false if an existing shop was updated
-            emptyShopExists(coordinates).thenAccept(exists -> {
+            return emptyShopExists(coordinates).thenApply(exists -> {
                 if (exists) {
-                    // Update the owners of the existing shop
+                    // Update existing shop
                     String updateSql = "UPDATE EmptyShops SET Owner1 = ?, Owner2 = ? WHERE Coordinates = ?";
                     getConnectionAsync().thenAccept(conn -> {
                         try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
@@ -249,20 +242,13 @@ public class DatabaseManager {
                             pstmt.setString(3, coordinates);
                             pstmt.executeUpdate();
                             plugin.getLogger().info("Empty shop at " + coordinates + " updated with new owners.");
-                            alreadyExists[0] = true;
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error updating empty shop: " + e.getMessage());
-                        } finally {
-                            try {
-                                conn.close();
-                            } catch (SQLException e) {
-                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                            }
                         }
                     });
+                    return true;
                 } else {
-                    // Insert a new empty shop
-                    alreadyExists[0] = false;
+                    // Insert new shop
                     String insertSql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
                     getConnectionAsync().thenAccept(conn -> {
                         try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
@@ -273,23 +259,17 @@ public class DatabaseManager {
                             plugin.getLogger().info("Empty shop registered at " + coordinates);
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error inserting empty shop: " + e.getMessage());
-                        } finally {
-                            try {
-                                conn.close();
-                            } catch (SQLException e) {
-                                plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                            }
+                        }
+                    }).thenRun(() -> {
+                        createEmptyShopsView(owner1);
+                        if (!owner2.isEmpty()) {
+                            createEmptyShopsView(owner2);
                         }
                     });
-                    createEmptyShopsView(owner1);
-                    if (!owner2.isEmpty()) {
-                        createEmptyShopsView(owner2);
-                    }
+                    return false;
                 }
-            });
-
-            return alreadyExists[0];
-        }, executorService); // Use the executorService for async execution
+            }).join();
+        }, executorService);
     }
 
     private static CompletableFuture<Boolean> emptyShopExists(@NotNull String coordinates) {
@@ -1086,8 +1066,10 @@ public class DatabaseManager {
                         String playerName = playersSection.getString(key + ".name");
                         String trimmedUuid = TypeChecker.trimUUID(key);
 
-                        if (!accountExists(trimmedUuid).join()) { // Use join() to wait for the CompletableFuture
-                            addAccount(trimmedUuid, playerName, balance, change);
+                        if (!accountExists(trimmedUuid).join()) {
+                            addAccount(trimmedUuid, playerName, balance, change, result -> {
+                                // Handle the callback if needed
+                            });
                         } else {
                             setPlayerBalance(trimmedUuid, balance, change);
                         }

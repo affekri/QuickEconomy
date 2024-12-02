@@ -8,6 +8,7 @@ import org.json.simple.parser.JSONParser;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -21,7 +22,7 @@ public class MojangAPI {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Create the complete URL with the username
-                URL url = new URL("https://api.mojang.com/users/profiles/minecraft/" + playerName);
+                URL url = new URI("https://api.mojang.com/users/profiles/minecraft/" + playerName).toURL();
 
                 // Open the connection to the URL
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -62,7 +63,7 @@ public class MojangAPI {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Create the complete URL with the UUID
-                URL url = new URL("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid);
+                URL url = new URI("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid).toURL();
 
                 // Open the connection to the URL
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();

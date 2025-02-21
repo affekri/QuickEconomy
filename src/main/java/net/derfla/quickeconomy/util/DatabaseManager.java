@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
+import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -816,22 +817,23 @@ public class DatabaseManager {
         }, executorService); // Use the executorService for async execution
     }
 
-    public static CompletableFuture<List<String>> listAllAccounts() {
+    public static CompletableFuture<HashMap<String, PlayerAccount>> listAllAccounts() {
         return getConnectionAsync().thenApply(conn -> {
-            String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
-            List<String> accounts = new ArrayList<>();
+            String sql = "SELECT UUID, PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
+            HashMap<String, PlayerAccount> accounts = new HashMap<>();
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql);
                  ResultSet rs = pstmt.executeQuery()) {
 
                     while (rs.next()) {
+                        String uuid = rs.getString("UUID");
                         String playerName = rs.getString("PlayerName");
                         double balance = rs.getDouble("Balance");
+                        double change = rs.getDouble("BalChange");
                         String accountDatetimeUTC = rs.getString("Created"); // Get the UTC datetime
                         String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC); // Convert to local time
 
-                        String accountInfo = playerName + ": " + balance + " (Created: " + accountDatetimeLocal + ")";
-                        accounts.add(accountInfo);
+                        accounts.put(uuid, new PlayerAccount(playerName, balance, change, accountDatetimeLocal));
                     }
                 } catch (SQLException e) {
                     plugin.getLogger().severe("Error listing accounts: " + e.getMessage());

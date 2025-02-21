@@ -184,7 +184,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 if(strings.length < 2) {
                     if(Main.SQLMode) {
-                        sender.sendMessage(DatabaseManager.listAllAccounts().join().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                        sender.sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
                     } else {
                         sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                     }

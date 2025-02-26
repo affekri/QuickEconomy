@@ -175,21 +175,24 @@ public class DatabaseManager {
                     + ");";
             tableCreationQueries.add(EmptyShops);
 
-                for (String query : tableCreationQueries) {
-                    tableExists(query).thenAccept(exists -> {
-                        if (!exists) {
-                            try (Statement statement = conn.createStatement()) {
-                                statement.executeUpdate(query);
-                                plugin.getLogger().info("Table created: " + query);
-                            } catch (SQLException e) {
-                                plugin.getLogger().severe("Error creating table: " + query + " " + e.getMessage());
-                            }
-                        } else {
-                            plugin.getLogger().info("Table " + query + " already exists in database.");
+            for (String query : tableCreationQueries) {
+                // Extract table name from query using the word after "EXISTS"
+                final String extractedTableName = query.substring(query.indexOf("EXISTS") + 7).trim();
+                final String tableName = extractedTableName.substring(0, extractedTableName.indexOf(" "));
+                             
+                tableExists(tableName).thenAccept(exists -> {
+                    if (!exists) {
+                        try (Statement statement = conn.createStatement()) {
+                            statement.executeUpdate(query);
+                            plugin.getLogger().info("Table created: " + tableName);
+                        } catch (SQLException e) {
+                            plugin.getLogger().severe("Error creating table: " + tableName + " " + e.getMessage());
                         }
-                    });
-                }
-
+                    } else {
+                        plugin.getLogger().info("Table " + tableName + " already exists in database.");
+                    }
+                });
+            }
         });
     }
 

@@ -82,6 +82,9 @@ public class Balances {
 
     public static boolean hasAccount(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        if(AccountCache.accountExists(trimmedUUID)) return true;
+
         if(SQLMode) {
             return DatabaseManager.accountExists(trimmedUUID).join();
         }
@@ -92,8 +95,13 @@ public class Balances {
 
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
+        String sourceUUID = TypeChecker.trimUUID(source);
+        String destinationUUID = TypeChecker.trimUUID(destination);
+
         if(SQLMode) {
             DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
+            if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
+            if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
             return;
         }
         if (source != null)

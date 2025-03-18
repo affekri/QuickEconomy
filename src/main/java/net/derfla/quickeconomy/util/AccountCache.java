@@ -24,8 +24,6 @@ public class AccountCache {
      * Is called in startup, in onEnable.
      */
     public static void init() {
-        // For loop. for every line in playerAccounts table/player in balance.yml. Create a new entry into the hashmap, with key Player UUID
-
         if(Main.SQLMode) {
             accountMap = DatabaseManager.listAllAccounts().join();
         } else {
@@ -90,4 +88,12 @@ public class AccountCache {
         return "";
     }
 
+    /**
+     * Checks if the provided UUID key exists in the account cache.
+     * @param uuid The UUID of the player.
+     * @return True if the UUID is present in the cache. False if it's not.
+     */
+    public static boolean accountExists(String uuid) {
+        return accountMap.containsKey(uuid);
+    }
 }

@@ -12,11 +12,10 @@ import java.util.List;
 public class Balances {
 
     static Plugin plugin = Main.getInstance();
-    static boolean SQLMode = Main.SQLMode;
 
     public static float getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if (SQLMode) {
+        if (Main.SQLMode) {
             double balance = DatabaseManager.displayBalance(trimmedUUID).join();
             return (float) balance;
         }
@@ -41,7 +40,7 @@ public class Balances {
 
     public static void setPlayerBalance(String uuid, float money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if (SQLMode) {
+        if (Main.SQLMode) {
             DatabaseManager.setPlayerBalance(uuid, money, 0).join();
             return;
         }
@@ -68,7 +67,7 @@ public class Balances {
 
     public static float getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if(SQLMode) {
+        if(Main.SQLMode) {
             double change = DatabaseManager.getPlayerBalanceChange(trimmedUUID).join();
             return (float) change;
         }
@@ -88,7 +87,7 @@ public class Balances {
 
     public static void setPlayerBalanceChange(String uuid, float moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if(SQLMode) {
+        if(Main.SQLMode) {
             DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
         }
@@ -110,7 +109,7 @@ public class Balances {
 
     public static boolean hasAccount(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if(SQLMode) {
+        if(Main.SQLMode) {
             return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
         }
 
@@ -120,7 +119,7 @@ public class Balances {
 
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
-        if(SQLMode) {
+        if(Main.SQLMode) {
             DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
             return;
         }
@@ -132,7 +131,7 @@ public class Balances {
     }
 
     public static void updatePlayerName(String uuid, String name) {
-        if (SQLMode) {
+        if (Main.SQLMode) {
             DatabaseManager.updatePlayerName(uuid, name).join();
             return;
         }
@@ -147,7 +146,7 @@ public class Balances {
     }
 
     public static void addAccount(String uuid, String name) {
-        if (SQLMode) {
+        if (Main.SQLMode) {
             DatabaseManager.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
             return;
         }
@@ -164,7 +163,7 @@ public class Balances {
     }
 
     public static String getUUID(String playerName) {
-        if (SQLMode) {
+        if (Main.SQLMode) {
             return DatabaseManager.getUUID(playerName).join();
         }
         FileConfiguration file = BalanceFile.get();

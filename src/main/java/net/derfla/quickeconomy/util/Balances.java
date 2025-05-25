@@ -148,7 +148,7 @@ public class Balances {
 
     public static void addAccount(String uuid, String name) {
         if (SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0, 0).join();
+            DatabaseManager.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();

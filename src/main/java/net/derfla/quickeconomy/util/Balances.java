@@ -2,12 +2,12 @@ package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 
 public class Balances {
 
@@ -16,31 +16,15 @@ public class Balances {
 
     public static float getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if (SQLMode) {
-            double balance = DatabaseManager.displayBalance(trimmedUUID).join();
-            return (float) balance;
-        }
 
-        FileConfiguration file = BalanceFile.get();
-
-        if (file == null){
-            plugin.getLogger().severe("balance.yml not found!");
-            return 0.0f;
-        }
-
-        if (!(file.contains("players." + trimmedUUID + ".balance"))) {
-            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID).join());
-            return 0.0f;
-        }
-        if (file.get("players." + trimmedUUID + ".balance") == null) {
-            plugin.getLogger().info("No balance found for player: " + MojangAPI.getName(trimmedUUID).join());
-            return 0.0f;
-        }
-        return (float) file.getDouble("players." + trimmedUUID + ".balance");
+        return (float) AccountCache.getPlayerAccount(trimmedUUID).balance();
     }
 
     public static void setPlayerBalance(String uuid, float money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        AccountCache.getPlayerAccount(trimmedUUID).balance(money);
+
         if (SQLMode) {
             DatabaseManager.setPlayerBalance(uuid, money, 0).join();
             return;
@@ -68,26 +52,14 @@ public class Balances {
 
     public static float getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        if(SQLMode) {
-            double change = DatabaseManager.getPlayerBalanceChange(trimmedUUID).join();
-            return (float) change;
-        }
-
-        FileConfiguration file = BalanceFile.get();
-
-        if (file == null){
-            plugin.getLogger().warning("balance.yml not found!");
-            return 0.0f;
-        }
-        if (!(file.contains("players." + trimmedUUID + ".change"))) {
-            return 0.0f;
-        }
-
-        return (float) file.getDouble("players." + trimmedUUID + ".change");
+        return (float) AccountCache.getPlayerAccount(trimmedUUID).change();
     }
 
     public static void setPlayerBalanceChange(String uuid, float moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        AccountCache.getPlayerAccount(trimmedUUID).change(moneyChange);
+
         if(SQLMode) {
             DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
@@ -110,8 +82,11 @@ public class Balances {
 
     public static boolean hasAccount(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        if(AccountCache.accountExists(trimmedUUID)) return true;
+
         if(SQLMode) {
-            return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
+            return DatabaseManager.accountExists(trimmedUUID).join();
         }
 
         FileConfiguration file = BalanceFile.get();
@@ -120,8 +95,13 @@ public class Balances {
 
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
+        String sourceUUID = TypeChecker.trimUUID(source);
+        String destinationUUID = TypeChecker.trimUUID(destination);
+
         if(SQLMode) {
             DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
+            if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
+            if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
             return;
         }
         if (source != null)
@@ -132,6 +112,9 @@ public class Balances {
     }
 
     public static void updatePlayerName(String uuid, String name) {
+
+        AccountCache.getPlayerAccount(uuid).name(name);
+
         if (SQLMode) {
             DatabaseManager.updatePlayerName(uuid, name).join();
             return;
@@ -147,8 +130,13 @@ public class Balances {
     }
 
     public static void addAccount(String uuid, String name) {
+
+        AccountCache.addAccount(uuid, name);
+
         if (SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0, 0).join();
+            DatabaseManager.addAccount(uuid, name, 0, 0,result -> {
+                // Handle the callback if needed
+            }).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();
@@ -157,32 +145,24 @@ public class Balances {
             plugin.getLogger().severe("balance.yml not found!");
             return;
         }
+        String timeStamp = TypeChecker.convertToUTC(Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         file.set("players." + uuid + ".name", name);
         file.set("players." + uuid + ".balance", 0.0f);
         file.set("players." + uuid + ".change", 0.0f);
+        file.set("players." + uuid + ".created", timeStamp);
         BalanceFile.save();
     }
 
+    /**
+     * Get the UUID from a player
+     * @deprecated
+     * Since 1.1.2. Use AccountCache.getUUID() instead.
+     *
+     * @param playerName The name of the player.
+     * @return A string with the UUID. If the playerName is not found in the cache, it returns an empty string.
+     */
+    @Deprecated
     public static String getUUID(String playerName) {
-        if (SQLMode) {
-            return DatabaseManager.getUUID(playerName).join();
-        }
-        FileConfiguration file = BalanceFile.get();
-
-        if (file == null){
-            plugin.getLogger().severe("balance.yml not found!");
-            return "";
-        }
-        ConfigurationSection players = file.getConfigurationSection("players");
-        List<String> keys = new ArrayList<>(players.getKeys(false));
-        int totalKeys = keys.size();
-        for(int i = 0; i < totalKeys;i++) {
-            String key = keys.get(i);
-            if(players.getString(key + ".name").toLowerCase().equals(playerName.toLowerCase())) {
-                return key;
-            }
-        }
-        plugin.getLogger().warning("Failed to get UUID for player: " + playerName);
-        return "";
+        return AccountCache.getUUID(playerName);
     }
 }

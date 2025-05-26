@@ -32,10 +32,10 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
             return true;
         }
-        float money = 0;
+        double money = 0;
         boolean moneySet;
         try {
-            money = Float.parseFloat(strings[1]);
+            money = Double.parseDouble(strings[1]);
             moneySet = true;
         } catch (Exception e) {
             moneySet = false;
@@ -198,8 +198,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])));
                     break;
                 }
-                float balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
-                if (balance == 0.0f) {
+                double balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
+                if (balance == 0.0) {
                     sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[1])).style(Styles.ERRORSTYLE));
                     break;
                 }

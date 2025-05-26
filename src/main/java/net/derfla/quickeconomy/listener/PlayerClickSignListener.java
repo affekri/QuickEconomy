@@ -71,7 +71,7 @@ public class PlayerClickSignListener implements Listener {
                 player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
-            float cost = Float.parseFloat(splitLine1[0]);
+            double cost = Float.parseFloat(splitLine1[0]);
             String shopType;
             if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";

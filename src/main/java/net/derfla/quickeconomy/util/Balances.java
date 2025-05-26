@@ -14,13 +14,13 @@ public class Balances {
     static Plugin plugin = Main.getInstance();
     static boolean SQLMode = Main.SQLMode;
 
-    public static float getPlayerBalance(String uuid) {
+    public static double getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
-        return (float) AccountCache.getPlayerAccount(trimmedUUID).balance();
+        return AccountCache.getPlayerAccount(trimmedUUID).balance();
     }
 
-    public static void setPlayerBalance(String uuid, float money) {
+    public static void setPlayerBalance(String uuid, double money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         AccountCache.getPlayerAccount(trimmedUUID).balance(money);
@@ -39,23 +39,23 @@ public class Balances {
         BalanceFile.save();
     }
 
-    public static void addPlayerBalance(String uuid, float money){
+    public static void addPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         addPlayerBalanceChange(trimmedUUID, money);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) + money);
     }
 
-    public static void subPlayerBalance(String uuid, float money){
+    public static void subPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) - money);
     }
 
-    public static float getPlayerBalanceChange(String uuid) {
+    public static double getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        return (float) AccountCache.getPlayerAccount(trimmedUUID).change();
+        return  AccountCache.getPlayerAccount(trimmedUUID).change();
     }
 
-    public static void setPlayerBalanceChange(String uuid, float moneyChange) {
+    public static void setPlayerBalanceChange(String uuid, double moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         AccountCache.getPlayerAccount(trimmedUUID).change(moneyChange);
@@ -76,7 +76,7 @@ public class Balances {
         BalanceFile.save();
     }
 
-    public static void addPlayerBalanceChange(String uuid, float money) {
+    public static void addPlayerBalanceChange(String uuid, double money) {
         setPlayerBalanceChange(uuid, getPlayerBalanceChange(uuid) + money);
     }
 
@@ -105,9 +105,9 @@ public class Balances {
             return;
         }
         if (source != null)
-            subPlayerBalance(source, (float) amount);
+            subPlayerBalance(source, amount);
         if (destination != null)
-            addPlayerBalance(destination, (float) amount);
+            addPlayerBalance(destination, amount);
 
     }
 
@@ -147,8 +147,8 @@ public class Balances {
         }
         String timeStamp = TypeChecker.convertToUTC(Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         file.set("players." + uuid + ".name", name);
-        file.set("players." + uuid + ".balance", 0.0f);
-        file.set("players." + uuid + ".change", 0.0f);
+        file.set("players." + uuid + ".balance", 0.0);
+        file.set("players." + uuid + ".change", 0.0);
         file.set("players." + uuid + ".created", timeStamp);
         BalanceFile.save();
     }

@@ -15,7 +15,7 @@ import org.bukkit.plugin.Plugin;
 
 public class PlayerJoinListener implements Listener {
 
-    float change = 0.0f;
+    double change = 0.0;
     static Plugin plugin = Main.getInstance();
 
     @EventHandler

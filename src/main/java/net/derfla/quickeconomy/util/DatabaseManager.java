@@ -97,25 +97,25 @@ public class DatabaseManager {
     }
 
     private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
-        // Check if table exists and return true if it does, false otherwise
-        return getConnectionAsync().thenCompose(conn -> {
-            try (PreparedStatement pstmt = conn.prepareStatement("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
-                pstmt.setString(1, tableName);
-                return CompletableFuture.supplyAsync(() -> {
-                    try (ResultSet rs = pstmt.executeQuery()) {
-                        if (rs.next()) {
-                            return rs.getInt(1) > 0;
+        return getConnectionAsync().thenCompose(conn ->
+                CompletableFuture.supplyAsync(() -> {
+                    try (PreparedStatement pstmt = conn.prepareStatement(
+                            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?"
+                    )) {
+                        pstmt.setString(1, tableName);
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            return rs.next() && rs.getInt(1) > 0;
                         }
                     } catch (SQLException e) {
                         plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+                        return false;
+                    } finally {
+                        try {
+                            conn.close();
+                        } catch (SQLException ignored) {}
                     }
-                    return false;
-                }, executorService);
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Error preparing statement for table check: " + e.getMessage());
-                return CompletableFuture.completedFuture(false);
-            }
-        });
+                }, executorService)
+        );
     }
 
     public static CompletableFuture<Void> createTables() {
@@ -188,8 +188,6 @@ public class DatabaseManager {
                         } catch (SQLException e) {
                             plugin.getLogger().severe("Error creating table: " + tableName + " " + e.getMessage());
                         }
-                    } else {
-                        plugin.getLogger().info("Table " + tableName + " already exists in database.");
                     }
                 });
             }
@@ -376,7 +374,7 @@ public class DatabaseManager {
 
                     // Commit the transaction
                     conn.commit();
-                    Balances.addPlayerBalanceChange(trimmedDestination, (float) amount);
+                    Balances.addPlayerBalanceChange(trimmedDestination, amount);
                 } catch (SQLException e) {
                     if(trimmedDestination != null && trimmedSource != null) {
                         plugin.getLogger().severe("Error executing transaction from " + trimmedSource + " to " + trimmedDestination + ": " + e.getMessage());
@@ -474,13 +472,13 @@ public class DatabaseManager {
 
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         }
 
         // Return a CompletableFuture for the transaction display
@@ -930,7 +928,7 @@ public class DatabaseManager {
                                     while (rs.next() && processedRows < batchSize) {
                                         String source = rs.getString("Source");
                                         String destination = rs.getString("Destination");
-                                        float amount = rs.getFloat("Amount");
+                                        double amount = rs.getDouble("Amount");
 
                                         // Update source balance if exists
                                         if (source != null) {
@@ -1196,35 +1194,36 @@ public class DatabaseManager {
     }
 
     public static CompletableFuture<Boolean> accountExists(@NotNull String uuid) {
-        String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-
-        // Use CompletableFuture to handle the connection asynchronously
-        return getConnectionAsync().thenCompose(conn -> {
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, trimmedUuid);
-                return CompletableFuture.supplyAsync(() -> {
-                    try (ResultSet rs = pstmt.executeQuery()) {
-                        if (rs.next()) {
-                            return rs.getInt(1) > 0; // Return true if count is greater than 0
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
+            String trimmedUuid = TypeChecker.trimUUID(uuid);
+            String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+            try {
+                return getConnectionAsync().thenApply(conn -> {
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                        pstmt.setString(1, trimmedUuid);
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            if (rs.next()) {
+                                return rs.getInt(1) > 0; // Return true if count is greater than 0
+                            }
                         }
                     } catch (SQLException e) {
                         plugin.getLogger().severe("Error checking account existence for UUID " + untrimmedUuid + ": " + e.getMessage());
+                    } finally {
+                        try {
+                            conn.close();
+                        } catch (SQLException e) {
+                            plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                        }
                     }
                     return false;
-                }, executorService);
-            } catch (SQLException e) {
-                plugin.getLogger().severe("Error preparing statement for account existence check for UUID " + untrimmedUuid + ": " + e.getMessage());
-                return CompletableFuture.completedFuture(false);
-            } finally {
-                try {
-                    conn.close();
-                } catch (SQLException e) {
-                    plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                }
+
+                }).join(); // Wait for the CompletableFuture to complete
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error checking account existence for UUID " + untrimmedUuid + ": " + e.getMessage());
+                return false;
             }
-        });
+        }, executorService); // Use the executorService for async execution
     }
 
     public static CompletableFuture<Void> updatePlayerName(String uuid, String playerName) {

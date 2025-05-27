@@ -44,7 +44,7 @@ public class Metrics {
      *
      * @param plugin Your plugin instance.
      * @param serviceId The id of the service. It can be found at <a
-     *     href="https://bstats.org/what-is-my-plugin-id">What is my plugin id?</a>
+     *     href="https://bStats.org/what-is-my-plugin-id">What is my plugin id?</a>
      */
     public Metrics(JavaPlugin plugin, int serviceId) {
         this.plugin = plugin;
@@ -121,17 +121,18 @@ public class Metrics {
         builder.appendField("osArch", System.getProperty("os.arch"));
         builder.appendField("osVersion", System.getProperty("os.version"));
         builder.appendField("coreCount", Runtime.getRuntime().availableProcessors());
+        builder.appendField("pluginVersion", plugin.getPluginMeta().getVersion());
+        builder.appendField("author", String.join(", ", plugin.getPluginMeta().getAuthors()));
+        builder.appendField("dependencies", String.join(", ", plugin.getPluginMeta().getPluginDependencies()));
+        builder.appendField("softDependencies", String.join(", ", plugin.getPluginMeta().getPluginSoftDependencies()));
     }
 
     private void appendServiceData(JsonObjectBuilder builder) {
-        builder.appendField("pluginVersion", plugin.getDescription().getVersion());
+        builder.appendField("pluginVersion", plugin.getPluginMeta().getVersion());
     }
 
     private int getPlayerAmount() {
         try {
-            // Around MC 1.8 the return type was changed from an array to a collection,
-            // This fixes java.lang.NoSuchMethodError:
-            // org.bukkit.Bukkit.getOnlinePlayers()Ljava/util/Collection;
             Method onlinePlayersMethod = Class.forName("org.bukkit.Server").getMethod("getOnlinePlayers");
             return onlinePlayersMethod.getReturnType().equals(Collection.class)
                     ? ((Collection<?>) onlinePlayersMethod.invoke(Bukkit.getServer())).size()

@@ -14,7 +14,7 @@ public class DerflaAPI {
 
     private static final Plugin plugin = Main.getInstance();
     private static final String VERSION_URL = "https://derfla.net/api/qe.json";
-    private static final String CURRENT_VERSION = plugin.getDescription().getVersion();
+    private static final String CURRENT_VERSION = plugin.getPluginMeta().getVersion();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
 

@@ -50,22 +50,22 @@ public class DatabaseManager {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
-            try {
-                return CompletableFuture.supplyAsync(() -> {
-                    try {
-                        return queryFunction.apply(conn);
-                    } catch (SQLException e) {
-                        plugin.getLogger().severe("SQL operation failed: " + e.getMessage());
-                        throw new CompletionException(e);
-                    }
-                }, executorService);
-            } finally {
+            return CompletableFuture.supplyAsync(() -> {
                 try {
-                    conn.close();
+                    return queryFunction.apply(conn);
                 } catch (SQLException e) {
-                    plugin.getLogger().warning("Failed to close connection after query: " + e.getMessage());
+                    plugin.getLogger().severe("SQL operation failed: " + e.getMessage());
+                    throw new CompletionException(e);
+                } finally {
+                    try {
+                        if (conn != null && !conn.isClosed()) {
+                            conn.close();
+                        }
+                    } catch (SQLException e) {
+                        plugin.getLogger().warning("Failed to close connection after query: " + e.getMessage());
+                    }
                 }
-            }
+            }, executorService);
         });
     }
 
@@ -74,22 +74,22 @@ public class DatabaseManager {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
-            try {
-                return CompletableFuture.runAsync(() -> {
-                    try {
-                        updateAction.accept(conn);
-                    } catch (SQLException e) {
-                        plugin.getLogger().severe("SQL update operation failed: " + e.getMessage());
-                        throw new CompletionException(e);
-                    }
-                }, executorService);
-            } finally {
+            return CompletableFuture.runAsync(() -> {
                 try {
-                    conn.close();
+                    updateAction.accept(conn);
                 } catch (SQLException e) {
-                    plugin.getLogger().warning("Failed to close connection after update: " + e.getMessage());
+                    plugin.getLogger().severe("SQL update operation failed: " + e.getMessage());
+                    throw new CompletionException(e);
+                } finally {
+                    try {
+                        if (conn != null && !conn.isClosed()) {
+                            conn.close();
+                        }
+                    } catch (SQLException e) {
+                        plugin.getLogger().warning("Failed to close connection after update: " + e.getMessage());
+                    }
                 }
-            }
+            }, executorService);
         });
     }
 
@@ -440,6 +440,21 @@ public class DatabaseManager {
         });
     }
 
+    // Synchronous method for rollback purposes
+    private static double displayBalanceSync(Connection conn, @NotNull String uuid) throws SQLException {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, trimmedUuid);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("Balance");
+                }
+            }
+        }
+        return 0.0; // Return 0 if no balance found
+    }
+
     public static CompletableFuture<Void> setPlayerBalance(@NotNull String uuid, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
@@ -461,6 +476,21 @@ public class DatabaseManager {
         });
     }
 
+    // Synchronous method for rollback purposes
+    private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, balance);
+            pstmt.setDouble(2, change);
+            pstmt.setString(3, trimmedUuid);
+            int rowsAffected = pstmt.executeUpdate();
+            }
+        }
+    }
+
     public static CompletableFuture<Double> getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
@@ -476,6 +506,21 @@ public class DatabaseManager {
             }
             return 0.0; // Return 0.0 if no change found
         });
+    }
+
+    // Synchronous method for rollback purposes
+    private static double getPlayerBalanceChangeSync(Connection conn, String uuid) throws SQLException {
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
+        String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, trimmedUUID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("BalChange");
+                }
+            }
+        }
+        return 0.0; // Return 0.0 if no change found
     }
 
     public static CompletableFuture<Void> setPlayerBalanceChange(@NotNull String uuid, double change) {
@@ -991,22 +1036,22 @@ public class DatabaseManager {
 
                                         // Update source balance if exists
                                         if (source != null) {
-                                            displayBalance(source).thenCombine(getPlayerBalanceChange(source), (balance, change) -> {
-                                                Double newBalance = balance + amount; // Add amount to the balance
-                                                Double newChange = change + amount;   // Add amount to the change
-                                                setPlayerBalance(source, newBalance, newChange);
-                                                return null; // Return null as we don't need a result
-                                            });
+                                            // Use synchronous methods with the transaction's connection
+                                            double currentBalance = displayBalanceSync(conn, source);
+                                            double currentChange = getPlayerBalanceChangeSync(conn, source);
+                                            double newBalance = currentBalance + amount;
+                                            double newChange = currentChange + amount;
+                                            setPlayerBalanceSync(conn, source, newBalance, newChange);
                                         }
 
                                         // Update destination balance if exists
                                         if (destination != null) {
-                                            displayBalance(destination).thenCombine(getPlayerBalanceChange(destination), (balance, change) -> {
-                                                Double newBalance = balance - amount; // Subtract amount from the balance
-                                                Double newChange = change - amount;   // Subtract amount from the change
-                                                setPlayerBalance(destination, newBalance, newChange);
-                                                return null; // Return null as we don't need a result
-                                            });
+                                            // Use synchronous methods with the transaction's connection
+                                            double currentBalance = displayBalanceSync(conn, destination);
+                                            double currentChange = getPlayerBalanceChangeSync(conn, destination);
+                                            double newBalance = currentBalance - amount;
+                                            double newChange = currentChange - amount;
+                                            setPlayerBalanceSync(conn, destination, newBalance, newChange);
                                         }
 
                                         processedRows++;

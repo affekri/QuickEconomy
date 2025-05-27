@@ -1345,17 +1345,16 @@ public class DatabaseManager {
         String csvFilePath = "QE_DatabaseExport.csv";
         int batchSize = 100;
 
-        return getConnectionAsync().thenComposeAsync(conn -> { // New: Chain directly
+        return getConnectionAsync().thenComposeAsync(conn -> {
             if (conn == null) {
                 plugin.getLogger().severe("Database export failed: Could not obtain database connection.");
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for export."));
             }
-            // Wrap the export logic in a CompletableFuture
-            return CompletableFuture.runAsync(() -> {
+
+            CompletableFuture<Void> fileWritingOperations = CompletableFuture.runAsync(() -> {
                 try (FileWriter csvWriter = new FileWriter(csvFilePath)) {
-                    // Consider making exportTableToCSV return CompletableFuture<Void> and using join or get with timeout
-                    // For simplicity, keeping .join() but be aware it blocks the virtual thread here.
-                    // If exportTableToCSV itself is fully async and returns a future, could chain them.
+                    // These .join() calls will block the current virtual thread, which is acceptable
+                    // as they ensure sequential writing to the same FileWriter.
                     exportTableToCSV(conn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize).join();
                     exportTableToCSV(conn, sqlTransactions, "Transactions Table", csvWriter, batchSize).join();
                     exportTableToCSV(conn, sqlAutopays, "Autopays Table", csvWriter, batchSize).join();
@@ -1364,24 +1363,50 @@ public class DatabaseManager {
                     plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
                 } catch (IOException e) {
                     plugin.getLogger().severe("Error writing CSV file during export: " + e.getMessage());
-                    throw new CompletionException(e); // Propagate
-                } catch (CompletionException e) { // Catch if join() throws this from a failed future
-                    plugin.getLogger().severe("Error during table export: " + e.getMessage());
-                    throw e; // Re-propagate
-                } finally {
-                    try {
-                        if (conn != null && !conn.isClosed()) {
-                            conn.close();
-                        }
-                    } catch (SQLException e) {
-                        plugin.getLogger().severe("Error closing connection during export: " + e.getMessage());
-                    }
+                    throw new CompletionException("CSV file writing error", e);
+                } catch (CompletionException e) { // Catches exceptions from join() if an exportTableToCSV sub-task fails
+                    plugin.getLogger().severe("Error during a table export sub-task: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
+                    throw e; // Re-throw to fail fileWritingOperations future
+                } catch (Exception e) { // Catch any other unexpected errors during the export logic
+                    plugin.getLogger().severe("Unexpected error during CSV export logic: " + e.getMessage());
+                    throw new CompletionException("Unexpected CSV export error", e);
                 }
-            }, executorService); // End of inner runAsync for export logic
-        }, executorService) // End of thenComposeAsync for connection handling
+            }, executorService);
+
+            // Ensure the connection is closed after fileWritingOperations completes, regardless of success or failure.
+            // The whenComplete block itself will run on the executorService.
+            return fileWritingOperations.whenCompleteAsync((result, ex) -> {
+                try {
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
+                    }
+                } catch (SQLException sqlEx) {
+                    plugin.getLogger().warning("Failed to close connection after export: " + sqlEx.getMessage());
+                    if (ex == null) { // If fileWritingOperations succeeded, but closing conn failed, this is the new primary error.
+                        throw new CompletionException("Failed to close connection after successful export", sqlEx);
+                    }
+
+                }
+                // If 'ex' (from fileWritingOperations) is not null, it will propagate from whenComplete.
+            }, executorService);
+
+        }, executorService) // executorService for the thenComposeAsync stage after getConnectionAsync
         .exceptionally(ex -> {
-            plugin.getLogger().severe("Comprehensive error during database export: " + ex.getMessage());
-            return null; // Or CompletableFuture.failedFuture(ex)
+            Throwable rootCause = ex;
+            if (ex instanceof CompletionException && ex.getCause() != null) {
+                rootCause = ex.getCause();
+            }
+            plugin.getLogger().severe("General error during database export operation: " + rootCause.getMessage());
+            if (rootCause != ex) {
+                // Log the stack trace to the console, as Logger doesn't have a standard severe with throwable
+                rootCause.printStackTrace(); // This will print to standard error
+            }
+
+            if (ex instanceof CompletionException) {
+                throw (CompletionException) ex;
+            } else {
+                throw new CompletionException("Database export failed due to an unexpected error", ex);
+            }
         });
     }
 

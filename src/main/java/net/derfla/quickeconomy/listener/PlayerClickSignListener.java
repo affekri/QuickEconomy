@@ -67,11 +67,11 @@ public class PlayerClickSignListener implements Listener {
                 return;
             }
             String[] splitLine1 = line1.split("/");
-            if (!TypeChecker.isFloat(splitLine1[0])) {
+            if (!TypeChecker.isDouble(splitLine1[0])) {
                 player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
                 return;
             }
-            float cost = Float.parseFloat(splitLine1[0]);
+            double cost = Double.parseDouble(splitLine1[0]);
             String shopType;
             if (splitLine1[1].equalsIgnoreCase("item")) {
                 shopType = "Item";

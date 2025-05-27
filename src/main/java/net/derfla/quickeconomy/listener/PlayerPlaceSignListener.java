@@ -90,12 +90,12 @@ public class PlayerPlaceSignListener implements Listener {
                 return;
             }
             String[] splitLine1 = line1.split("/");
-            if (!TypeChecker.isFloat(splitLine1[0])) {
+            if (!TypeChecker.isDouble(splitLine1[0])) {
                 player.sendMessage(Component.translatable("shop.sign.line1error", Styles.ERRORSTYLE));
                 return;
             }
-            float cost = TypeChecker.formatFloat(Float.parseFloat(splitLine1[0]));
-            if (cost <= 0.0f) {
+            double cost = TypeChecker.formatDouble(Double.parseDouble(splitLine1[0]));
+            if (cost <= 0.0) {
                 player.sendMessage(Component.translatable("shop.sign.costtolow", Styles.ERRORSTYLE));
                 return;
             }

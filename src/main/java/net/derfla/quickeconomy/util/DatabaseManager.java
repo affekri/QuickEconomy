@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
+import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -162,9 +163,32 @@ public class DatabaseManager {
         executorService.shutdown();
     }
 
+    private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
+        return getConnectionAsync().thenCompose(conn ->
+                CompletableFuture.supplyAsync(() -> {
+                    try (PreparedStatement pstmt = conn.prepareStatement(
+                            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?"
+                    )) {
+                        pstmt.setString(1, tableName);
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            return rs.next() && rs.getInt(1) > 0;
+                        }
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+                        return false;
+                    } finally {
+                        try {
+                            conn.close();
+                        } catch (SQLException ignored) {}
+                    }
+                }, executorService)
+        );
+    }
+
     // ===============================
     // ### TABLE/SCHEMA MANAGEMENT ###
     // ===============================
+
 
     public static CompletableFuture<Void> createTables() {
         return getConnectionAsync().thenCompose(conn -> {
@@ -633,13 +657,13 @@ public class DatabaseManager {
 
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         }
 
         return executeQueryAsync(conn -> {
@@ -869,6 +893,7 @@ public class DatabaseManager {
         });
     }
 
+
     public static CompletableFuture<List<String>> displayEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_EmptyShops_" + trimmedUuid;
@@ -889,6 +914,7 @@ public class DatabaseManager {
                     }
                 }
             }
+
 
             // If the view exists, proceed to retrieve the coordinates
             String sql = "SELECT Coordinates FROM " + viewName + ";";
@@ -987,7 +1013,7 @@ public class DatabaseManager {
                                     while (rs.next() && processedRows < batchSize) {
                                         String source = rs.getString("Source");
                                         String destination = rs.getString("Destination");
-                                        float amount = rs.getFloat("Amount");
+                                        double amount = rs.getDouble("Amount");
 
                                         // Update source balance if exists
                                         if (source != null) {

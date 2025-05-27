@@ -8,6 +8,7 @@ import org.bukkit.plugin.Plugin;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 
 public class DerflaAPI {
@@ -21,7 +22,7 @@ public class DerflaAPI {
     public static boolean updateAvailable() {
         try {
             // Create a URL object and open connection
-            URL url = new URL(VERSION_URL);
+            URL url = new URI(VERSION_URL).toURL();
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
 

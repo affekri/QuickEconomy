@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.Style;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;

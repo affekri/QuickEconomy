@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.block.sign.Side;

@@ -6,15 +6,12 @@ import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.Styles;
 import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.player.PlayerInteractEvent;
 
 public class PlayerOpenChestListener implements Listener {
 

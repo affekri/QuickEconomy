@@ -42,18 +42,26 @@ public class QuickeconomyCommand implements TabExecutor {
                         sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
                         return true;
                     } else {
+                        boolean connectedAndSetup = false;
                         try{
                             DatabaseManager.connectToDatabase();
                             DatabaseManager.createTables();
-                            Main.SQLMode = true;
                             plugin.getConfig().set("database.enabled", true);
                             plugin.saveConfig();
+                            Main.SQLMode = true;
                             sender.sendMessage(Component.translatable("qecommand.migrate.database").style(Styles.INFOSTYLE));
+                            connectedAndSetup = true;
                         } catch (Exception e) {
                             sender.sendMessage(Component.translatable("qecommand.migrate.database.fail").style(Styles.ERRORSTYLE));
-                            plugin.getLogger().warning("Failed to connect to database! " + e.getMessage());
+                            plugin.getLogger().warning("Failed to connect to database during migration attempt! " + e.getMessage());
+                            plugin.getConfig().set("database.enabled", false);
+                            plugin.saveConfig();
+                            Main.SQLMode = false;
                         }
-                        DatabaseManager.migrateToDatabase();
+
+                        if (connectedAndSetup) {
+                            DatabaseManager.migrateToDatabase();
+                        }
                         return true;
                     }
                 case "rollback":

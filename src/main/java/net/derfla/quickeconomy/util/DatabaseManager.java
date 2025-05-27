@@ -489,18 +489,6 @@ public class DatabaseManager {
         });
     }
 
-    // Synchronous method for rollback purposes
-    private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
-
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setDouble(1, balance);
-            pstmt.setDouble(2, change);
-            pstmt.setString(3, trimmedUuid);
-        }
-    }
-
     public static CompletableFuture<Double> getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
@@ -516,21 +504,6 @@ public class DatabaseManager {
             }
             return 0.0; // Return 0.0 if no change found
         });
-    }
-
-    // Synchronous method for rollback purposes
-    private static double getPlayerBalanceChangeSync(Connection conn, String uuid) throws SQLException {
-        String trimmedUUID = TypeChecker.trimUUID(uuid);
-        String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, trimmedUUID);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("BalChange");
-                }
-            }
-        }
-        return 0.0; // Return 0.0 if no change found
     }
 
     public static CompletableFuture<Void> setPlayerBalanceChange(@NotNull String uuid, double change) {
@@ -1183,6 +1156,33 @@ public class DatabaseManager {
             plugin.getLogger().severe("Error during transaction check for rollback validation: " + ex.getMessage());
             return false; // On exception, consider it not valid to proceed
         });
+    }
+
+    // Synchronous method for rollback purposes
+    private static double getPlayerBalanceChangeSync(Connection conn, String uuid) throws SQLException {
+        String trimmedUUID = TypeChecker.trimUUID(uuid);
+        String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, trimmedUUID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("BalChange");
+                }
+            }
+        }
+        return 0.0; // Return 0.0 if no change found
+    }
+
+    // Synchronous method for rollback purposes
+    private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, balance);
+            pstmt.setDouble(2, change);
+            pstmt.setString(3, trimmedUuid);
+        }
     }
 
     // =================================

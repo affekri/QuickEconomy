@@ -383,7 +383,12 @@ public class DatabaseManager {
                     }
                 });
             }
-        }).thenCompose(v -> createTransactionsView(trimmedUuid)); // Ensure createTransactionsView is called after the account is added and use thenCompose
+        }).thenCompose(v -> createTransactionsView(trimmedUuid))
+        .exceptionally(ex -> {
+            plugin.getLogger().severe("Error during addAccount operation for UUID: " + trimmedUuid + " PlayerName: " + playerName + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
+        });
     }
 
     public static CompletableFuture<Boolean> accountExists(@NotNull String uuid) {
@@ -403,23 +408,27 @@ public class DatabaseManager {
         });
     }
 
-    public static CompletableFuture<Void> updatePlayerName(String uuid, String playerName) {
+    public static CompletableFuture<Void> updatePlayerName(String uuid, String newPlayerName) {
         String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
 
         return executeUpdateAsync(conn -> {
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, playerName);
+                pstmt.setString(1, newPlayerName);
                 pstmt.setString(2, trimmedUuid);
                 int rowsAffected = pstmt.executeUpdate();
 
                 if (rowsAffected > 0) {
-                    plugin.getLogger().info("Player name updated successfully for UUID: " + untrimmedUuid);
+                    plugin.getLogger().info("Updated player name for UUID " + untrimmedUuid + ": " + newPlayerName);
                 } else {
                     plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
                 }
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error updating player name for UUID: " + untrimmedUuid + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -473,21 +482,22 @@ public class DatabaseManager {
                     plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
                 }
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error setting player balance for UUID: " + untrimmedUuid + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
     // Synchronous method for rollback purposes
     private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String untrimmedUuid = TypeChecker.untrimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setDouble(1, balance);
             pstmt.setDouble(2, change);
             pstmt.setString(3, trimmedUuid);
-            int rowsAffected = pstmt.executeUpdate();
-            }
         }
     }
 
@@ -533,6 +543,10 @@ public class DatabaseManager {
                 pstmt.setString(2, trimmedUuid);
                 pstmt.executeUpdate();
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error setting player balance change for UUID: " + uuid + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -665,6 +679,10 @@ public class DatabaseManager {
                 }
                 throw e; // Re-throw to let executeUpdateAsync handle it
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Outer error during executeTransaction: " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException("Transaction execution failed unexpectedly", ex);
         });
     }
 
@@ -771,6 +789,10 @@ public class DatabaseManager {
                 pstmt.executeUpdate();
                 plugin.getLogger().info("Autopay added successfully");
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error adding autopay for Source: " + trimmedUuid + ", Name: " + autopayName + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -827,6 +849,10 @@ public class DatabaseManager {
                 plugin.getLogger().severe("Error " + action + " autopay: " + e.getMessage());
                 throw e; // Re-throw to let executeUpdateAsync handle it
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Outer error toggling autopay #" + autopayID + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -846,6 +872,10 @@ public class DatabaseManager {
                     plugin.getLogger().info("Autopay not found. No deletion was performed.");
                 }
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error deleting autopay #" + autopayID + ", Source: " + trimmedUuid + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -895,6 +925,10 @@ public class DatabaseManager {
                     return future1;
                 }).thenApply(v -> false); // Return false if a new shop was created
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error registering empty shop for coords: " + coordinates + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -963,6 +997,10 @@ public class DatabaseManager {
                     plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
                 }
             }
+        }).exceptionally(ex -> {
+            plugin.getLogger().severe("Error removing empty shop for coords: " + coordinates + " - " + ex.getMessage());
+            if (ex instanceof CompletionException) throw (CompletionException) ex;
+            throw new CompletionException(ex);
         });
     }
 
@@ -986,8 +1024,12 @@ public class DatabaseManager {
                 return CompletableFuture.completedFuture(null); // Format is invalid, no need to query DB
             }
 
-            return CompletableFuture.runAsync(() -> {
-                getConnectionAsync().thenAccept(conn -> {
+            return getConnectionAsync().thenComposeAsync(conn -> { // New: chain directly
+                if (conn == null) {
+                    plugin.getLogger().severe("Rollback failed: Could not obtain database connection.");
+                    return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for rollback."));
+                }
+                return CompletableFuture.runAsync(() -> {
                     try {
                         // Disable auto-commit to ensure transaction consistency
                         conn.setAutoCommit(false);
@@ -1109,8 +1151,13 @@ public class DatabaseManager {
                             plugin.getLogger().severe("Error closing connection: " + e.getMessage());
                         }
                     }
-                });
-            }, executorService);
+                }, executorService); // End of the inner runAsync for transactional logic
+            }, executorService) // End of thenComposeAsync for connection handling
+            .exceptionally(ex -> {
+                plugin.getLogger().severe("Comprehensive error during rollback operation: " + ex.getMessage());
+                // Ensure that we still return CompletableFuture<Void>
+                return null; // Or CompletableFuture.failedFuture(ex) if callers should strongly react
+            });
         });
     }
 
@@ -1298,9 +1345,17 @@ public class DatabaseManager {
         String csvFilePath = "QE_DatabaseExport.csv";
         int batchSize = 100;
 
-        return CompletableFuture.runAsync(() -> {
-            getConnectionAsync().thenAccept(conn -> {
+        return getConnectionAsync().thenComposeAsync(conn -> { // New: Chain directly
+            if (conn == null) {
+                plugin.getLogger().severe("Database export failed: Could not obtain database connection.");
+                return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for export."));
+            }
+            // Wrap the export logic in a CompletableFuture
+            return CompletableFuture.runAsync(() -> {
                 try (FileWriter csvWriter = new FileWriter(csvFilePath)) {
+                    // Consider making exportTableToCSV return CompletableFuture<Void> and using join or get with timeout
+                    // For simplicity, keeping .join() but be aware it blocks the virtual thread here.
+                    // If exportTableToCSV itself is fully async and returns a future, could chain them.
                     exportTableToCSV(conn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize).join();
                     exportTableToCSV(conn, sqlTransactions, "Transactions Table", csvWriter, batchSize).join();
                     exportTableToCSV(conn, sqlAutopays, "Autopays Table", csvWriter, batchSize).join();
@@ -1308,16 +1363,26 @@ public class DatabaseManager {
 
                     plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
                 } catch (IOException e) {
-                    plugin.getLogger().severe("Error writing CSV file: " + e.getMessage());
+                    plugin.getLogger().severe("Error writing CSV file during export: " + e.getMessage());
+                    throw new CompletionException(e); // Propagate
+                } catch (CompletionException e) { // Catch if join() throws this from a failed future
+                    plugin.getLogger().severe("Error during table export: " + e.getMessage());
+                    throw e; // Re-propagate
                 } finally {
                     try {
-                        conn.close();
+                        if (conn != null && !conn.isClosed()) {
+                            conn.close();
+                        }
                     } catch (SQLException e) {
-                        plugin.getLogger().severe("Error closing connection: " + e.getMessage());
+                        plugin.getLogger().severe("Error closing connection during export: " + e.getMessage());
                     }
                 }
-            });
-        }, executorService);
+            }, executorService); // End of inner runAsync for export logic
+        }, executorService) // End of thenComposeAsync for connection handling
+        .exceptionally(ex -> {
+            plugin.getLogger().severe("Comprehensive error during database export: " + ex.getMessage());
+            return null; // Or CompletableFuture.failedFuture(ex)
+        });
     }
 
     public static CompletableFuture<Void> exportTableToCSV(Connection conn, String sql, String tableName, FileWriter csvWriter, int batchSize) {

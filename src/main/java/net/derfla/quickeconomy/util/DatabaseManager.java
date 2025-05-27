@@ -1012,16 +1012,15 @@ public class DatabaseManager {
         // Validate input
         return validateRollbackInput(targetDateTime).thenCompose(isValid -> {
             if (!isValid) {
-                // If validation failed, complete with null or an appropriate exception immediately.
-                return CompletableFuture.completedFuture(null); // Or CompletableFuture.failedFuture(new RuntimeException("Validation failed"));
+                return CompletableFuture.failedFuture(new IllegalStateException("Rollback validation failed. Input: " + targetDateTime));
             }
             
             final String targetDateTimeUTC;
             try {
                 targetDateTimeUTC = TypeChecker.convertToUTC(targetDateTime);
             } catch (DateTimeParseException e) {
-                plugin.getLogger().severe("Invalid targetDateTime format for validation: " + targetDateTime + " - " + e.getMessage());
-                return CompletableFuture.completedFuture(null); // Format is invalid, no need to query DB
+                plugin.getLogger().severe("Invalid targetDateTime format for rollback: " + targetDateTime + " - " + e.getMessage());
+                return CompletableFuture.failedFuture(e);
             }
 
             return getConnectionAsync().thenComposeAsync(conn -> { // New: chain directly
@@ -1029,90 +1028,58 @@ public class DatabaseManager {
                     plugin.getLogger().severe("Rollback failed: Could not obtain database connection.");
                     return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for rollback."));
                 }
-                return CompletableFuture.runAsync(() -> {
+
+                CompletableFuture<Void> transactionLogicFuture = CompletableFuture.runAsync(() -> {
                     try {
-                        // Disable auto-commit to ensure transaction consistency
-                        conn.setAutoCommit(false);
+                        conn.setAutoCommit(false); // Start transaction
 
+                        // Inner try-catch for the actual transactional work and commit/rollback
                         try {
-                            // CRITICAL NOTE: The following balance update logic is FLAWED for transactional integrity.
-                            // displayBalance, getPlayerBalanceChange, and setPlayerBalance are asynchronous operations
-                            // that acquire their OWN connections from the pool. Their updates WILL NOT be part of
-                            // the transaction controlled by 'conn'. A full rollback of balances requires these
-                            // operations to be executed on the 'conn' itself, likely via new synchronous helper methods
-                            // that accept a Connection object or a complete redesign of this rollback mechanism.
-                            // The current implementation will likely lead to inconsistent data if an error occurs
-                            // during the balance update phase, as only operations directly on 'conn' (like deletes)
-                            // would be rolled back.
-                            //
-                            // TO PROPERLY FIX: Consider creating synchronous versions of balance modification methods
-                            // that take an existing Connection as a parameter, e.g.:
-                            //   private static double getBalanceSync(Connection conn, String uuid) throws SQLException { ... }
-                            //   private static void updateBalanceSync(Connection conn, String uuid, double newBalance, double newChange) throws SQLException { ... }
-                            // Then, use these synchronous methods here within the transaction managed by 'conn'.
-
-                            // 1. Get all successful transactions after the target datetime
+                            // 1. Get all successful transactions after the target datetime (batched)
                             String getTransactionsSQL =
                                     "SELECT * FROM Transactions " +
                                     "WHERE TransactionDatetime > ? AND Passed = 1 " +
-                                    "ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?"; // Add LIMIT and OFFSET
-
-                            int batchSize = 100; // Define a suitable batch size
-                            AtomicInteger offset = new AtomicInteger(0); // Use AtomicInteger for offset
+                                    "ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
+                            int batchSize = 100;
+                            AtomicInteger offset = new AtomicInteger(0);
                             boolean hasMoreRows = true;
 
                             while (hasMoreRows) {
                                 try (PreparedStatement pstmt = conn.prepareStatement(getTransactionsSQL)) {
-                                    pstmt.setString(1, targetDateTimeUTC); // Set target datetime
-                                    pstmt.setInt(2, batchSize); // Set limit
-                                    pstmt.setInt(3, offset.get()); // Use offset.get() to get the current value
+                                    pstmt.setString(1, targetDateTimeUTC);
+                                    pstmt.setInt(2, batchSize);
+                                    pstmt.setInt(3, offset.get());
                                     ResultSet rs = pstmt.executeQuery();
+                                    int processedRows = 0;
 
-                                    int processedRows = 0; // Count processed rows in this batch
-
-                                    // 2. Reverse each transaction in the batch
                                     while (rs.next() && processedRows < batchSize) {
                                         String source = rs.getString("Source");
                                         String destination = rs.getString("Destination");
                                         float amount = rs.getFloat("Amount");
 
-                                        // Update source balance if exists
                                         if (source != null) {
-                                            // Use synchronous methods with the transaction's connection
                                             double currentBalance = displayBalanceSync(conn, source);
                                             double currentChange = getPlayerBalanceChangeSync(conn, source);
-                                            double newBalance = currentBalance + amount;
-                                            double newChange = currentChange + amount;
-                                            setPlayerBalanceSync(conn, source, newBalance, newChange);
+                                            setPlayerBalanceSync(conn, source, currentBalance + amount, currentChange + amount);
                                         }
-
-                                        // Update destination balance if exists
                                         if (destination != null) {
-                                            // Use synchronous methods with the transaction's connection
                                             double currentBalance = displayBalanceSync(conn, destination);
                                             double currentChange = getPlayerBalanceChangeSync(conn, destination);
-                                            double newBalance = currentBalance - amount;
-                                            double newChange = currentChange - amount;
-                                            setPlayerBalanceSync(conn, destination, newBalance, newChange);
+                                            setPlayerBalanceSync(conn, destination, currentBalance - amount, currentChange - amount);
                                         }
-
                                         processedRows++;
                                     }
-
-                                    // Check if we processed fewer rows than the batch size
-                                    if (processedRows < batchSize) {
-                                        hasMoreRows = false; // No more rows to process
-                                    }
+                                    if (processedRows < batchSize) hasMoreRows = false;
                                 }
-                                offset.addAndGet(batchSize); // Increment the offset for the next batch
+                                offset.addAndGet(batchSize);
                             }
 
                             // 3. Delete transactions after target datetime
                             String deleteTransactionsSQL = "DELETE FROM Transactions WHERE TransactionDatetime > ?";
                             try (PreparedStatement pstmt = conn.prepareStatement(deleteTransactionsSQL)) {
                                 pstmt.setString(1, targetDateTimeUTC);
-                                int rowsDeleted = pstmt.executeUpdate(); // Store the number of deleted rows
-                                plugin.getLogger().info(rowsDeleted + " transactions deleted after " + targetDateTime); // Log the count
+                                int rowsDeleted = pstmt.executeUpdate();
+                                plugin.getLogger().info(rowsDeleted + " transactions deleted after " + targetDateTime);
                             }
 
                             // 4. Delete autopays created after target datetime
@@ -1132,31 +1099,55 @@ public class DatabaseManager {
                                 pstmt.executeUpdate();
                             }
 
-                            // If everything succeeded, commit the transaction
-                            conn.commit();
+                            conn.commit(); // Commit transaction
                             plugin.getLogger().info("Successfully rolled back database to " + targetDateTime);
 
                         } catch (SQLException e) {
-                            // If anything fails, roll back all changes
-                            conn.rollback();
-                            plugin.getLogger().severe("Error during rollback, changes reverted: " + e.getMessage());
-                            throw e; // Rethrow to handle it at a higher level
+                            plugin.getLogger().warning("SQLException during rollback transaction, attempting to rollback...: " + e.getMessage());
+                            try {
+                                conn.rollback();
+                                plugin.getLogger().info("Transaction rolled back successfully due to error.");
+                            } catch (SQLException rbEx) {
+                                plugin.getLogger().severe("Failed to rollback transaction: " + rbEx.getMessage());
+                                e.addSuppressed(rbEx); 
+                            }
+                            throw new CompletionException("Transactional logic failed during rollback", e);
                         }
-                    } catch (SQLException e) {
-                        plugin.getLogger().severe("Database rollback failed: " + e.getMessage());
-                    } finally {
-                        try {
-                            conn.close();
-                        } catch (SQLException e) {
-                            plugin.getLogger().severe("Error closing connection: " + e.getMessage());
-                        }
+                    } catch (SQLException e) { // Catches errors from conn.setAutoCommit(false) or other pre-transaction issues
+                        plugin.getLogger().severe("SQLException preparing for rollback transaction (e.g., setAutoCommit): " + e.getMessage());
+                        throw new CompletionException("Setup for rollback transaction failed", e);
                     }
-                }, executorService); // End of the inner runAsync for transactional logic
-            }, executorService) // End of thenComposeAsync for connection handling
+                }, executorService);
+
+                // Ensure connection is closed after transactionLogicFuture completes (successfully or exceptionally)
+                return transactionLogicFuture.whenCompleteAsync((result, ex) -> {
+                    try {
+                        if (conn != null && !conn.isClosed()) {
+                            conn.close();
+                        }
+                    } catch (SQLException sqlEx) {
+                        plugin.getLogger().warning("Failed to close connection after rollback attempt: " + sqlEx.getMessage());
+                        if (ex == null) { // transactionLogicFuture succeeded, but closing conn failed.
+                            throw new CompletionException("Failed to close connection after successful rollback logic execution", sqlEx);
+                        }
+                        // If transactionLogicFuture already failed (ex != null), its exception is primary.
+                        // The sqlEx for closing is logged, and the original 'ex' will propagate.
+                    }
+                }, executorService);
+
+            }, executorService) // For the thenComposeAsync stage after getConnectionAsync
             .exceptionally(ex -> {
-                plugin.getLogger().severe("Comprehensive error during rollback operation: " + ex.getMessage());
-                // Ensure that we still return CompletableFuture<Void>
-                return null; // Or CompletableFuture.failedFuture(ex) if callers should strongly react
+                Throwable rootCause = ex;
+                if (ex instanceof CompletionException && ex.getCause() != null) {
+                    rootCause = ex.getCause();
+                }
+                plugin.getLogger().severe("General error during rollback operation: " + rootCause.getMessage());
+                if (rootCause != ex) {
+                    rootCause.printStackTrace();
+                }
+                // Ensure consistent exception type for the CompletableFuture<Void>
+                if (ex instanceof CompletionException) throw (CompletionException)ex;
+                throw new CompletionException("Rollback operation failed unexpectedly", ex);
             });
         });
     }

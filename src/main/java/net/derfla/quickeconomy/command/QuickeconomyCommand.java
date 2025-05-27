@@ -89,7 +89,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         break;
                     }
                     String storageMethod = Main.SQLMode ? "SQL Server" : "File";
-                    String connections = "(" + DatabaseManager.dataSource.getMaximumPoolSize() + ")";
+                    String connections = Main.SQLMode ? "(" + DatabaseManager.dataSource.getMaximumPoolSize() + ")" : "";
                     sender.sendMessage(Component.translatable("qecommand.setup", Component.text(storageMethod + " " + connections), Component.text(plugin.getDescription().getVersion())).style(Styles.INFOSTYLE));
                     if(DerflaAPI.updateAvailable()) {
                         sender.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));

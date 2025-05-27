@@ -12,10 +12,22 @@ import java.time.format.DateTimeFormatter;
 public class Balances {
 
     static Plugin plugin = Main.getInstance();
-    static boolean SQLMode = Main.SQLMode;
 
     public static double getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        if (Main.SQLMode) {
+            double balance = DatabaseManager.displayBalance(trimmedUUID).join();
+            return balance;
+        }
+
+        FileConfiguration file = BalanceFile.get();
+
+        if (file == null){
+            plugin.getLogger().severe("balance.yml not found!");
+            return 0.0;
+        }
+
 
         return AccountCache.getPlayerAccount(trimmedUUID).balance();
     }
@@ -24,8 +36,7 @@ public class Balances {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         AccountCache.getPlayerAccount(trimmedUUID).balance(money);
-
-        if (SQLMode) {
+        if (Main.SQLMode) {
             DatabaseManager.setPlayerBalance(uuid, money, 0).join();
             return;
         }
@@ -60,7 +71,8 @@ public class Balances {
 
         AccountCache.getPlayerAccount(trimmedUUID).change(moneyChange);
 
-        if(SQLMode) {
+        if(Main.SQLMode) {
+
             DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
         }
@@ -85,8 +97,9 @@ public class Balances {
 
         if(AccountCache.accountExists(trimmedUUID)) return true;
 
-        if(SQLMode) {
-            return DatabaseManager.accountExists(trimmedUUID).join();
+        if(Main.SQLMode) {
+            return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
+
         }
 
         FileConfiguration file = BalanceFile.get();
@@ -95,10 +108,11 @@ public class Balances {
 
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
+
         String sourceUUID = TypeChecker.trimUUID(source);
         String destinationUUID = TypeChecker.trimUUID(destination);
 
-        if(SQLMode) {
+        if(Main.SQLMode) {
             DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
             if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
             if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
@@ -113,9 +127,11 @@ public class Balances {
 
     public static void updatePlayerName(String uuid, String name) {
 
+
         AccountCache.getPlayerAccount(uuid).name(name);
 
-        if (SQLMode) {
+        if (Main.SQLMode) {
+
             DatabaseManager.updatePlayerName(uuid, name).join();
             return;
         }
@@ -133,10 +149,8 @@ public class Balances {
 
         AccountCache.addAccount(uuid, name);
 
-        if (SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0, 0,result -> {
-                // Handle the callback if needed
-            }).join();
+        if (Main.SQLMode) {
+            DatabaseManager.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();

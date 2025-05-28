@@ -1028,7 +1028,8 @@ public class DatabaseManager {
                 if (rowsAffected > 0) {
                     plugin.getLogger().info("Empty shop at " + coordinates + " removed from the database.");
                 } else {
-                    plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
+                    // only show for debugging reasons
+                    //plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
                 }
             }
         }).exceptionally(ex -> {

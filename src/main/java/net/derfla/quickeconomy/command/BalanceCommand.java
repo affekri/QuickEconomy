@@ -69,7 +69,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
                     break;
                 }
-                Balances.setPlayerBalance(Balances.getUUID(strings[2]), money);
+                Balances.setPlayerBalance(AccountCache.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.set", Component.text(strings[2]), Component.text(money)).style(Styles.INFOSTYLE));
                 break;
 
@@ -94,7 +94,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.addPlayerBalance(Balances.getUUID(strings[2]), money);
+                Balances.addPlayerBalance(AccountCache.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -117,7 +117,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
                     break;
                 }
-                Balances.subPlayerBalance(Balances.getUUID(strings[2]), money);
+                Balances.subPlayerBalance(AccountCache.getUUID(strings[2]), money);
                 sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 break;
 
@@ -142,10 +142,10 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
                     break;
                 }
-                String targetUUID = Balances.getUUID(strings[2]);
+                String targetUUID = AccountCache.getUUID(strings[2]);
 
                 if (!Balances.hasAccount(targetUUID)) {
-                    sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[2])));
+                    sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[2])).style(Styles.ERRORSTYLE));
                     break;
                 }
 
@@ -167,7 +167,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 break;
             case "transactions":
                 if (!(sender instanceof Player)) {
-                    sender.sendMessage("You can only use this command as a player");
+                    sender.sendMessage(Component.translatable("balcommand.send.notplayer", Styles.ERRORSTYLE));
                     break;
                 }
                 Player transactionsPlayer = (Player) sender;
@@ -261,7 +261,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 if(strings.length == 1) {
                     if(Main.SQLMode) {
-                        sender.sendMessage(AccountCache.listAllPlayerAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                        sender.sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
                     } else {
                         // List all balances in file mode
                         FileConfiguration file = BalanceFile.get();
@@ -295,9 +295,9 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     String checkPlayer;
                     if (Bukkit.getServer().getPlayerExact(strings[1]) != null) {
                         checkPlayer = Bukkit.getServer().getPlayerExact(strings[1]).getUniqueId().toString();
-                    } else checkPlayer = Balances.getUUID(strings[1]);
+                    } else checkPlayer = AccountCache.getUUID(strings[1]);
                     if (!Balances.hasAccount(checkPlayer)) {
-                        sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])));
+                        sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])).style(Styles.ERRORSTYLE));
                         break;
                     }
                     double balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));

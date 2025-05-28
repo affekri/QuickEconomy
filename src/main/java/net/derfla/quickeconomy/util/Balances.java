@@ -141,8 +141,22 @@ public class Balances {
             plugin.getLogger().severe("balance.yml not found!");
             return;
         }
+        
+        // Check if the current name is different before updating
+        String currentName = file.getString("players." + uuid + ".name");
+        if (currentName != null && currentName.equals(name)) {
+            // Name hasn't changed, no need to update
+            return;
+        }
+        
+        // Name has changed or is new, proceed with update
         file.set("players." + uuid + ".name", name);
         BalanceFile.save();
+        
+        // Log only if there was an actual name change (not initial setting)
+        if (currentName != null) {
+            plugin.getLogger().info("Updated player name for UUID " + TypeChecker.untrimUUID(uuid) + ": " + currentName + " -> " + name);
+        }
     }
 
     public static void addAccount(String uuid, String name) {

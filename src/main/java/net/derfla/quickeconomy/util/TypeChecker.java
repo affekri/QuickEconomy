@@ -105,7 +105,18 @@ public class TypeChecker {
 
     public static String convertToLocalTime(String dateString) {
         // Parse the input date string to LocalDateTime
-        LocalDateTime localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        LocalDateTime localDateTime;
+        try {
+            // Try parsing with milliseconds first
+            localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+        } catch (Exception e) {
+            try {
+                // Fall back to parsing without milliseconds
+                localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } catch (Exception ex) {
+                throw new RuntimeException("Unable to parse date string: " + dateString, ex);
+            }
+        }
         // Convert LocalDateTime to ZonedDateTime in UTC
         ZonedDateTime utcDateTime = localDateTime.atZone(ZoneOffset.UTC);
         // Convert UTC ZonedDateTime to the system's default time zone

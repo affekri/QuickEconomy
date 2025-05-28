@@ -46,51 +46,35 @@ public class DatabaseManager {
     // ======================================
 
     private static <T> CompletableFuture<T> executeQueryAsync(SQLFunction<Connection, T> queryFunction) {
-        return getConnectionAsync().thenCompose(conn -> {
+        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
             return CompletableFuture.supplyAsync(() -> {
-                try {
-                    return queryFunction.apply(conn);
+                try (Connection autoCloseConn = conn) { // Use try-with-resources
+                    return queryFunction.apply(autoCloseConn);
                 } catch (SQLException e) {
                     plugin.getLogger().severe("SQL operation failed: " + e.getMessage());
                     throw new CompletionException(e);
-                } finally {
-                    try {
-                        if (conn != null && !conn.isClosed()) {
-                            conn.close();
-                        }
-                    } catch (SQLException e) {
-                        plugin.getLogger().warning("Failed to close connection after query: " + e.getMessage());
-                    }
                 }
             }, executorService);
-        });
+        }));
     }
 
     private static CompletableFuture<Void> executeUpdateAsync(SQLConsumer<Connection> updateAction) {
-        return getConnectionAsync().thenCompose(conn -> {
+        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
             return CompletableFuture.runAsync(() -> {
-                try {
-                    updateAction.accept(conn);
+                try (Connection autoCloseConn = conn) { // Use try-with-resources
+                    updateAction.accept(autoCloseConn);
                 } catch (SQLException e) {
                     plugin.getLogger().severe("SQL update operation failed: " + e.getMessage());
                     throw new CompletionException(e);
-                } finally {
-                    try {
-                        if (conn != null && !conn.isClosed()) {
-                            conn.close();
-                        }
-                    } catch (SQLException e) {
-                        plugin.getLogger().warning("Failed to close connection after update: " + e.getMessage());
-                    }
                 }
             }, executorService);
-        });
+        }));
     }
 
     public static CompletableFuture<Connection> getConnectionAsync() {
@@ -332,7 +316,7 @@ public class DatabaseManager {
                 + "LEFT JOIN PlayerAccounts pa ON t.Source = pa.UUID "
                 + "LEFT JOIN PlayerAccounts pa2 ON t.Destination = pa2.UUID "
                 + "WHERE t.Source = ? OR t.Destination = ? "
-                + "ORDER BY t.TransactionDatetime ASC;";
+                + "ORDER BY t.TransactionDatetime DESC;";
         String[] params = {trimmedUuid, trimmedUuid};
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
@@ -409,22 +393,47 @@ public class DatabaseManager {
     }
 
     public static CompletableFuture<Void> updatePlayerName(String uuid, String newPlayerName) {
-        String sql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
 
-        return executeUpdateAsync(conn -> {
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, newPlayerName);
-                pstmt.setString(2, trimmedUuid);
-                int rowsAffected = pstmt.executeUpdate();
-
-                if (rowsAffected > 0) {
-                    plugin.getLogger().info("Updated player name for UUID " + untrimmedUuid + ": " + newPlayerName);
-                } else {
-                    plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
+        // First get the current player name to check if it's different
+        String getCurrentNameSql = "SELECT PlayerName FROM PlayerAccounts WHERE UUID = ?";
+        
+        return executeQueryAsync(conn -> {
+            try (PreparedStatement pstmt = conn.prepareStatement(getCurrentNameSql)) {
+                pstmt.setString(1, trimmedUuid);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getString("PlayerName");
+                    }
                 }
             }
+            return null; // Return null if not found
+        }).thenCompose(currentName -> {
+            if (currentName == null) {
+                plugin.getLogger().info("No account found for UUID: " + untrimmedUuid);
+                return CompletableFuture.completedFuture(null);
+            }
+            
+            // Only update if the name has actually changed
+            if (currentName.equals(newPlayerName)) {
+                // Name hasn't changed, no need to update or log
+                return CompletableFuture.completedFuture(null);
+            }
+            
+            // Name has changed, proceed with update
+            String updateSql = "UPDATE PlayerAccounts SET PlayerName = ? WHERE UUID = ?";
+            return executeUpdateAsync(conn -> {
+                try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+                    pstmt.setString(1, newPlayerName);
+                    pstmt.setString(2, trimmedUuid);
+                    int rowsAffected = pstmt.executeUpdate();
+
+                    if (rowsAffected > 0) {
+                        plugin.getLogger().info("Updated player name for UUID " + untrimmedUuid + ": " + currentName + " -> " + newPlayerName);
+                    }
+                }
+            });
         }).exceptionally(ex -> {
             plugin.getLogger().severe("Error updating player name for UUID: " + untrimmedUuid + " - " + ex.getMessage());
             if (ex instanceof CompletionException) throw (CompletionException) ex;
@@ -567,14 +576,32 @@ public class DatabaseManager {
 
     public static CompletableFuture<Void> executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                           String destination, double amount, String transactionMessage) {
-        String trimmedSource = TypeChecker.trimUUID(source);
-        String trimmedDestination = TypeChecker.trimUUID(destination);
-        Instant currentTime = Instant.now(); // Use Instant for UTC time
-        // For VARCHAR(23), ensure .SSS for milliseconds and it's UTC for Transactions.TransactionDatetime
+        // Sort UUIDs to prevent deadlocks
+        String trimmedSource = source != null ? TypeChecker.trimUUID(source) : null;
+        String trimmedDestination = destination != null ? TypeChecker.trimUUID(destination) : null;
+        
+        // Create final variables for transaction parameters
+        final String finalSource;
+        final String finalDestination;
+        final double finalAmount;
+        
+        // Ensure consistent ordering of account updates
+        if (trimmedSource != null && trimmedDestination != null && trimmedSource.compareTo(trimmedDestination) > 0) {
+            finalSource = trimmedDestination;
+            finalDestination = trimmedSource;
+            finalAmount = -amount;
+        } else {
+            finalSource = trimmedSource;
+            finalDestination = trimmedDestination;
+            finalAmount = amount;
+        }
+
+        Instant currentTime = Instant.now();
         String currentUTCTimeString = currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
 
-        return executeUpdateAsync(conn -> {
-            conn.setAutoCommit(false);  // Begin transaction
+        return DatabaseRetryUtil.withRetry(() -> executeUpdateAsync(conn -> {
+            conn.setAutoCommit(false);
+            conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             
             try {
                 // SQL to handle the transaction
@@ -585,38 +612,38 @@ public class DatabaseManager {
 
                 // Update source account balance if applicable
                 Double newSourceBalance = null;
-                if (trimmedSource != null) {
+                if (finalSource != null) {
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateSource.setString(1, trimmedSource);
+                        pstmtUpdateSource.setString(1, finalSource);
                         ResultSet rs = pstmtUpdateSource.executeQuery();
                         if (rs.next()) {
-                            newSourceBalance = rs.getDouble(1) - amount;  // Calculate new source balance
+                            newSourceBalance = rs.getDouble(1) - finalAmount;  // Calculate new source balance
                         }
                     }
 
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(sqlUpdateSource)) {
-                        pstmtUpdateSource.setDouble(1, amount);
-                        pstmtUpdateSource.setString(2, trimmedSource);
+                        pstmtUpdateSource.setDouble(1, finalAmount);
+                        pstmtUpdateSource.setString(2, finalSource);
                         pstmtUpdateSource.executeUpdate();
                     }
                 }
 
                 // Update destination account balance if applicable
                 Double newDestinationBalance = null;
-                if (trimmedDestination != null) {
+                if (finalDestination != null) {
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateDestination.setString(1, trimmedDestination);
+                        pstmtUpdateDestination.setString(1, finalDestination);
                         ResultSet rs = pstmtUpdateDestination.executeQuery();
                         if (rs.next()) {
-                            newDestinationBalance = rs.getDouble(1) + amount;  // Calculate new destination balance
+                            newDestinationBalance = rs.getDouble(1) + finalAmount;  // Calculate new destination balance
                         }
                     }
 
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(sqlUpdateDestination)) {
-                        pstmtUpdateDestination.setDouble(1, amount);
-                        pstmtUpdateDestination.setString(2, trimmedDestination);
+                        pstmtUpdateDestination.setDouble(1, finalAmount);
+                        pstmtUpdateDestination.setString(2, finalDestination);
                         pstmtUpdateDestination.executeUpdate();
                     }
                 }
@@ -626,11 +653,11 @@ public class DatabaseManager {
                     pstmtInsertTransaction.setString(1, currentUTCTimeString); // Use the formatted UTC SSS time
                     pstmtInsertTransaction.setString(2, transactType);                   // TransactionType
                     pstmtInsertTransaction.setString(3, induce);                         // Induce
-                    pstmtInsertTransaction.setString(4, trimmedSource);                  // Source
-                    pstmtInsertTransaction.setString(5, trimmedDestination);             // Destination
+                    pstmtInsertTransaction.setString(4, finalSource);                  // Source
+                    pstmtInsertTransaction.setString(5, finalDestination);             // Destination
                     pstmtInsertTransaction.setObject(6, newSourceBalance);               // NewSourceBalance (nullable)
                     pstmtInsertTransaction.setObject(7, newDestinationBalance);          // NewDestinationBalance (nullable)
-                    pstmtInsertTransaction.setDouble(8, amount);                         // Amount
+                    pstmtInsertTransaction.setDouble(8, finalAmount);                         // Amount
                     pstmtInsertTransaction.setInt(9, 1);                               // Passed (always 1 if successful)
                     pstmtInsertTransaction.setString(10, transactionMessage);            // TransactionMessage
                     pstmtInsertTransaction.executeUpdate();
@@ -638,25 +665,30 @@ public class DatabaseManager {
 
                 // Commit the transaction
                 conn.commit();
-                Balances.addPlayerBalanceChange(trimmedDestination, (float) amount);
+                Balances.addPlayerBalanceChange(finalDestination, (float) finalAmount);
             } catch (SQLException e) {
-                conn.rollback(); // Rollback on error
-                if(trimmedDestination != null && trimmedSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + " to " + trimmedDestination + ": " + e.getMessage());
-                } else if (trimmedSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + ": " + e.getMessage());
-                } else if (trimmedDestination != null) {
-                    plugin.getLogger().severe("Error executing transaction to " + trimmedDestination + ": " + e.getMessage());
+                conn.rollback();
+                if(finalDestination != null && finalSource != null) {
+                    plugin.getLogger().severe("Error executing transaction from " + finalSource + " to " + finalDestination + ": " + e.getMessage());
+                } else if (finalSource != null) {
+                    plugin.getLogger().severe("Error executing transaction from " + finalSource + ": " + e.getMessage());
+                } else if (finalDestination != null) {
+                    plugin.getLogger().severe("Error executing transaction to " + finalDestination + ": " + e.getMessage());
                 } else {
                     plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
                 }
-                throw e; // Re-throw to let executeUpdateAsync handle it
+                throw e;
+            } finally {
+                try {
+                    if (!conn.getAutoCommit()) {
+                        conn.commit();
+                    }
+                } catch (SQLException e) {
+                    plugin.getLogger().severe("Error committing transaction: " + e.getMessage());
+                    throw e;
+                }
             }
-        }).exceptionally(ex -> {
-            plugin.getLogger().severe("Outer error during executeTransaction: " + ex.getMessage());
-            if (ex instanceof CompletionException) throw (CompletionException) ex;
-            throw new CompletionException("Transaction execution failed unexpectedly", ex);
-        });
+        }));
     }
 
     public static CompletableFuture<String> displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
@@ -669,13 +701,13 @@ public class DatabaseManager {
 
         if (displayPassed == null) {
             // Display all transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else if (displayPassed) {
             // Display only passed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Passed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         } else {
             // Display only failed transactions
-            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime ASC LIMIT ? OFFSET ?";
+            sql = "SELECT TransactionDatetime, Amount, SourceUUID, DestinationUUID, SourcePlayerName, DestinationPlayerName, Message FROM " + viewName + " WHERE Passed = 'Failed' ORDER BY TransactionDatetime DESC LIMIT ? OFFSET ?";
         }
 
         return executeQueryAsync(conn -> {
@@ -1336,69 +1368,38 @@ public class DatabaseManager {
         String csvFilePath = "QE_DatabaseExport.csv";
         int batchSize = 100;
 
-        return getConnectionAsync().thenComposeAsync(conn -> {
+        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenComposeAsync(conn -> {
             if (conn == null) {
                 plugin.getLogger().severe("Database export failed: Could not obtain database connection.");
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for export."));
             }
 
-            CompletableFuture<Void> fileWritingOperations = CompletableFuture.runAsync(() -> {
-                try (FileWriter csvWriter = new FileWriter(csvFilePath)) {
-                    // These .join() calls will block the current virtual thread, which is acceptable
-                    // as they ensure sequential writing to the same FileWriter.
-                    exportTableToCSV(conn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize).join();
-                    exportTableToCSV(conn, sqlTransactions, "Transactions Table", csvWriter, batchSize).join();
-                    exportTableToCSV(conn, sqlAutopays, "Autopays Table", csvWriter, batchSize).join();
-                    exportTableToCSV(conn, sqlEmptyShops, "EmptyShops Table", csvWriter, batchSize).join();
-
-                    plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
-                } catch (IOException e) {
-                    plugin.getLogger().severe("Error writing CSV file during export: " + e.getMessage());
-                    throw new CompletionException("CSV file writing error", e);
-                } catch (CompletionException e) { // Catches exceptions from join() if an exportTableToCSV sub-task fails
-                    plugin.getLogger().severe("Error during a table export sub-task: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
-                    throw e; // Re-throw to fail fileWritingOperations future
-                } catch (Exception e) { // Catch any other unexpected errors during the export logic
-                    plugin.getLogger().severe("Unexpected error during CSV export logic: " + e.getMessage());
-                    throw new CompletionException("Unexpected CSV export error", e);
-                }
-            }, executorService);
-
-            // Ensure the connection is closed after fileWritingOperations completes, regardless of success or failure.
-            // The whenComplete block itself will run on the executorService.
-            return fileWritingOperations.whenCompleteAsync((result, ex) -> {
-                try {
-                    if (conn != null && !conn.isClosed()) {
-                        conn.close();
+            try (Connection autoCloseConn = conn;
+                 FileWriter csvWriter = new FileWriter(csvFilePath)) {
+                
+                CompletableFuture<Void> exportFuture = CompletableFuture.runAsync(() -> {
+                    try {
+                        exportTableToCSV(autoCloseConn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize).join();
+                        exportTableToCSV(autoCloseConn, sqlTransactions, "Transactions Table", csvWriter, batchSize).join();
+                        exportTableToCSV(autoCloseConn, sqlAutopays, "Autopays Table", csvWriter, batchSize).join();
+                        exportTableToCSV(autoCloseConn, sqlEmptyShops, "EmptyShops Table", csvWriter, batchSize).join();
+                        
+                        plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
+                    } catch (Exception e) {
+                        plugin.getLogger().severe("Error during database export: " + e.getMessage());
+                        throw new CompletionException(e);
                     }
-                } catch (SQLException sqlEx) {
-                    plugin.getLogger().warning("Failed to close connection after export: " + sqlEx.getMessage());
-                    if (ex == null) { // If fileWritingOperations succeeded, but closing conn failed, this is the new primary error.
-                        throw new CompletionException("Failed to close connection after successful export", sqlEx);
-                    }
+                }, executorService);
 
-                }
-                // If 'ex' (from fileWritingOperations) is not null, it will propagate from whenComplete.
-            }, executorService);
-
-        }, executorService) // executorService for the thenComposeAsync stage after getConnectionAsync
-        .exceptionally(ex -> {
-            Throwable rootCause = ex;
-            if (ex instanceof CompletionException && ex.getCause() != null) {
-                rootCause = ex.getCause();
+                return exportFuture;
+            } catch (IOException e) {
+                plugin.getLogger().severe("Error creating CSV file: " + e.getMessage());
+                return CompletableFuture.failedFuture(e);
+            } catch (SQLException e) {
+                plugin.getLogger().severe("Error with database connection during export: " + e.getMessage());
+                return CompletableFuture.failedFuture(e);
             }
-            plugin.getLogger().severe("General error during database export operation: " + rootCause.getMessage());
-            if (rootCause != ex) {
-                // Log the stack trace to the console, as Logger doesn't have a standard severe with throwable
-                rootCause.printStackTrace(); // This will print to standard error
-            }
-
-            if (ex instanceof CompletionException) {
-                throw (CompletionException) ex;
-            } else {
-                throw new CompletionException("Database export failed due to an unexpected error", ex);
-            }
-        });
+        }, executorService));
     }
 
     public static CompletableFuture<Void> exportTableToCSV(Connection conn, String sql, String tableName, FileWriter csvWriter, int batchSize) {

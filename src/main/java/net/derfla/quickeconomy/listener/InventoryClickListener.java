@@ -1,8 +1,10 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.Style;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
@@ -12,6 +14,8 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.concurrent.CompletableFuture;
 
 public class InventoryClickListener implements Listener {
 
@@ -77,17 +81,57 @@ public class InventoryClickListener implements Listener {
                 player.sendMessage(Component.translatable("shop.buy.diamond", errorStyle));
                 return;
             }
-            // Gives the paid coins to the shop owner or owners
-            if (owner2.isEmpty()) {
-                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost, "");
-            }else  {
-                Balances.executeTransaction("p2p", "purchase", String.valueOf(player.getUniqueId()), owner, cost/2, "");
-                Balances.executeTransaction("p2p", "purchase", owner2, owner, cost/2, "");
-            }
-            player.getOpenInventory().getTopInventory().removeItem(boughtItem);
-            chest.getBlockInventory().removeItem(boughtItem);
-            // Adds the bought item to the player inventory
-            player.getInventory().addItem(boughtItem);
+
+            // Handle the transaction asynchronously
+            CompletableFuture.runAsync(() -> {
+                try {
+                    if (owner2.isEmpty()) {
+                        // Single owner transaction
+                        Balances.executeTransaction("p2p", "purchase", 
+                            String.valueOf(player.getUniqueId()), owner, cost, "");
+                    } else {
+                        // Two owners - execute as a single atomic transaction
+                        String playerUUID = String.valueOf(player.getUniqueId());
+                        // Sort UUIDs to prevent deadlocks (handled in DatabaseManager)
+                        if (playerUUID.compareTo(owner) > 0) {
+                            Balances.executeTransaction("p2p", "purchase", owner, playerUUID, -cost/2, "");
+                        } else {
+                            Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "");
+                        }
+                        
+                        if (owner.compareTo(owner2) > 0) {
+                            Balances.executeTransaction("p2p", "purchase", owner2, owner, cost/2, "");
+                        } else {
+                            Balances.executeTransaction("p2p", "purchase", owner, owner2, cost/2, "");
+                        }
+                    }
+
+                    // Update inventory after successful transaction
+                    Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
+                        try {
+                            player.getOpenInventory().getTopInventory().removeItem(boughtItem);
+                            chest.getBlockInventory().removeItem(boughtItem);
+                            player.getInventory().addItem(boughtItem);
+                        } catch (Exception e) {
+                            Main.getInstance().getLogger().severe("Error updating inventory after purchase: " + e.getMessage());
+                            // Attempt to rollback the transaction if inventory update fails
+                            if (owner2.isEmpty()) {
+                                Balances.executeTransaction("p2p", "rollback", 
+                                    owner, String.valueOf(player.getUniqueId()), cost, "inventory_error");
+                            } else {
+                                Balances.executeTransaction("p2p", "rollback", 
+                                    owner, String.valueOf(player.getUniqueId()), cost/2, "inventory_error");
+                                Balances.executeTransaction("p2p", "rollback", 
+                                    owner2, owner, cost/2, "inventory_error");
+                            }
+                        }
+                    });
+                } catch (Exception e) {
+                    Main.getInstance().getLogger().severe("Error processing shop transaction: " + e.getMessage());
+                    Bukkit.getScheduler().runTask(Main.getInstance(), () -> 
+                        player.sendMessage(Component.translatable("shop.buy.error", errorStyle)));
+                }
+            }, Main.getExecutorService());
         }
     }
 }

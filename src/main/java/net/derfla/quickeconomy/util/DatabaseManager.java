@@ -556,25 +556,28 @@ public class DatabaseManager {
         });
     }
 
-    public static CompletableFuture<List<String>> listAllAccounts() {
-        String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
+
+    public static CompletableFuture<HashMap<String, PlayerAccount>> listAllPlayerAccounts() {
+        String sql = "SELECT UUID, PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts";
         
         return executeQueryAsync(conn -> {
-            List<String> accounts = new ArrayList<>();
+            HashMap<String, PlayerAccount> accountMap = new HashMap<>();
             try (PreparedStatement pstmt = conn.prepareStatement(sql);
                  ResultSet rs = pstmt.executeQuery()) {
 
                 while (rs.next()) {
+                    String uuid = rs.getString("UUID");
                     String playerName = rs.getString("PlayerName");
                     double balance = rs.getDouble("Balance");
-                    String accountDatetimeUTC = rs.getString("Created"); // Get the UTC datetime
-                    String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC); // Convert to local time
-
-                    String accountInfo = playerName + ": " + balance + " (Created: " + accountDatetimeLocal + ")";
-                    accounts.add(accountInfo);
+                    double change = rs.getDouble("BalChange");
+                    String accountDatetimeUTC = rs.getString("Created");
+                    String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC);
+                    
+                    PlayerAccount account = new PlayerAccount(playerName, balance, change, accountDatetimeLocal);
+                    accountMap.put(uuid, account);
                 }
             }
-            return accounts; // Return the list of accounts
+            return accountMap;
         });
     }
 
@@ -689,7 +692,7 @@ public class DatabaseManager {
 
                 // Commit the transaction
                 conn.commit();
-                Balances.addPlayerBalanceChange(finalDestination, (float) finalAmount);
+                Balances.addPlayerBalanceChange(finalDestination, finalAmount);
             } catch (SQLException e) {
                 conn.rollback();
                 if(finalDestination != null && finalSource != null) {

@@ -261,7 +261,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 if(strings.length == 1) {
                     if(Main.SQLMode) {
-                        sender.sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                        sender.sendMessage(AccountCache.listAllPlayerAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
                     } else {
                         // List all balances in file mode
                         FileConfiguration file = BalanceFile.get();
@@ -277,7 +277,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         StringBuilder balanceList = new StringBuilder();
                         for (String uuid : players.getKeys(false)) {
                             String name = players.getString(uuid + ".name");
-                            float balance = (float) players.getDouble(uuid + ".balance");
+                            double balance = players.getDouble(uuid + ".balance");
                             if (name != null && balance > 0) {
                                 balanceList.append(name).append(": ").append(balance).append("\n");
                             }
@@ -300,8 +300,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])));
                         break;
                     }
-                    float balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
-                    if (balance == 0.0f) {
+                    double balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
+                    if (balance == 0.0) {
                         sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[1])).style(Styles.ERRORSTYLE));
                         break;
                     }

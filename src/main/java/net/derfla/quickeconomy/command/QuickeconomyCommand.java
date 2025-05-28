@@ -72,25 +72,40 @@ public class QuickeconomyCommand implements TabExecutor {
                     if(!sender.hasPermission("quickeconomy.rollback") && sender instanceof Player) {
                         break;
                     }
-                    Timestamp rollbackTime;
+                    // Ensure proper validation of input parameters
+                    if (strings.length < 5) {
+                        sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
+                        return true;
+                    }
+                    
                     String timestampString;
                     try {
-                        timestampString = strings[1] + "-" + strings[2] + "-" + strings[3] + " " + strings[4];
-                        rollbackTime = Timestamp.valueOf(timestampString);
-                    }catch (Exception e){
+                        // Zero-pad month and day to ensure correct format
+                        String year = strings[1];
+                        String month = String.format("%02d", Integer.parseInt(strings[2]));
+                        String day = String.format("%02d", Integer.parseInt(strings[3]));
+                        String time = strings[4];
+                        
+                        timestampString = year + "-" + month + "-" + day + " " + time;
+                        
+                        // Validate that the timestamp can be parsed
+                        Timestamp.valueOf(timestampString);
+                    } catch (Exception e) {
                         sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
                         plugin.getLogger().info("Rollback failed: " + e.getMessage());
                         return true;
                     }
-                    try {
-                        DatabaseManager.rollback(timestampString);
-                        sender.sendMessage(Component.translatable("qecommand.rollback.success").style(Styles.INFOSTYLE));
-                        plugin.getLogger().info("Rollback complete to " + timestampString);
-                    } catch (Exception e){
-                        sender.sendMessage(Component.translatable("qecommand.rollback.fail", Styles.INFOSTYLE));
-                        plugin.getLogger().info("Rollback failed: " + e.getMessage());
-                        return true;
-                    }
+                    
+                    // Execute rollback asynchronously and handle the result
+                    DatabaseManager.rollback(timestampString).whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            sender.sendMessage(Component.translatable("qecommand.rollback.fail").style(Styles.ERRORSTYLE));
+                            plugin.getLogger().info("Rollback failed: " + ex.getMessage());
+                        } else {
+                            sender.sendMessage(Component.translatable("qecommand.rollback.success").style(Styles.INFOSTYLE));
+                            plugin.getLogger().info("Rollback complete to " + timestampString);
+                        }
+                    });
                     return true;
                 case "setup":
                     if(!sender.hasPermission("quickeconomy.setup") && sender instanceof Player) {
@@ -159,15 +174,15 @@ public class QuickeconomyCommand implements TabExecutor {
             switch (strings.length) {
                 case 2:
                     return Stream.of(String.valueOf(LocalDate.now().getYear()))
-                            .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[1]))
+                            .filter(subCommand -> subCommand.startsWith(strings[1]))
                             .collect(Collectors.toList());
                 case 3:
-                    return Stream.of(String.valueOf(LocalDate.now().getMonthValue()))
-                            .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[2]))
+                    return Stream.of(String.format("%02d", LocalDate.now().getMonthValue()))
+                            .filter(subCommand -> subCommand.startsWith(strings[2]))
                             .collect(Collectors.toList());
                 case 4:
-                    return Stream.of(String.valueOf(LocalDate.now().getDayOfMonth()))
-                            .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[3]))
+                    return Stream.of(String.format("%02d", LocalDate.now().getDayOfMonth()))
+                            .filter(subCommand -> subCommand.startsWith(strings[3]))
                             .collect(Collectors.toList());
                 case 5:
                     return Collections.singletonList("hh:mm:ss");

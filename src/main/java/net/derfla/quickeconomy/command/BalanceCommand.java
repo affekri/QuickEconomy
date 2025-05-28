@@ -305,6 +305,10 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[1])).style(Styles.ERRORSTYLE));
                         break;
                     }
+                    // Ensure translation is available for the sender if they are a player
+                    if (sender instanceof Player) {
+                        Translation.init((Player) sender);
+                    }
                     sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[1]), Component.text(balance)).style(Styles.INFOSTYLE));
                     break;
                 }

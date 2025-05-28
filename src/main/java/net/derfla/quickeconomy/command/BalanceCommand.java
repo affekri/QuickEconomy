@@ -188,10 +188,36 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 
                 String transactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page).join());
-                if(transactions.isEmpty()){
+                
+                // Check if the user has any transactions at all
+                if (page == 1 && transactions.isEmpty()) {
                     transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
                     break;
                 }
+                
+                // If not page 1 and no transactions, check if this is an invalid page number
+                if (page > 1 && transactions.isEmpty()) {
+                    // Find the total number of pages by checking backwards
+                    int lastValidPage = 1;
+                    for (int checkPage = page - 1; checkPage >= 1; checkPage--) {
+                        String checkTransactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, checkPage).join());
+                        if (!checkTransactions.isEmpty()) {
+                            lastValidPage = checkPage;
+                            break;
+                        }
+                    }
+                    
+                    // If we found a valid page, this means the requested page is invalid
+                    if (lastValidPage < page) {
+                        transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page.invalid", 
+                            Component.text(page), Component.text(lastValidPage)).style(Styles.ERRORSTYLE));
+                        break;
+                    }
+                }
+                
+                // Check if there are more transactions on the next page
+                String nextPageTransactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page + 1).join());
+                boolean hasNextPage = !nextPageTransactions.isEmpty();
                 
                 // Display transactions with pagination controls
                 transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page", Component.text(page)).style(Styles.INFOSTYLE));
@@ -208,18 +234,25 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.previous.hover", Component.text(page - 1))));
                     navigation = navigation.append(prevArrow);
                     
-                    // Add space separator
-                    navigation = navigation.append(Component.text("  ").style(Styles.BODY));
+                    // Add space separator if both arrows will be present
+                    if (hasNextPage) {
+                        navigation = navigation.append(Component.text("  ").style(Styles.BODY));
+                    }
                 }
                 
-                // Next page arrow (always show, will display empty if no more transactions)
-                Component nextArrow = Component.translatable("balcommand.transactions.next")
-                    .style(Styles.INFOSTYLE)
-                    .clickEvent(ClickEvent.runCommand("/bal transactions " + (page + 1)))
-                    .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.next.hover", Component.text(page + 1))));
-                navigation = navigation.append(nextArrow);
+                // Next page arrow (only show if there are more transactions)
+                if (hasNextPage) {
+                    Component nextArrow = Component.translatable("balcommand.transactions.next")
+                        .style(Styles.INFOSTYLE)
+                        .clickEvent(ClickEvent.runCommand("/bal transactions " + (page + 1)))
+                        .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.next.hover", Component.text(page + 1))));
+                    navigation = navigation.append(nextArrow);
+                }
                 
-                transactionsPlayer.sendMessage(navigation);
+                // Only send navigation if there are arrows to show
+                if (page > 1 || hasNextPage) {
+                    transactionsPlayer.sendMessage(navigation);
+                }
                 break;
             case "list":
                 if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.seeall"))) {

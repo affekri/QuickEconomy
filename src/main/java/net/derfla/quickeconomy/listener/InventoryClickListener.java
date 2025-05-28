@@ -57,7 +57,7 @@ public class InventoryClickListener implements Listener {
                 return;
             }
             // Sets cost variable
-            float cost = ShopInventory.getShopCost();
+            double cost = ShopInventory.getShopCost();
             // Sets owner variables
             String owner = ShopInventory.getShopOwner();
             String owner2 = ShopInventory.getShopOwner2();

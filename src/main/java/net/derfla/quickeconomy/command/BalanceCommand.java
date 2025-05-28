@@ -37,10 +37,10 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
             return true;
         }
-        float money = 0;
+        double money = 0;
         boolean moneySet;
         try {
-            money = Float.parseFloat(strings[1]);
+            money = Double.parseDouble(strings[1]);
             moneySet = true;
         } catch (Exception e) {
             moneySet = false;
@@ -261,7 +261,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 if(strings.length == 1) {
                     if(Main.SQLMode) {
-                        sender.sendMessage(DatabaseManager.listAllAccounts().join().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                        sender.sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
                     } else {
                         // List all balances in file mode
                         FileConfiguration file = BalanceFile.get();

@@ -18,7 +18,7 @@ public class ShopInventory implements InventoryHolder {
 
     private static String shopOwner;
     private static String shopOwner2;
-    private static float shopCost;
+    private static double shopCost;
     private static Chest shopChest;
     private static boolean singleShopItem;
 
@@ -26,7 +26,7 @@ public class ShopInventory implements InventoryHolder {
     final Player target;
 
 
-    public ShopInventory(Player player, Chest chest, float cost, String owner, boolean singleItem, String owner2) {
+    public ShopInventory(Player player, Chest chest, double cost, String owner, boolean singleItem, String owner2) {
         this.target = player;
         shopOwner = owner;
         shopOwner2 = owner2;
@@ -123,7 +123,7 @@ public class ShopInventory implements InventoryHolder {
         return shopChest;
     }
 
-    public static float getShopCost() {
+    public static double getShopCost() {
         return shopCost;
     }
 

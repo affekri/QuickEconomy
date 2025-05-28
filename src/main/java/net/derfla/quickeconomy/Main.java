@@ -5,6 +5,7 @@ import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
+import net.derfla.quickeconomy.util.AccountCache;
 import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
@@ -13,7 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public final class Main extends JavaPlugin {
+public class Main extends JavaPlugin {
 
 
     public static boolean SQLMode = false;
@@ -41,6 +42,8 @@ public final class Main extends JavaPlugin {
         } else {
             setupFileMode();
         }
+
+        AccountCache.init();
 
         int pluginID = 20985;
         Metrics metrics = new Metrics(this, pluginID);

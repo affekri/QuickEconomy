@@ -78,7 +78,7 @@ public class BankInventory implements InventoryHolder {
     }
 
     public Boolean trigger(ItemStack itemStack, boolean bankInventory, ClickType clickType) {
-        float exchangeRate = getExchangeRate();
+        double exchangeRate = getExchangeRate();
         //check if the clicked item is in the BankInventory
         if (bankInventory) {
             switch (itemStack.getType()) {
@@ -133,10 +133,10 @@ public class BankInventory implements InventoryHolder {
         return this.inventory;
     }
 
-    private static float getExchangeRate() {
-        float exchangeRate = 10f;
+    private static double getExchangeRate() {
+        double exchangeRate = 10;
         if (plugin.getConfig().contains("exchangeRate") && plugin.getConfig().getString("exchangeRate") != null) {
-            if (TypeChecker.isFloat(plugin.getConfig().getString("exchangeRate"))) exchangeRate = Float.parseFloat(plugin.getConfig().getString("exchangeRate"));
+            if (TypeChecker.isDouble(plugin.getConfig().getString("exchangeRate"))) exchangeRate = Double.parseDouble(plugin.getConfig().getString("exchangeRate"));
         } else {
             plugin.getLogger().warning("Could not find exchangeRate in config.yml!");
         }

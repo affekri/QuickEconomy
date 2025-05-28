@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class PlayerJoinListener implements Listener {
+
     static Plugin plugin = Main.getInstance();
 
     @EventHandler
@@ -44,7 +45,7 @@ public class PlayerJoinListener implements Listener {
 
                 // Handle welcome message and balance change
                 if (plugin.getConfig().getBoolean("player.welcomeMessage")) {
-                    float change = Balances.getPlayerBalanceChange(uuid);
+                    double change = Balances.getPlayerBalanceChange(uuid);
                     if (change > 0) {
                         Bukkit.getScheduler().runTask(plugin, () -> 
                             player.sendMessage(Component.translatable("player.welcomeback", 

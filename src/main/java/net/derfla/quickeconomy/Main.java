@@ -18,7 +18,7 @@ public class Main extends JavaPlugin {
 
 
     public static boolean SQLMode = false;
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private static final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     @Override
     public void onEnable() {

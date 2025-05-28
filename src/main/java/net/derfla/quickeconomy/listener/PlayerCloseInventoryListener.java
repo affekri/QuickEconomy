@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.ShopInventory;
-import org.bukkit.Bukkit;
 import org.bukkit.block.Chest;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;

@@ -2,8 +2,8 @@ package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
 import org.bukkit.plugin.Plugin;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -17,6 +17,7 @@ public class MojangAPI {
 
     static Plugin plugin = Main.getInstance();
     private static final ExecutorService executorService = Main.getExecutorService();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static CompletableFuture<String> getUUID(String playerName) {
         return CompletableFuture.supplyAsync(() -> {
@@ -46,9 +47,8 @@ public class MojangAPI {
 
                     // Parse JSON
                     String jsonString = content.toString();
-                    JSONParser parser = new JSONParser();
-                    JSONObject json = (JSONObject) parser.parse(jsonString);
-                    return (String) json.get("id"); // Returning the player's UUID
+                    JsonNode json = objectMapper.readTree(jsonString);
+                    return json.get("id").asText(); // Returning the player's UUID
                 } else {
                     plugin.getLogger().warning("Error: Username not found or server error.");
                 }
@@ -87,10 +87,9 @@ public class MojangAPI {
 
                     // Parse JSON
                     String jsonString = content.toString();
-                    JSONParser parser = new JSONParser();
-                    JSONObject json = (JSONObject) parser.parse(jsonString);
+                    JsonNode json = objectMapper.readTree(jsonString);
 
-                    return (String) json.get("name"); // Returning the player's name
+                    return json.get("name").asText(); // Returning the player's name
                 } else {
                     plugin.getLogger().warning("Error: UUID not found or server error.");
                 }

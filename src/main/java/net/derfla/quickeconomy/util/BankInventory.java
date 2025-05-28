@@ -16,7 +16,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 public class BankInventory implements InventoryHolder {
@@ -108,6 +107,9 @@ public class BankInventory implements InventoryHolder {
                     target.closeInventory();
                     target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(target.getUniqueId())))).style(Styles.INFOSTYLE));
                     return true;
+                default:
+                    // Do nothing for other item types
+                    break;
             }
         }
         if (!itemStack.getType().equals(Material.DIAMOND)) return false;

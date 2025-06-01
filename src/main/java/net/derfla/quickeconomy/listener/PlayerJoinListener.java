@@ -60,9 +60,10 @@ public class PlayerJoinListener implements Listener {
                         .thenAccept(emptyShops -> {
                             if (emptyShops != null && !emptyShops.isEmpty()) {
                                 int emptyShopCount = emptyShops.size();
+                                String shopCoordinates = String.join(", ", emptyShops);
                                 Bukkit.getScheduler().runTask(plugin, () -> 
-                                    player.sendMessage(Component.translatable("shop.empty.list", 
-                                        Component.text(emptyShopCount)).style(Styles.INFOSTYLE)));
+                                    player.sendMessage(Component.translatable("shop.inventory.empty.list", 
+                                        Component.text(emptyShopCount), Component.text(shopCoordinates)).style(Styles.INFOSTYLE)));
                             }
                         })
                         .exceptionally(ex -> {

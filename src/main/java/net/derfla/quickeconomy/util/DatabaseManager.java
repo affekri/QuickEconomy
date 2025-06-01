@@ -979,7 +979,7 @@ public class DatabaseManager {
             return false; // Return false if the shop does not exist or an error occurred
         });
     }
-
+    
 
     public static CompletableFuture<List<String>> displayEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);

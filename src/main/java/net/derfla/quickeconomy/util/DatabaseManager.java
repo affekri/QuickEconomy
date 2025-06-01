@@ -186,8 +186,8 @@ public class DatabaseManager {
                     + "  UUID char(32) NOT NULL,"
                     + "  AccountDatetime varchar(23) NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
-                    + "  Balance float NOT NULL DEFAULT 0,"
-                    + "  BalChange float NOT NULL DEFAULT 0,"
+                    + "  Balance real NOT NULL DEFAULT 0,"
+                    + "  BalChange real NOT NULL DEFAULT 0,"
                     + "  PRIMARY KEY (UUID)"
                     + ");";
             tableCreationQueries.add(PlayerAccounts);
@@ -199,9 +199,9 @@ public class DatabaseManager {
                     + "  Induce varchar(16) NOT NULL,"
                     + "  Source char(32),"
                     + "  Destination char(32),"
-                    + "  NewSourceBalance float,"
-                    + "  NewDestinationBalance float,"
-                    + "  Amount float NOT NULL,"
+                    + "  NewSourceBalance real,"
+                    + "  NewDestinationBalance real,"
+                    + "  Amount real NOT NULL,"
                     + "  Passed tinyint(1),"
                     + "  PassedReason varchar(16) DEFAULT NULL,"
                     + "  TransactionMessage varchar(32),"
@@ -221,7 +221,7 @@ public class DatabaseManager {
                     + "  AutopayName varchar(16),"
                     + "  Source char(32),"
                     + "  Destination char(32),"
-                    + "  Amount float NOT NULL,"
+                    + "  Amount real NOT NULL,"
                     + "  InverseFrequency int NOT NULL,"
                     + "  TimesLeft int,"
                     + "  PRIMARY KEY (AutopayID),";

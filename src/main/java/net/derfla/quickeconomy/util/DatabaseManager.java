@@ -186,8 +186,8 @@ public class DatabaseManager {
                     + "  UUID char(32) NOT NULL,"
                     + "  AccountDatetime varchar(23) NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
-                    + "  Balance float NOT NULL DEFAULT 0,"
-                    + "  BalChange float NOT NULL DEFAULT 0,"
+                    + "  Balance real NOT NULL DEFAULT 0,"
+                    + "  BalChange real NOT NULL DEFAULT 0,"
                     + "  PRIMARY KEY (UUID)"
                     + ");";
             tableCreationQueries.add(PlayerAccounts);
@@ -199,9 +199,9 @@ public class DatabaseManager {
                     + "  Induce varchar(16) NOT NULL,"
                     + "  Source char(32),"
                     + "  Destination char(32),"
-                    + "  NewSourceBalance float,"
-                    + "  NewDestinationBalance float,"
-                    + "  Amount float NOT NULL,"
+                    + "  NewSourceBalance real,"
+                    + "  NewDestinationBalance real,"
+                    + "  Amount real NOT NULL,"
                     + "  Passed tinyint(1),"
                     + "  PassedReason varchar(16) DEFAULT NULL,"
                     + "  TransactionMessage varchar(32),"
@@ -221,7 +221,7 @@ public class DatabaseManager {
                     + "  AutopayName varchar(16),"
                     + "  Source char(32),"
                     + "  Destination char(32),"
-                    + "  Amount float NOT NULL,"
+                    + "  Amount real NOT NULL,"
                     + "  InverseFrequency int NOT NULL,"
                     + "  TimesLeft int,"
                     + "  PRIMARY KEY (AutopayID),";
@@ -556,25 +556,28 @@ public class DatabaseManager {
         });
     }
 
-    public static CompletableFuture<List<String>> listAllAccounts() {
-        String sql = "SELECT PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts ORDER BY PlayerName ASC";
+
+    public static CompletableFuture<HashMap<String, PlayerAccount>> listAllAccounts() {
+        String sql = "SELECT UUID, PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts";
         
         return executeQueryAsync(conn -> {
-            List<String> accounts = new ArrayList<>();
+            HashMap<String, PlayerAccount> accountMap = new HashMap<>();
             try (PreparedStatement pstmt = conn.prepareStatement(sql);
                  ResultSet rs = pstmt.executeQuery()) {
 
                 while (rs.next()) {
+                    String uuid = rs.getString("UUID");
                     String playerName = rs.getString("PlayerName");
                     double balance = rs.getDouble("Balance");
-                    String accountDatetimeUTC = rs.getString("Created"); // Get the UTC datetime
-                    String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC); // Convert to local time
-
-                    String accountInfo = playerName + ": " + balance + " (Created: " + accountDatetimeLocal + ")";
-                    accounts.add(accountInfo);
+                    double change = rs.getDouble("BalChange");
+                    String accountDatetimeUTC = rs.getString("Created");
+                    String accountDatetimeLocal = TypeChecker.convertToLocalTime(accountDatetimeUTC);
+                    
+                    PlayerAccount account = new PlayerAccount(playerName, balance, change, accountDatetimeLocal);
+                    accountMap.put(uuid, account);
                 }
             }
-            return accounts; // Return the list of accounts
+            return accountMap;
         });
     }
 
@@ -689,7 +692,7 @@ public class DatabaseManager {
 
                 // Commit the transaction
                 conn.commit();
-                Balances.addPlayerBalanceChange(finalDestination, (float) finalAmount);
+                Balances.addPlayerBalanceChange(finalDestination, finalAmount);
             } catch (SQLException e) {
                 conn.rollback();
                 if(finalDestination != null && finalSource != null) {
@@ -976,7 +979,7 @@ public class DatabaseManager {
             return false; // Return false if the shop does not exist or an error occurred
         });
     }
-
+    
 
     public static CompletableFuture<List<String>> displayEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
@@ -1025,7 +1028,8 @@ public class DatabaseManager {
                 if (rowsAffected > 0) {
                     plugin.getLogger().info("Empty shop at " + coordinates + " removed from the database.");
                 } else {
-                    plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
+                    // only show for debugging reasons
+                    //plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
                 }
             }
         }).exceptionally(ex -> {

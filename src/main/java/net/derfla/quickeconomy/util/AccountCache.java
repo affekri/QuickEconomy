@@ -27,6 +27,7 @@ public class AccountCache {
         if(Main.SQLMode) {
             accountMap = DatabaseManager.listAllAccounts().join();
         } else {
+            accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();
             ConfigurationSection players = file.getConfigurationSection("players");
             for(String uuid : players.getKeys(false)){

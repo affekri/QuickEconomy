@@ -25,7 +25,7 @@ public class AccountCache {
      */
     public static void init() {
         if(Main.SQLMode) {
-            accountMap = DatabaseManager.listAllPlayerAccounts().join();
+            accountMap = DatabaseManager.listAllAccounts().join();
         } else {
             accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();

@@ -557,7 +557,7 @@ public class DatabaseManager {
     }
 
 
-    public static CompletableFuture<HashMap<String, PlayerAccount>> listAllPlayerAccounts() {
+    public static CompletableFuture<HashMap<String, PlayerAccount>> listAllAccounts() {
         String sql = "SELECT UUID, PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts";
         
         return executeQueryAsync(conn -> {

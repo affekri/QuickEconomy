@@ -30,6 +30,12 @@ public class Utility {
         R apply(T t) throws SQLException;
     }
 
+    /**
+     * Executes a query on the database and returns the result.
+     * 
+     * @param queryFunction The function to execute on the database.
+     * @return A CompletableFuture that resolves to the result of the query.
+     */
     public static <T> CompletableFuture<T> executeQueryAsync(Utility.SQLFunction<Connection, T> queryFunction) {
         return Utility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
@@ -46,6 +52,12 @@ public class Utility {
         }));
     }
 
+    /**
+     * Executes an update on the database.
+     * 
+     * @param updateAction The function to execute on the database.
+     * @return A CompletableFuture that completes when the update has been executed.
+     */
     public static CompletableFuture<Void> executeUpdateAsync(Utility.SQLConsumer<Connection> updateAction) {
         return Utility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
@@ -62,6 +74,11 @@ public class Utility {
         }));
     }
 
+    /**
+     * Gets a connection from the database connection pool.
+     * 
+     * @return A CompletableFuture that resolves to a connection from the database connection pool.
+     */
     public static CompletableFuture<Connection> getConnectionAsync() {
         return CompletableFuture.supplyAsync(() -> {
             if (dataSource == null) {
@@ -76,6 +93,9 @@ public class Utility {
         }, executorService);
     }
 
+    /**
+     * Connects to the database using HikariCP. Supports MySQL and SQLite.
+     */
     public static void connectToDatabase() {
         HikariConfig config = new HikariConfig();
 
@@ -120,6 +140,9 @@ public class Utility {
         plugin.getLogger().info("Database connection pool established.");
     }
 
+    /**
+     * Closes the database connection pool.
+     */
     public static void closePool() {
         if (dataSource != null) {
             dataSource.close();
@@ -127,6 +150,9 @@ public class Utility {
         }
     }
 
+    /**
+     * Shuts down the executor service.
+     */
     public static void shutdownExecutorService() {
         executorService.shutdown();
     }
@@ -134,10 +160,23 @@ public class Utility {
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_DELAY_MS = 1000;
 
+    /**
+     * Retries an operation if it fails due to a transient error.
+     * 
+     * @param operation The operation to retry.
+     * @return A CompletableFuture that resolves to the result of the operation.
+     */
     public static <T> CompletableFuture<T> withRetry(Supplier<CompletableFuture<T>> operation) {
         return withRetryInternal(operation, 0);
     }
 
+    /**
+     * Retries an operation if it fails due to a transient error.
+     * 
+     * @param operation The operation to retry.
+     * @param retryCount The number of times the operation has been retried.
+     * @return A CompletableFuture that resolves to the result of the operation.
+     */
     private static <T> CompletableFuture<T> withRetryInternal(Supplier<CompletableFuture<T>> operation, int retryCount) {
         CompletableFuture<T> future = operation.get();
         return future.<CompletableFuture<T>>handle((result, ex) -> {
@@ -160,6 +199,12 @@ public class Utility {
         }).thenCompose(f -> f);
     }
 
+    /**
+     * Checks if an error is transient.
+     * 
+     * @param ex The error to check.
+     * @return True if the error is transient, false otherwise.
+     */
     private static boolean isTransientError(Throwable ex) {
         if (ex instanceof SQLException) {
             SQLException sqlEx = (SQLException) ex;

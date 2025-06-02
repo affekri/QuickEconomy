@@ -5,10 +5,10 @@ import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
 
-import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
+import org.checkerframework.checker.units.qual.s;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
@@ -239,7 +239,7 @@ public class DatabaseManager {
                     + "  z_coord INT NOT NULL,"
                     + "  Owner1 char(32) NOT NULL,"
                     + "  Owner2 char(32),"
-                    + "  IsEmpty tinyint(1) NOT NULL DEFAULT 0";
+                    + "  IsEmpty DATETIME";   // Marks when the shop was registered as empty. Null means it's not empty.
             if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
                 Shops += "  PRIMARY KEY (x_coord, y_coord, z_coord),"
                       + "  FOREIGN KEY (Owner1) REFERENCES PlayerAccounts(UUID),"
@@ -251,7 +251,7 @@ public class DatabaseManager {
             CompletableFuture<Void> allTablesFuture = CompletableFuture.completedFuture(null);
 
             for (String query : tableCreationQueries) {
-                final String currentQuery = query; // Need to be effectively final for lambda
+                final String currentQuery = query; 
                 allTablesFuture = allTablesFuture.thenCompose(v ->
                         CompletableFuture.runAsync(() -> {
                             try (Statement statement = conn.createStatement()) {
@@ -353,17 +353,26 @@ public class DatabaseManager {
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
 
-    private static CompletableFuture<Void> createEmptyShopsView(@NotNull String uuid) {
+    private static CompletableFuture<Void> createShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-        String viewName = "vw_EmptyShops_" + trimmedUuid;
+        String viewName = "vw_Shops_" + trimmedUuid;
         String databaseName = plugin.getConfig().getString("database.database");
 
         String sql = "CREATE VIEW " + viewName + " AS "
                 + "SELECT "
-                + "    e.Coordinates "
-                + "FROM EmptyShops e "
-                + "WHERE Owner1 = ? OR Owner2 = ?;";
+                + "    s.CreationDatetime, "
+                + "    s.x_coord, "
+                + "    s.y_coord, "
+                + "    s.z_coord, "
+                + "    s.Owner1 AS Owner1UUID, "
+                + "    s.Owner2 AS Owner2UUID, "
+                + "    pa.PlayerName1 AS Owner1PlayerName, "
+                + "    pa.PlayerName2 AS Owner2PlayerName, "
+                + "FROM Shops s "
+                + "LEFT JOIN PlayerAccounts pa ON s.Owner1 = pa.UUID "
+                + "LEFT JOIN PlayerAccounts pa2 ON s.Owner2 = pa2.UUID "
+                + "WHERE s.Owner1 = ? OR s.Owner2 = ?;";
         String[] params = {trimmedUuid, trimmedUuid};
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
@@ -917,64 +926,81 @@ public class DatabaseManager {
     }
 
     // =============================
-    // ### EMPTY SHOP MANAGEMENT ###
+    // ### SHOP MANAGEMENT ###
     // =============================
 
-    public static CompletableFuture<Boolean> insertEmptyShop(@NotNull String coordinates, @NotNull String owner1, String owner2) {
+    public static CompletableFuture<Void> insertShop(@NotNull String owner1, @NotNull String owner2, @NotNull int x, @NotNull int y, @NotNull int z) {
         String Owner1 = TypeChecker.trimUUID(owner1);
         final String Owner2 = !owner2.isEmpty() ? TypeChecker.trimUUID(owner2) : "";
 
-        return emptyShopExists(coordinates).thenCompose(exists -> {
+        return shopExists(x, y, z).thenCompose(exists -> {
             if (exists) {
-                // Update the owners of the existing shop
-                String updateSql = "UPDATE EmptyShops SET Owner1 = ?, Owner2 = ? WHERE Coordinates = ?";
-                return executeUpdateAsync(conn -> {
-                    try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
-                        pstmt.setString(1, Owner1);
-                        pstmt.setString(2, Owner2);
-                        pstmt.setString(3, coordinates);
-                        pstmt.executeUpdate();
-                        plugin.getLogger().info("Empty shop at " + coordinates + " updated with new owners.");
-                    }
-                }).thenCompose(v -> { // Use thenCompose for sequential async operations
-                    CompletableFuture<Void> future1 = createEmptyShopsView(owner1);
-                    if (Owner2 != null && !Owner2.isEmpty()) {
-                        return future1.thenCompose(v2 -> createEmptyShopsView(Owner2));
-                    }
-                    return future1;
-                }).thenApply(v -> true); // Return true if an existing shop was updated
-            } else {
-                // Insert a new empty shop
-                String insertSql = "INSERT INTO EmptyShops (Coordinates, Owner1, Owner2) VALUES (?, ?, ?)";
-                return executeUpdateAsync(conn -> {
-                    try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
-                        pstmt.setString(1, coordinates);
-                        pstmt.setString(2, Owner1);
-                        pstmt.setString(3, Owner2);
-                        pstmt.executeUpdate();
-                        plugin.getLogger().info("Empty shop registered at " + coordinates);
-                    }
-                }).thenCompose(v -> { // Use thenCompose for sequential async operations
-                    CompletableFuture<Void> future1 = createEmptyShopsView(owner1);
-                    if (Owner2 != null && !Owner2.isEmpty()) {
-                        return future1.thenCompose(v2 -> createEmptyShopsView(Owner2));
-                    }
-                    return future1;
-                }).thenApply(v -> false); // Return false if a new shop was created
+                return CompletableFuture.completedFuture(null);
             }
-        }).exceptionally(ex -> {
-            plugin.getLogger().severe("Error registering empty shop for coords: " + coordinates + " - " + ex.getMessage());
-            if (ex instanceof CompletionException) throw (CompletionException) ex;
-            throw new CompletionException(ex);
+
+            String sql = "INSERT INTO Shops (Owner1, Owner2, x_coord, y_coord, z_coord) VALUES (?, ?, ?, ?, ?)";
+            return executeUpdateAsync(conn -> {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setString(1, Owner1);
+                    pstmt.setString(2, Owner2);
+                    pstmt.setInt(3, x);
+                    pstmt.setInt(4, y);
+                    pstmt.setInt(5, z);
+                    pstmt.executeUpdate();
+                }
+            });
         });
     }
 
-    private static CompletableFuture<Boolean> emptyShopExists(@NotNull String coordinates) {
-        String sql = "SELECT COUNT(*) FROM EmptyShops WHERE Coordinates = ?";
+    public static CompletableFuture<Void> removeShop(@NotNull int x, @NotNull int y, @NotNull int z) {
+        String sql = "DELETE FROM Shops WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
+
+        return shopExists(x, y, z).thenCompose(exists -> {
+            if (!exists) {
+                plugin.getLogger().warning("Shop at " + x + ", " + y + ", " + z + " does not exist. No removal was performed.");
+                return CompletableFuture.failedFuture(new SQLException("Shop does not exist at " + x + ", " + y + ", " + z));
+            }
+
+            return executeUpdateAsync(conn -> {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setInt(1, x);
+                    pstmt.setInt(2, y);
+                    pstmt.setInt(3, z);
+                    pstmt.executeUpdate();
+                }
+            });
+        });
+    }
+
+    public static CompletableFuture<Void> updateShopState(@NotNull int x, @NotNull int y, @NotNull int z, @NotNull boolean isEmpty) {
+        String sql = "UPDATE Shops SET IsEmpty = ? WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
+        
+        return shopExists(x, y, z).thenCompose(exists -> {
+            if (!exists) {
+                plugin.getLogger().warning("Shop at " + x + ", " + y + ", " + z + " does not exist. No update was performed.");
+                return CompletableFuture.failedFuture(new SQLException("Shop does not exist at " + x + ", " + y + ", " + z));
+            }
+
+            return executeUpdateAsync(conn -> {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setBoolean(1, isEmpty);
+                    pstmt.setInt(2, x);
+                    pstmt.setInt(3, y);
+                    pstmt.setInt(4, z);
+                    pstmt.executeUpdate();
+                }
+            });
+        });
+    }
+
+    private static CompletableFuture<Boolean> shopExists(@NotNull int x, @NotNull int y, @NotNull int z) {
+        String sql = "SELECT COUNT(*) FROM Shops WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
         
         return executeQueryAsync(conn -> {
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, coordinates);
+                pstmt.setInt(1, x);
+                pstmt.setInt(2, y);
+                pstmt.setInt(3, z);
                 try (ResultSet rs = pstmt.executeQuery()) {
                     if (rs.next()) {
                         return rs.getInt(1) > 0; // Return true if the shop exists
@@ -986,14 +1012,14 @@ public class DatabaseManager {
     }
 
 
-    public static CompletableFuture<List<String>> displayEmptyShopsView(@NotNull String uuid) {
+    public static CompletableFuture<List<String>> displayShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String viewName = "vw_EmptyShops_" + trimmedUuid;
+        String viewName = "vw_Shops_" + trimmedUuid;
         String checkViewSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
         String databaseName = plugin.getConfig().getString("database.database");
 
         return executeQueryAsync(conn -> {
-            List<String> emptyShops = new ArrayList<>();
+            List<String> shops = new ArrayList<>();
             
             // Check if the view for that player exists
             try (PreparedStatement pstmt = conn.prepareStatement(checkViewSQL)) {
@@ -1002,44 +1028,20 @@ public class DatabaseManager {
 
                 try (ResultSet rs = pstmt.executeQuery()) {
                     if (rs.next() && rs.getInt(1) == 0) {
-                        return emptyShops; // Return empty list if the view does not exist
+                        return shops; // Return empty list if the view does not exist
                     }
                 }
             }
-
 
             // If the view exists, proceed to retrieve the coordinates
             String sql = "SELECT Coordinates FROM " + viewName + ";";
             try (PreparedStatement pstmt = conn.prepareStatement(sql);
                  ResultSet rs = pstmt.executeQuery()) {
 
-                while (rs.next()) {
-                    String coordinates = rs.getString("Coordinates");
-                    emptyShops.add(coordinates);
-                }
+                
             }
 
-            return emptyShops; // Return the list of empty shops
-        });
-    }
-
-    public static CompletableFuture<Void> removeEmptyShop(String coordinates) {
-        String sql = "DELETE FROM EmptyShops WHERE Coordinates = ?;";
-        
-        return executeUpdateAsync(conn -> {
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, coordinates);
-                int rowsAffected = pstmt.executeUpdate();
-                if (rowsAffected > 0) {
-                    plugin.getLogger().info("Empty shop at " + coordinates + " removed from the database.");
-                } else {
-                    plugin.getLogger().info("No empty shop found with coordinates " + coordinates + " to remove.");
-                }
-            }
-        }).exceptionally(ex -> {
-            plugin.getLogger().severe("Error removing empty shop for coords: " + coordinates + " - " + ex.getMessage());
-            if (ex instanceof CompletionException) throw (CompletionException) ex;
-            throw new CompletionException(ex);
+            return shops; // Return the list of shops
         });
     }
 
@@ -1135,6 +1137,13 @@ public class DatabaseManager {
                             try (PreparedStatement pstmt = conn.prepareStatement(resetAccountsSQL)) {
                                 pstmt.setString(1, targetDateTimeUTC);
                                 pstmt.setString(2, targetDateTimeUTC);
+                                pstmt.executeUpdate();
+                            }
+
+                            // 6. Delete shops created after target datetime
+                            String deleteShopsSQL = "DELETE FROM Shops WHERE CreationDatetime > ?";
+                            try (PreparedStatement pstmt = conn.prepareStatement(deleteShopsSQL)) {
+                                pstmt.setString(1, targetDateTimeUTC);
                                 pstmt.executeUpdate();
                             }
 

@@ -19,6 +19,16 @@ public class Shop {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Adds a new shop to the database at the specified coordinates if it does not already exist.
+     * 
+     * @param x_coord The x-coordinate of the shop's location.
+     * @param y_coord The y-coordinate of the shop's location.
+     * @param z_coord The z-coordinate of the shop's location.
+     * @param owner1 The UUID of the primary owner of the shop.
+     * @param owner2 The UUID of the secondary owner of the shop, or null if there is no secondary owner.
+     * @return A CompletableFuture that completes when the shop has been added or if it already exists.
+     */
     public static CompletableFuture<Void> addShop(@NotNull int x_coord, @NotNull int y_coord, @NotNull int z_coord, @NotNull String owner1, String owner2) {
         String Owner1 = TypeChecker.trimUUID(owner1);
         final String Owner2 = (owner2 == null || owner2.isEmpty()) ? null : TypeChecker.trimUUID(owner2);
@@ -47,6 +57,13 @@ public class Shop {
         });
     }
 
+    /**
+     * Removes a shop from the database at the specified coordinates.
+     * 
+     * @param x_coord The x-coordinate of the shop's location.
+     * @param y_coord The y-coordinate of the shop's location.
+     * @param z_coord The z-coordinate of the shop's location.
+     */
     public static CompletableFuture<Void> removeShop(int x_coord, int y_coord, int z_coord) {
         String sql = "DELETE FROM Shops WHERE x_coord = ? AND y_coord = ? AND z_coord = ?;";
 
@@ -70,6 +87,13 @@ public class Shop {
         });
     }
 
+    /**
+     * Sets the shop as empty in the database at the specified coordinates.
+     * 
+     * @param x_coord The x-coordinate of the shop's location.
+     * @param y_coord The y-coordinate of the shop's location.
+     * @param z_coord The z-coordinate of the shop's location.
+     */
     public static CompletableFuture<Void> setShopEmpty(int x_coord, int y_coord, int z_coord) {
         String sql = "UPDATE Shops SET IsEmpty = NOW() WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
         
@@ -83,6 +107,13 @@ public class Shop {
         });
     }
 
+    /**
+     * Sets the shop as not empty in the database at the specified coordinates.
+     * 
+     * @param x_coord The x-coordinate of the shop's location.
+     * @param y_coord The y-coordinate of the shop's location.
+     * @param z_coord The z-coordinate of the shop's location.
+     */
     public static CompletableFuture<Void> unsetShopEmpty(int x_coord, int y_coord, int z_coord) {
         String sql = "UPDATE Shops SET IsEmpty = NULL WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
         return Utility.executeUpdateAsync(conn -> {
@@ -95,6 +126,14 @@ public class Shop {
         });
     }
 
+    /**
+     * Checks if a shop exists at the specified coordinates in the database.
+     * 
+     * @param x_coord The x-coordinate of the shop's location.
+     * @param y_coord The y-coordinate of the shop's location.
+     * @param z_coord The z-coordinate of the shop's location.
+     * @return A CompletableFuture that resolves to true if the shop exists, false otherwise.
+     */
     private static CompletableFuture<Boolean> shopExists(@NotNull int x_coord, @NotNull int y_coord, @NotNull int z_coord) {
         String sql = "SELECT COUNT(*) FROM Shops WHERE x_coord = ? AND y_coord = ? AND z_coord = ?";
 
@@ -113,6 +152,12 @@ public class Shop {
         });
     }
 
+    /**
+     * Displays the shops view for a given player.
+     * 
+     * @param uuid The UUID of the player whose shops view is to be displayed.
+     * @return A CompletableFuture that resolves to a list of shop coordinates and their emptiness status.
+     */
     public static CompletableFuture<List<String>> displayShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Shops_" + trimmedUuid;

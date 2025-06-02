@@ -20,7 +20,16 @@ import java.util.concurrent.CompletableFuture;
 public class TransactionManagement {
 
     static Plugin plugin = Main.getInstance();
-
+    /**
+     * Executes a transaction between players, shops or the bank.
+     * @param transactType The type of transaction to execute; "Deposit", "Withdraw", "p2p" or "Autopay".
+     * @param induce The induce of the transaction; "Bank", "Purchase" or integer (for AutopayID).
+     * @param source The source of the transaction; UUID or null (for withdrawal from bank account).
+     * @param destination The destination of the transaction; UUID or null (for deposit to bank account).
+     * @param amount The amount of money to be transferred.
+     * @param transactionMessage Arbitrary message to be displayed in the transaction log. Up to 255 characters.
+     * @return A CompletableFuture that completes when the transaction has been executed.
+     */
     public static CompletableFuture<Void> executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                                              String destination, double amount, String transactionMessage) {
         // Sort UUIDs to prevent deadlocks
@@ -144,6 +153,14 @@ public class TransactionManagement {
         }));
     }
 
+    /**
+     * Displays pages from the transactions view for a given player. Each page contains 10 entries.
+     * 
+     * @param uuid The UUID of the player whose transactions view is to be displayed.
+     * @param displayPassed Whether to display passed transactions.
+     * @param page The page number to display.
+     * @return A CompletableFuture that resolves to a string containing the transactions view.
+     */
     public static CompletableFuture<String> displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;

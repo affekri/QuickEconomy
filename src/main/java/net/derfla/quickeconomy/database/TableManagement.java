@@ -20,6 +20,11 @@ public class TableManagement {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Creates the tables for the database if they do not exist.
+     * 
+     * @return A CompletableFuture that completes when the tables have been created.
+     */
     public static CompletableFuture<Void> createTables() {
         return Utility.getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
@@ -133,6 +138,12 @@ public class TableManagement {
         });
     }
 
+    /**
+     * Checks if a table exists in the database.
+     * 
+     * @param tableName The name of the table to check.
+     * @return A CompletableFuture that resolves to true if the table exists, false otherwise.
+     */
     private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
         return Utility.getConnectionAsync().thenCompose(conn ->
                 CompletableFuture.supplyAsync(() -> {
@@ -155,7 +166,16 @@ public class TableManagement {
         );
     }
 
-    // Helper method for creating views
+    /**
+     * Creates a view in the database.
+     * 
+     * @param viewName The name of the view to create.
+     * @param databaseName The name of the database to create the view in.
+     * @param createViewSql The SQL query to create the view.
+     * @param createViewParams The parameters to pass to the SQL query.
+     * @param logMsgContext The context to log the view creation.
+     * @return A CompletableFuture that completes when the view has been created.
+     */
     private static CompletableFuture<Void> createViewInternal(String viewName, String databaseName, String createViewSql, String[] createViewParams, String logMsgContext) {
         String checkSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
 
@@ -191,6 +211,12 @@ public class TableManagement {
         });
     }
 
+    /**
+     * Creates a view for the transactions of a given player.
+     * 
+     * @param uuid The UUID of the player whose transactions view is to be created.
+     * @return A CompletableFuture that completes when the view has been created.
+     */
     public static CompletableFuture<Void> createTransactionsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
@@ -220,6 +246,12 @@ public class TableManagement {
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
 
+    /**
+     * Creates a view for the shops of a given player.
+     * 
+     * @param uuid The UUID of the player whose shops view is to be created.
+     * @return A CompletableFuture that completes when the view has been created.
+     */
     static CompletableFuture<Void> createShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);

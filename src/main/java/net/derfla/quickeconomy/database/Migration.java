@@ -26,6 +26,11 @@ public class Migration {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Migrates player balances from the balance.yml file to the database.
+     * 
+     * @return A CompletableFuture that completes when the migration is complete.
+     */
     public static CompletableFuture<Void> migrateToDatabase() {
         AtomicInteger failedCounter = new AtomicInteger(0);
         return CompletableFuture.runAsync(() -> {
@@ -88,6 +93,11 @@ public class Migration {
         }, executorService); // Use the executorService for async execution
     }
 
+    /**
+     * Migrates player balances from the database to the balance.yml file.
+     * 
+     * @return A CompletableFuture that completes when the migration is complete.
+     */
     public static CompletableFuture<Void> migrateToBalanceFile() {
         String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
         String sqlFetch = "SELECT UUID, PlayerName, Balance, BalChange FROM PlayerAccounts LIMIT ? OFFSET ?";
@@ -165,6 +175,11 @@ public class Migration {
         });
     }
 
+    /**
+     * Exports the database to a CSV file.
+     * 
+     * @return A CompletableFuture that completes when the export is complete.
+     */
     public static CompletableFuture<Void> exportDatabase() {
         String sqlAccounts = "SELECT * FROM PlayerAccounts";
         String sqlTransactions = "SELECT * FROM Transactions";
@@ -207,6 +222,16 @@ public class Migration {
         }, executorService));
     }
 
+    /**
+     * Exports a database table to a CSV file.
+     * 
+     * @param conn The database connection.
+     * @param sql The SQL query to execute.
+     * @param tableName The name of the table to export.
+     * @param csvWriter The FileWriter to write the CSV file.
+     * @param batchSize The batch size for the export.
+     * @return A CompletableFuture that completes when the export is complete.
+     */
     public static CompletableFuture<Void> exportTableToCSV(Connection conn, String sql, String tableName, FileWriter csvWriter, int batchSize) {
         return CompletableFuture.runAsync(() -> {
             try {
@@ -244,6 +269,12 @@ public class Migration {
         }, executorService);
     }
 
+    /**
+     * Writes a ResultSet to a CSV file.
+     * 
+     * @param rs The ResultSet to write.
+     * @param csvWriter The FileWriter to write the CSV file.
+     */
     private static void writeResultSetToCSV(ResultSet rs, FileWriter csvWriter) throws SQLException, IOException {
         ResultSetMetaData metaData = rs.getMetaData();
         int columnCount = metaData.getColumnCount();

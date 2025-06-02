@@ -232,13 +232,21 @@ public class DatabaseManager {
             Autopays += ");";
             tableCreationQueries.add(Autopays);
 
-            String EmptyShops = "CREATE TABLE IF NOT EXISTS EmptyShops ("
-                    + "  Coordinates varchar(32) NOT NULL,"
-                    + "  Owner1 char(32),"
+            String Shops = "CREATE TABLE IF NOT EXISTS Shops ("
+                    + "  CreationDatetime DATETIME NOT NULL,"
+                    + "  x_coord INT NOT NULL,"
+                    + "  y_coord INT NOT NULL,"
+                    + "  z_coord INT NOT NULL,"
+                    + "  Owner1 char(32) NOT NULL,"
                     + "  Owner2 char(32),"
-                    + "  PRIMARY KEY (Coordinates)"
-                    + ");";
-            tableCreationQueries.add(EmptyShops);
+                    + "  IsEmpty tinyint(1) NOT NULL DEFAULT 0";
+            if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
+                Shops += "  PRIMARY KEY (x_coord, y_coord, z_coord),"
+                      + "  FOREIGN KEY (Owner1) REFERENCES PlayerAccounts(UUID),"
+                      + "  FOREIGN KEY (Owner2) REFERENCES PlayerAccounts(UUID)";
+            }
+            Shops += ");";
+            tableCreationQueries.add(Shops);
 
             CompletableFuture<Void> allTablesFuture = CompletableFuture.completedFuture(null);
 

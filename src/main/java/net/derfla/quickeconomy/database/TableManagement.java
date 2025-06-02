@@ -52,7 +52,6 @@ public class TableManagement {
                     + "  PassedReason varchar(16) DEFAULT NULL,"
                     + "  TransactionMessage varchar(32),"
                     + "  PRIMARY KEY (TransactionID),";
-            // MySQL specific foreign key syntax, for SQLite this might need adjustment
             if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
                 Transactions += "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
                         + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)";
@@ -78,13 +77,21 @@ public class TableManagement {
             Autopays += ");";
             tableCreationQueries.add(Autopays);
 
-            String EmptyShops = "CREATE TABLE IF NOT EXISTS EmptyShops ("
-                    + "  Coordinates varchar(32) NOT NULL,"
-                    + "  Owner1 char(32),"
+            String Shops = "CREATE TABLE IF NOT EXISTS Shops ("
+                    + "  CreationDatetime DATETIME NOT NULL,"
+                    + "  x_coord INT NOT NULL,"
+                    + "  y_coord INT NOT NULL,"
+                    + "  z_coord INT NOT NULL,"
+                    + "  Owner1 char(32) NOT NULL,"
                     + "  Owner2 char(32),"
-                    + "  PRIMARY KEY (Coordinates)"
-                    + ");";
-            tableCreationQueries.add(EmptyShops);
+                    + "  IsEmpty DATETIME,"   // Marks when the shop was registered as empty. Null means it's not empty.
+                    + "  PRIMARY KEY (x_coord, y_coord, z_coord),";
+            if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
+                Shops += "  FOREIGN KEY (Owner1) REFERENCES PlayerAccounts(UUID),"
+                        + "  FOREIGN KEY (Owner2) REFERENCES PlayerAccounts(UUID)";
+            }
+            Shops += ");";
+            tableCreationQueries.add(Shops);
 
             CompletableFuture<Void> allTablesFuture = CompletableFuture.completedFuture(null);
 
@@ -124,6 +131,28 @@ public class TableManagement {
                 plugin.getLogger().info("Database table creation/verification process completed.");
             }
         });
+    }
+
+    private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
+        return Utility.getConnectionAsync().thenCompose(conn ->
+                CompletableFuture.supplyAsync(() -> {
+                    try (PreparedStatement pstmt = conn.prepareStatement(
+                            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?"
+                    )) {
+                        pstmt.setString(1, tableName);
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            return rs.next() && rs.getInt(1) > 0;
+                        }
+                    } catch (SQLException e) {
+                        plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
+                        return false;
+                    } finally {
+                        try {
+                            conn.close();
+                        } catch (SQLException ignored) {}
+                    }
+                }, executorService)
+        );
     }
 
     // Helper method for creating views
@@ -191,17 +220,25 @@ public class TableManagement {
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
 
-    static CompletableFuture<Void> createEmptyShopsView(@NotNull String uuid) {
+    static CompletableFuture<Void> createShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
-        String viewName = "vw_EmptyShops_" + trimmedUuid;
+        String viewName = "vw_Shops_" + trimmedUuid;
         String databaseName = plugin.getConfig().getString("database.database");
 
         String sql = "CREATE VIEW " + viewName + " AS "
                 + "SELECT "
-                + "    e.Coordinates "
-                + "FROM EmptyShops e "
-                + "WHERE Owner1 = ? OR Owner2 = ?;";
+                + "    s.x_coord, "
+                + "    s.y_coord, "
+                + "    s.z_coord, "
+                + "    s.Owner1 AS Owner1UUID, "
+                + "    s.Owner2 AS Owner2UUID, "
+                + "    pa.PlayerName AS Owner1PlayerName, "
+                + "    pa2.PlayerName AS Owner2PlayerName "
+                + "FROM Shops s "
+                + "LEFT JOIN PlayerAccounts pa ON s.Owner1 = pa.UUID "
+                + "LEFT JOIN PlayerAccounts pa2 ON s.Owner2 = pa2.UUID "
+                + "WHERE s.Owner1 = ? OR s.Owner2 = ?;";
         String[] params = {trimmedUuid, trimmedUuid};
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }

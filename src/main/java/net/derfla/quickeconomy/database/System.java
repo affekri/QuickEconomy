@@ -3,9 +3,7 @@ package net.derfla.quickeconomy.database;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.NotNull;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -14,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static net.derfla.quickeconomy.database.AccountManagement.displayBalanceSync;
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
 public class System {
@@ -71,14 +68,22 @@ public class System {
                                                 double amount = rs.getDouble("Amount");
 
                                                 if (source != null) {
-                                                    double currentBalance = displayBalanceSync(conn, source);
-                                                    double currentChange = getPlayerBalanceChangeSync(conn, source);
-                                                    setPlayerBalanceSync(conn, source, currentBalance + amount, currentChange + amount);
+                                                    String updateSourceSQL = "UPDATE PlayerAccounts SET Balance = Balance + ?, BalChange = BalChange + ? WHERE UUID = ?";
+                                                    try (PreparedStatement pstmt2 = conn.prepareStatement(updateSourceSQL)) {
+                                                        pstmt2.setDouble(1, amount);
+                                                        pstmt2.setDouble(2, amount);
+                                                        pstmt2.setString(3, source);
+                                                        pstmt2.executeUpdate();
+                                                    }
                                                 }
                                                 if (destination != null) {
-                                                    double currentBalance = displayBalanceSync(conn, destination);
-                                                    double currentChange = getPlayerBalanceChangeSync(conn, destination);
-                                                    setPlayerBalanceSync(conn, destination, currentBalance - amount, currentChange - amount);
+                                                    String updateDestSQL = "UPDATE PlayerAccounts SET Balance = Balance - ?, BalChange = BalChange - ? WHERE UUID = ?";
+                                                    try (PreparedStatement pstmt2 = conn.prepareStatement(updateDestSQL)) {
+                                                        pstmt2.setDouble(1, amount);
+                                                        pstmt2.setDouble(2, amount);
+                                                        pstmt2.setString(3, destination);
+                                                        pstmt2.executeUpdate();
+                                                    }
                                                 }
                                                 processedRows++;
                                             }
@@ -99,10 +104,27 @@ public class System {
                                     String deleteAutopaysSQL = "DELETE FROM Autopays WHERE AutopayDatetime > ?";
                                     try (PreparedStatement pstmt = conn.prepareStatement(deleteAutopaysSQL)) {
                                         pstmt.setString(1, targetDateTimeUTC);
-                                        pstmt.executeUpdate();
+                                        int rowsDeleted = pstmt.executeUpdate();
+                                        plugin.getLogger().info(rowsDeleted + " autopays deleted after " + targetDateTime);
                                     }
 
-                                    // 5. Reset account creation dates that are after target datetime
+                                    // 5. Delete shops registered after target datetime
+                                    String deleteShopsSQL = "DELETE FROM Shops WHERE CreationDatetime > ?";
+                                    try (PreparedStatement pstmt = conn.prepareStatement(deleteShopsSQL)) {
+                                        pstmt.setString(1, targetDateTimeUTC);
+                                        int rowsDeleted = pstmt.executeUpdate();
+                                        plugin.getLogger().info(rowsDeleted + " shops deleted after " + targetDateTime);
+                                    }
+
+                                    // 6. Unset IsEmpty for shops that were marked empty after target datetime
+                                    String unsetEmptySQL = "UPDATE Shops SET IsEmpty = NULL WHERE IsEmpty > ?";
+                                    try (PreparedStatement pstmt = conn.prepareStatement(unsetEmptySQL)) {
+                                        pstmt.setString(1, targetDateTimeUTC);
+                                        int rowsUpdated = pstmt.executeUpdate();
+                                        plugin.getLogger().info(rowsUpdated + " shops unmarked as empty");
+                                    }
+
+                                    // 7. Reset account creation dates that are after target datetime
                                     String resetAccountsSQL =
                                             "UPDATE PlayerAccounts SET AccountDatetime = ? " +
                                                     "WHERE AccountDatetime > ?";
@@ -110,6 +132,7 @@ public class System {
                                         pstmt.setString(1, targetDateTimeUTC);
                                         pstmt.setString(2, targetDateTimeUTC);
                                         pstmt.executeUpdate();
+                                        plugin.getLogger().info("Reset account creation dates that are after " + targetDateTime);
                                     }
 
                                     conn.commit(); // Commit transaction
@@ -196,32 +219,5 @@ public class System {
             plugin.getLogger().severe("Error during transaction check for rollback validation: " + ex.getMessage());
             return false; // On exception, consider it not valid to proceed
         });
-    }
-
-    // Synchronous method for rollback purposes
-    private static double getPlayerBalanceChangeSync(Connection conn, String uuid) throws SQLException {
-        String trimmedUUID = TypeChecker.trimUUID(uuid);
-        String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, trimmedUUID);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("BalChange");
-                }
-            }
-        }
-        return 0.0; // Return 0.0 if no change found
-    }
-
-    // Synchronous method for rollback purposes
-    private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";
-
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setDouble(1, balance);
-            pstmt.setDouble(2, change);
-            pstmt.setString(3, trimmedUuid);
-        }
     }
 }

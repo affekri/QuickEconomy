@@ -51,6 +51,7 @@ public class AccountManagement {
                         });
                     }
                 }).thenCompose(v -> TableManagement.createTransactionsView(trimmedUuid))
+                .thenCompose(v -> TableManagement.createShopsView(trimmedUuid))
                 .exceptionally(ex -> {
                     plugin.getLogger().severe("Error during addAccount operation for UUID: " + trimmedUuid + " PlayerName: " + playerName + " - " + ex.getMessage());
                     if (ex instanceof CompletionException) throw (CompletionException) ex;
@@ -124,7 +125,7 @@ public class AccountManagement {
         });
     }
 
-    public static CompletableFuture<Double> displayBalance(@NotNull String uuid) {
+    public static CompletableFuture<Double> getPlayerBalance(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
 
@@ -139,21 +140,6 @@ public class AccountManagement {
             }
             return 0.0; // Return 0 if no balance found or an error occurred
         });
-    }
-
-    // Synchronous method for rollback purposes
-    static double displayBalanceSync(Connection conn, @NotNull String uuid) throws SQLException {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, trimmedUuid);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("Balance");
-                }
-            }
-        }
-        return 0.0; // Return 0 if no balance found
     }
 
     public static CompletableFuture<Void> setPlayerBalance(@NotNull String uuid, double balance, double change) {

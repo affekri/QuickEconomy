@@ -2,8 +2,9 @@ package net.derfla.quickeconomy.database;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.Balances;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
 import net.derfla.quickeconomy.util.TypeChecker;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -45,7 +46,7 @@ public class TransactionManagement {
         Instant currentTime = Instant.now();
         String currentUTCTimeString = currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
 
-        return DatabaseRetryUtil.withRetry(() -> Utility.executeUpdateAsync(conn -> {
+        return Utility.withRetry(() -> Utility.executeUpdateAsync(conn -> {
             conn.setAutoCommit(false);
             conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 
@@ -111,7 +112,13 @@ public class TransactionManagement {
 
                 // Commit the transaction
                 conn.commit();
-                Balances.addPlayerBalanceChange(finalDestination, finalAmount);
+                // Only add to BalChange if the destination player is offline
+                if (finalDestination != null) {
+                    Player destinationPlayer = Bukkit.getPlayer(TypeChecker.untrimUUID(finalDestination));
+                    if (destinationPlayer == null || !destinationPlayer.isOnline()) {
+                        Balances.addPlayerBalanceChange(finalDestination, finalAmount);
+                    }
+                }
             } catch (SQLException e) {
                 conn.rollback();
                 if(finalDestination != null && finalSource != null) {

@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.database;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
 import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -170,11 +169,11 @@ public class Migration {
         String sqlAccounts = "SELECT * FROM PlayerAccounts";
         String sqlTransactions = "SELECT * FROM Transactions";
         String sqlAutopays = "SELECT * FROM Autopays";
-        String sqlEmptyShops = "SELECT * FROM EmptyShops";
+        String sqlShops = "SELECT * FROM Shops";
         String csvFilePath = "QE_DatabaseExport.csv";
         int batchSize = 100;
 
-        return DatabaseRetryUtil.withRetry(() -> Utility.getConnectionAsync().thenComposeAsync(conn -> {
+        return Utility.withRetry(() -> Utility.getConnectionAsync().thenComposeAsync(conn -> {
             if (conn == null) {
                 plugin.getLogger().severe("Database export failed: Could not obtain database connection.");
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for export."));
@@ -188,7 +187,7 @@ public class Migration {
                         exportTableToCSV(autoCloseConn, sqlAccounts, "PlayerAccounts Table", csvWriter, batchSize).join();
                         exportTableToCSV(autoCloseConn, sqlTransactions, "Transactions Table", csvWriter, batchSize).join();
                         exportTableToCSV(autoCloseConn, sqlAutopays, "Autopays Table", csvWriter, batchSize).join();
-                        exportTableToCSV(autoCloseConn, sqlEmptyShops, "EmptyShops Table", csvWriter, batchSize).join();
+                        exportTableToCSV(autoCloseConn, sqlShops, "Shops Table", csvWriter, batchSize).join();
 
                         plugin.getLogger().info("Database exported to " + csvFilePath + " successfully.");
                     } catch (Exception e) {

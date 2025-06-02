@@ -19,8 +19,7 @@ public class Balances {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         if (Main.SQLMode) {
-            double balance = AccountManagement.displayBalance(trimmedUUID).join();
-            return balance;
+            return AccountManagement.getPlayerBalance(trimmedUUID).join();
         }
 
         FileConfiguration file = BalanceFile.get();
@@ -30,26 +29,42 @@ public class Balances {
             return 0.0;
         }
 
+        // Add safety check for account cache in file mode
+        if (!AccountCache.accountExists(trimmedUUID)) {
+            plugin.getLogger().warning("Account not found in cache for UUID: " + trimmedUUID + " in file mode, returning 0.0");
+            return 0.0;
+        }
 
         return AccountCache.getPlayerAccount(trimmedUUID).balance();
     }
 
-    public static void setPlayerBalance(String uuid, double money) {
+    public static void setPlayerBalance(String uuid, double newBalance) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+        
+        double currentBalance = getPlayerBalance(trimmedUUID);
+        double balanceChange = newBalance - currentBalance;
 
-        AccountCache.getPlayerAccount(trimmedUUID).balance(money);
+        addPlayerBalanceChange(trimmedUUID, balanceChange);
+
+        // Add safety check for account cache
+        if (!AccountCache.accountExists(trimmedUUID)) {
+            plugin.getLogger().warning("Account not found in cache for UUID: " + trimmedUUID + ", cannot set balance");
+            return;
+        }
+
+        AccountCache.getPlayerAccount(trimmedUUID).balance(newBalance);
+
         if (Main.SQLMode) {
-            AccountManagement.setPlayerBalance(uuid, money, 0).join();
-            return;
+            AccountManagement.setPlayerBalance(uuid, newBalance, getPlayerBalanceChange(trimmedUUID)).join();
+        } else {
+            FileConfiguration file = BalanceFile.get();
+            if (file == null){
+                plugin.getLogger().warning("balance.yml not found!");
+                return;
+            }
+            file.set("players." + trimmedUUID + ".balance", newBalance);
+            BalanceFile.save();
         }
-
-        FileConfiguration file = BalanceFile.get();
-        if (file == null){
-            plugin.getLogger().warning("balance.yml not found!");
-            return;
-        }
-        file.set("players." + trimmedUUID + ".balance", money);
-        BalanceFile.save();
     }
 
     public static void addPlayerBalance(String uuid, double money){
@@ -65,11 +80,24 @@ public class Balances {
 
     public static double getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        return  AccountCache.getPlayerAccount(trimmedUUID).change();
+        
+        // Add safety check for account cache
+        if (!AccountCache.accountExists(trimmedUUID)) {
+            plugin.getLogger().warning("Account not found in cache for UUID: " + trimmedUUID + ", returning 0.0 for balance change");
+            return 0.0;
+        }
+        
+        return AccountCache.getPlayerAccount(trimmedUUID).change();
     }
 
     public static void setPlayerBalanceChange(String uuid, double moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
+
+        // Add safety check for account cache
+        if (!AccountCache.accountExists(trimmedUUID)) {
+            plugin.getLogger().warning("Account not found in cache for UUID: " + trimmedUUID + ", cannot set balance change");
+            return;
+        }
 
         AccountCache.getPlayerAccount(trimmedUUID).change(moneyChange);
 
@@ -129,6 +157,11 @@ public class Balances {
 
     public static void updatePlayerName(String uuid, String name) {
 
+        // Add safety check for account cache
+        if (!AccountCache.accountExists(uuid)) {
+            plugin.getLogger().warning("Account not found in cache for UUID: " + uuid + ", cannot update player name");
+            return;
+        }
 
         AccountCache.getPlayerAccount(uuid).name(name);
 

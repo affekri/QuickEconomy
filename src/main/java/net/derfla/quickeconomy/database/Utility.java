@@ -3,17 +3,16 @@ package net.derfla.quickeconomy.database;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
+import net.derfla.quickeconomy.database.Utility;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.NotNull;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLTransientException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 public class Utility {
 
@@ -32,7 +31,7 @@ public class Utility {
     }
 
     public static <T> CompletableFuture<T> executeQueryAsync(Utility.SQLFunction<Connection, T> queryFunction) {
-        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
+        return Utility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
@@ -48,7 +47,7 @@ public class Utility {
     }
 
     public static CompletableFuture<Void> executeUpdateAsync(Utility.SQLConsumer<Connection> updateAction) {
-        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
+        return Utility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
@@ -132,25 +131,52 @@ public class Utility {
         executorService.shutdown();
     }
 
-    private static CompletableFuture<Boolean> tableExists(@NotNull String tableName) {
-        return getConnectionAsync().thenCompose(conn ->
-                CompletableFuture.supplyAsync(() -> {
-                    try (PreparedStatement pstmt = conn.prepareStatement(
-                            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?"
-                    )) {
-                        pstmt.setString(1, tableName);
-                        try (ResultSet rs = pstmt.executeQuery()) {
-                            return rs.next() && rs.getInt(1) > 0;
-                        }
-                    } catch (SQLException e) {
-                        plugin.getLogger().severe("Error checking table " + tableName + ": " + e.getMessage());
-                        return false;
-                    } finally {
-                        try {
-                            conn.close();
-                        } catch (SQLException ignored) {}
-                    }
-                }, executorService)
-        );
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 1000;
+
+    public static <T> CompletableFuture<T> withRetry(Supplier<CompletableFuture<T>> operation) {
+        return withRetryInternal(operation, 0);
     }
+
+    private static <T> CompletableFuture<T> withRetryInternal(Supplier<CompletableFuture<T>> operation, int retryCount) {
+        CompletableFuture<T> future = operation.get();
+        return future.<CompletableFuture<T>>handle((result, ex) -> {
+            if (ex != null && isTransientError(ex) && retryCount < MAX_RETRIES) {
+                try {
+                    Thread.sleep(RETRY_DELAY_MS * (retryCount + 1)); // Exponential backoff
+                    return withRetryInternal(operation, retryCount + 1);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new CompletionException(ie);
+                }
+            }
+            if (ex != null) {
+                if (ex instanceof CompletionException) {
+                    throw (CompletionException) ex;
+                }
+                throw new CompletionException(ex);
+            }
+            return CompletableFuture.completedFuture(result);
+        }).thenCompose(f -> f);
+    }
+
+    private static boolean isTransientError(Throwable ex) {
+        if (ex instanceof SQLException) {
+            SQLException sqlEx = (SQLException) ex;
+            // Check for transient SQL exceptions
+            if (sqlEx instanceof SQLTransientException) {
+                return true;
+            }
+            // Check SQL state for transient errors
+            String sqlState = sqlEx.getSQLState();
+            if (sqlState != null) {
+                // Common transient error states
+                return sqlState.startsWith("08") || // Connection errors
+                       sqlState.startsWith("40") || // Transaction errors
+                       sqlState.startsWith("53");   // Insufficient resources
+            }
+        }
+        return false;
+    }
+
 }

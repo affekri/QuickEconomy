@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy.listener;
 
+import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import org.bukkit.block.Chest;
@@ -10,10 +11,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 
 public class PlayerClickSignListener implements Listener {
+
+    private static final Plugin plugin = Main.getInstance();
 
     @EventHandler
     public void onPlayerClickSign(PlayerInteractEvent event){
@@ -51,7 +55,11 @@ public class PlayerClickSignListener implements Listener {
                 return;
             }
             List<String> owners = BlockOwner.getChestOwner(chest);
-            assert owners != null;
+            if (owners == null || owners.isEmpty()) {
+                player.sendMessage(Component.translatable("shop.broken", Styles.INFOSTYLE));
+                plugin.getLogger().warning("Shop chest at " + chest.getLocation() + " has no owner data!");
+                return;
+            }
             String seller = owners.getFirst();
             String seller2 = "";
             if(owners.size() == 2) seller2 = owners.getLast();

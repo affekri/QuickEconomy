@@ -1,10 +1,12 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.Shop;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.Style;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
@@ -14,12 +16,14 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.CompletableFuture;
 
 public class InventoryClickListener implements Listener {
 
     Style errorStyle = Styles.ERRORSTYLE;
+    private static final Plugin plugin = Main.getInstance();
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
@@ -45,7 +49,10 @@ public class InventoryClickListener implements Listener {
             event.setCancelled(true);
             // Returns if the player clicks in the player inventory
             if (inventoryType != InventoryType.CHEST) return;
-            Boolean buy = ((ShopInventory) event.getInventory().getHolder()).trigger(event.getCurrentItem(), event.getSlot());
+
+            ShopInventory shopInventory = (ShopInventory) event.getInventory().getHolder();
+
+            Boolean buy = shopInventory.trigger(event.getCurrentItem(), event.getSlot());
             // Returns if the player does not buy anything
             if (!buy) return;
             // Sets player variable
@@ -57,14 +64,14 @@ public class InventoryClickListener implements Listener {
                 return;
             }
             // Sets cost variable
-            double cost = ShopInventory.getShopCost();
+            double cost = shopInventory.getShopCost();
             // Sets owner variables
-            String owner = ShopInventory.getShopOwner();
-            String owner2 = ShopInventory.getShopOwner2();
+            String owner = shopInventory.getShopOwner();
+            String owner2 = shopInventory.getShopOwner2();
             // Sets the chest variable
-            Chest chest = ShopInventory.getShopChest();
+            Chest chest = shopInventory.getShopChest();
             // Sets the singleItem variable
-            boolean singleItem = ShopInventory.isSingleItem();
+            boolean singleItem = shopInventory.isSingleItem();
             // Checks if the player have enough coins
             if (cost > Balances.getPlayerBalance(String.valueOf(player.getUniqueId()))) {
                 player.sendMessage(Component.translatable("balance.notenough", errorStyle));
@@ -109,20 +116,54 @@ public class InventoryClickListener implements Listener {
                     // Update inventory after successful transaction
                     Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
                         try {
+                            // Check if chest is still valid and loaded
+                            if (chest == null || !chest.isPlaced() || !chest.getChunk().isLoaded()) {
+                                plugin.getLogger().warning("Shop chest is null or not loaded during inventory update for player " + player.getName());
+                                // Rollback transaction if chest is invalid
+                                String playerUUID = String.valueOf(player.getUniqueId());
+                                if (owner2.isEmpty()) {
+                                    Balances.executeTransaction("p2p", "rollback", owner, playerUUID, cost, "chest_disappeared");
+                                } else {
+                                    Balances.executeTransaction("p2p", "rollback", owner, playerUUID, cost/2, "chest_disappeared");
+                                    Balances.executeTransaction("p2p", "rollback", owner2, playerUUID, cost/2, "chest_disappeared");
+                                }
+                                return;
+                            }
+
                             player.getOpenInventory().getTopInventory().removeItem(boughtItem);
                             chest.getBlockInventory().removeItem(boughtItem);
                             player.getInventory().addItem(boughtItem);
+
+                            // Update shop status in database after successful purchase
+                            if (Main.SQLMode) {
+                                Location chestLoc = chest.getLocation();
+                                if (chest.getBlockInventory().isEmpty()) {
+                                    Shop.setShopEmpty(chestLoc.getBlockX(), chestLoc.getBlockY(), chestLoc.getBlockZ())
+                                        .exceptionally(ex -> {
+                                            plugin.getLogger().warning("Failed to set shop as empty after purchase: " + ex.getMessage());
+                                            return null;
+                                        });
+                                } else {
+                                    Shop.unsetShopEmpty(chestLoc.getBlockX(), chestLoc.getBlockY(), chestLoc.getBlockZ())
+                                        .exceptionally(ex -> {
+                                            plugin.getLogger().warning("Failed to unset shop as empty after purchase: " + ex.getMessage());
+                                            return null;
+                                        });
+                                }
+                            }
+
                         } catch (Exception e) {
-                            Main.getInstance().getLogger().severe("Error updating inventory after purchase: " + e.getMessage());
+                            plugin.getLogger().severe("Error updating inventory after purchase for " + player.getName() + ": " + e.getMessage());
                             // Attempt to rollback the transaction if inventory update fails
+                            String playerUUID = String.valueOf(player.getUniqueId());
                             if (owner2.isEmpty()) {
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner, String.valueOf(player.getUniqueId()), cost, "inventory_error");
+                                    owner, playerUUID, cost, "inventory_error");
                             } else {
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner, String.valueOf(player.getUniqueId()), cost/2, "inventory_error");
+                                    owner, playerUUID, cost/2, "inventory_error");
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner2, owner, cost/2, "inventory_error");
+                                    owner2, playerUUID, cost/2, "inventory_error");
                             }
                         }
                     });

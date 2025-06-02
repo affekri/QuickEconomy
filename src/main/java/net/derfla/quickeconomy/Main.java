@@ -12,6 +12,7 @@ import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,22 +40,33 @@ public class Main extends JavaPlugin {
 
         // Database and file usage
         if (getConfig().getBoolean("database.enabled")) {
-            setupSQLMode();
+            setupSQLMode().thenRunAsync(() -> {
+                AccountCache.init(); // Initialize cache after tables are ready
+            }, executorService).thenRunAsync(() -> {
+                // Plugin startup logic after successful SQL setup and cache init
+                getLogger().info("QuickEconomy has been enabled (SQL Mode)!");
+                if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
+                // Setup Metrics for SQL Mode after successful init
+                Metrics metrics = new Metrics(this, 20985);
+                metrics.addCustomChart(new Metrics.SimplePie("sql_mode", () -> "SQL-mode"));
+            }, executorService).exceptionally(e -> {
+                getLogger().severe("Failed to initialize QuickEconomy in SQL mode: " + e.getMessage());
+                if (e.getCause() != null) {
+                    getLogger().severe("Cause: " + e.getCause().getMessage());
+                }
+                getServer().getPluginManager().disablePlugin(this);
+                return null;
+            });
         } else {
             setupFileMode();
+            AccountCache.init(); // Initialize cache for file mode
+            // Plugin startup logic for File Mode
+            getLogger().info("QuickEconomy has been enabled (File Mode)!");
+            if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
+            // Setup Metrics for File Mode
+            Metrics metrics = new Metrics(this, 20985);
+            metrics.addCustomChart(new Metrics.SimplePie("sql_mode", () -> "File-mode"));
         }
-
-        AccountCache.init();
-
-        int pluginID = 20985;
-        Metrics metrics = new Metrics(this, pluginID);
-        metrics.addCustomChart(new Metrics.SimplePie("sql_mode", () -> {
-            return SQLMode ? "SQL-mode" : "File-mode";
-        }));
-
-        // Plugin startup logic
-        getLogger().info("QuickEconomy has been enabled!");
-        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
     }
 
     private void registerEvents() {
@@ -81,15 +93,17 @@ public class Main extends JavaPlugin {
             BalanceFile.convertKeys();
     }
 
-    private void setupSQLMode() {
+    private CompletableFuture<Void> setupSQLMode() {
         getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
         try {
             Utility.connectToDatabase();
             SQLMode = true;
-            TableManagement.createTables();
+            return TableManagement.createTables();
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
+            SQLMode = false;
             getServer().getPluginManager().disablePlugin(this);
+            return CompletableFuture.failedFuture(e);
         }
     }
 

@@ -1,7 +1,5 @@
 package net.derfla.quickeconomy.listener;
 
-import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.database.Shop;
 import net.derfla.quickeconomy.util.BlockOwner;
 import net.derfla.quickeconomy.util.Styles;
 import net.derfla.quickeconomy.util.TypeChecker;
@@ -36,12 +34,6 @@ public class PlayerOpenChestListener implements Listener {
         }
         if (BlockOwner.isShop(chest)) {
             BlockOwner.setShopOpen(chest, true);
-            if(Main.SQLMode){
-                String coordinates = chest.getLocation().getBlockX() + "," +
-                        chest.getLocation().getBlockY() + "," +
-                        chest.getLocation().getBlockZ();
-                Shop.removeEmptyShop(coordinates);
-            }
         }
     }
 }

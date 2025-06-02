@@ -71,38 +71,6 @@ public class Autopay {
         });
     }
 
-    public static CompletableFuture<List<Map<String, Object>>> viewAutopays(@NotNull String uuid) {
-        String trimmedUuid = TypeChecker.trimUUID(uuid);
-        String sql = "SELECT a.AutopayID, a.AutopayName, a.Amount, pa.PlayerName AS DestinationName, a.InverseFrequency, a.TimesLeft " +
-                "FROM Autopays a " +
-                "JOIN PlayerAccounts pa ON a.Destination = pa.UUID " +
-                "WHERE a.Source = ? " +
-                "ORDER BY a.AutopayDatetime DESC";
-
-        return Utility.executeQueryAsync(conn -> {
-            List<Map<String, Object>> autopays = new ArrayList<>();
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, trimmedUuid);
-
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    ResultSetMetaData metaData = rs.getMetaData();
-                    int columnCount = metaData.getColumnCount();
-
-                    while (rs.next()) {
-                        Map<String, Object> autopay = new HashMap<>();
-                        for (int i = 1; i <= columnCount; i++) {
-                            String columnName = metaData.getColumnName(i);
-                            Object value = rs.getObject(i);
-                            autopay.put(columnName, value);
-                        }
-                        autopays.add(autopay);
-                    }
-                }
-            }
-            return autopays; // Return the list of autopays
-        });
-    }
-
     public static CompletableFuture<Void> stateChangeAutopay(boolean activeState, int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
@@ -142,9 +110,9 @@ public class Autopay {
 
                 int rowsAffected = pstmt.executeUpdate();
                 if (rowsAffected > 0) {
-                    plugin.getLogger().info("Autopay deleted successfully");
+                    plugin.getLogger().info("Autopay #" + autopayID + " deleted successfully");
                 } else {
-                    plugin.getLogger().info("Autopay not found. No deletion was performed.");
+                    plugin.getLogger().info("Autopay #" + autopayID + " not found. No deletion was performed.");
                 }
             }
         }).exceptionally(ex -> {
@@ -153,4 +121,37 @@ public class Autopay {
             throw new CompletionException(ex);
         });
     }
+
+    public static CompletableFuture<List<Map<String, Object>>> viewAutopays(@NotNull String uuid) {
+        String trimmedUuid = TypeChecker.trimUUID(uuid);
+        String sql = "SELECT a.AutopayID, a.AutopayName, a.Amount, pa.PlayerName AS DestinationName, a.InverseFrequency, a.TimesLeft " +
+                "FROM Autopays a " +
+                "JOIN PlayerAccounts pa ON a.Destination = pa.UUID " +
+                "WHERE a.Source = ? " +
+                "ORDER BY a.AutopayDatetime DESC";
+
+        return Utility.executeQueryAsync(conn -> {
+            List<Map<String, Object>> autopays = new ArrayList<>();
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, trimmedUuid);
+
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    while (rs.next()) {
+                        Map<String, Object> autopay = new HashMap<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            String columnName = metaData.getColumnName(i);
+                            Object value = rs.getObject(i);
+                            autopay.put(columnName, value);
+                        }
+                        autopays.add(autopay);
+                    }
+                }
+            }
+            return autopays; // Return the list of autopays
+        });
+    }
+    
 }

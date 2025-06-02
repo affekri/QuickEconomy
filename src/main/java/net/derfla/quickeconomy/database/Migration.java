@@ -19,7 +19,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static net.derfla.quickeconomy.database.AccountManagement.addAccount;
-import static net.derfla.quickeconomy.database.AccountManagement.setPlayerBalance;
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
 public class Migration {
@@ -62,7 +61,8 @@ public class Migration {
                                     // Handle the callback if needed
                                 });
                             } else {
-                                return setPlayerBalance(trimmedUuid, balance, change);
+                                return AccountManagement.setPlayerBalance(trimmedUuid, balance)
+                                    .thenCompose(v -> AccountManagement.setPlayerBalanceChange(trimmedUuid, change));
                             }
                         });
 

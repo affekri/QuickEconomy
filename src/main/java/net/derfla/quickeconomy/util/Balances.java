@@ -55,7 +55,8 @@ public class Balances {
         AccountCache.getPlayerAccount(trimmedUUID).balance(newBalance);
 
         if (Main.SQLMode) {
-            AccountManagement.setPlayerBalance(uuid, newBalance, getPlayerBalanceChange(trimmedUUID)).join();
+            AccountManagement.setPlayerBalance(uuid, newBalance).join();
+            AccountManagement.setPlayerBalanceChange(trimmedUUID, getPlayerBalanceChange(trimmedUUID)).join();
         } else {
             FileConfiguration file = BalanceFile.get();
             if (file == null){

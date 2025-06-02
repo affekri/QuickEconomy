@@ -1,8 +1,8 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.Shop;
 import net.derfla.quickeconomy.util.BlockOwner;
-import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.Styles;
 import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
@@ -40,7 +40,7 @@ public class PlayerOpenChestListener implements Listener {
                 String coordinates = chest.getLocation().getBlockX() + "," +
                         chest.getLocation().getBlockY() + "," +
                         chest.getLocation().getBlockZ();
-                DatabaseManager.removeEmptyShop(coordinates);
+                Shop.removeEmptyShop(coordinates);
             }
         }
     }

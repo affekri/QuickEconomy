@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.Shop;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -40,7 +41,7 @@ public class ShopInventory implements InventoryHolder {
             if (Main.SQLMode) {
                 // Store empty shop details in the database
                 String coordinates = chest.getLocation().getBlockX() + "," + chest.getLocation().getBlockY() + "," + chest.getLocation().getBlockZ();
-                if (DatabaseManager.insertEmptyShop(coordinates, owner, owner2).join()) {
+                if (Shop.insertEmptyShop(coordinates, owner, owner2).join()) {
                     // Notify the shop owners
                     if (Main.getInstance().getConfig().getBoolean("shop.emptyShopOwnerMessage")) {
                         if (!owner.isEmpty()) {

@@ -1,6 +1,8 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.Shop;
+import net.derfla.quickeconomy.database.TableManagement;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -56,13 +58,14 @@ public class PlayerJoinListener implements Listener {
 
                 // Handle empty shops list if enabled
                 if (Main.SQLMode && plugin.getConfig().getBoolean("shop.emptyShopListJoin")) {
-                    DatabaseManager.displayEmptyShopsView(uuid)
+                    Shop.displayEmptyShopsView(uuid)
                         .thenAccept(emptyShops -> {
                             if (emptyShops != null && !emptyShops.isEmpty()) {
                                 int emptyShopCount = emptyShops.size();
+                                String shopCoordinates = String.join(", ", emptyShops);
                                 Bukkit.getScheduler().runTask(plugin, () -> 
-                                    player.sendMessage(Component.translatable("shop.empty.list", 
-                                        Component.text(emptyShopCount)).style(Styles.INFOSTYLE)));
+                                    player.sendMessage(Component.translatable("shop.inventory.empty.list", 
+                                        Component.text(emptyShopCount), Component.text(shopCoordinates)).style(Styles.INFOSTYLE)));
                             }
                         })
                         .exceptionally(ex -> {

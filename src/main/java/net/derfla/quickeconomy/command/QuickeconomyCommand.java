@@ -1,7 +1,10 @@
 package net.derfla.quickeconomy.command;
 
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.util.DatabaseManager;
+import net.derfla.quickeconomy.database.Migration;
+import net.derfla.quickeconomy.database.System;
+import net.derfla.quickeconomy.database.TableManagement;
+import net.derfla.quickeconomy.database.Utility;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
@@ -35,7 +38,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         break;
                     }
                     if(Main.SQLMode) {
-                        DatabaseManager.migrateToBalanceFile();
+                        Migration.migrateToBalanceFile();
                         plugin.getConfig().set("database.enabled", false);
                         plugin.saveConfig();
                         Main.SQLMode = false;
@@ -44,8 +47,8 @@ public class QuickeconomyCommand implements TabExecutor {
                     } else {
                         boolean connectedAndSetup = false;
                         try{
-                            DatabaseManager.connectToDatabase();
-                            DatabaseManager.createTables();
+                            Utility.connectToDatabase();
+                            TableManagement.createTables();
                             plugin.getConfig().set("database.enabled", true);
                             plugin.saveConfig();
                             Main.SQLMode = true;
@@ -60,7 +63,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         }
 
                         if (connectedAndSetup) {
-                            DatabaseManager.migrateToDatabase();
+                            Migration.migrateToDatabase();
                         }
                         return true;
                     }
@@ -97,7 +100,7 @@ public class QuickeconomyCommand implements TabExecutor {
                     }
                     
                     // Execute rollback asynchronously and handle the result
-                    DatabaseManager.rollback(timestampString).whenComplete((result, ex) -> {
+                    System.rollback(timestampString).whenComplete((result, ex) -> {
                         if (ex != null) {
                             sender.sendMessage(Component.translatable("qecommand.rollback.fail").style(Styles.ERRORSTYLE));
                             plugin.getLogger().info("Rollback failed: " + ex.getMessage());
@@ -112,7 +115,7 @@ public class QuickeconomyCommand implements TabExecutor {
                         break;
                     }
                     String storageMethod = Main.SQLMode ? "SQL Server" : "File";
-                    String connections = Main.SQLMode ? "(" + DatabaseManager.dataSource.getMaximumPoolSize() + ")" : "";
+                    String connections = Main.SQLMode ? "(" + Utility.dataSource.getMaximumPoolSize() + ")" : "";
                     sender.sendMessage(Component.translatable("qecommand.setup", Component.text(storageMethod + " " + connections), Component.text(plugin.getPluginMeta().getVersion())).style(Styles.INFOSTYLE));
                     if(DerflaAPI.updateAvailable()) {
                         sender.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));

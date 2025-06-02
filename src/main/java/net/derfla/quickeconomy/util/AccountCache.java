@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.AccountManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
@@ -25,8 +26,9 @@ public class AccountCache {
      */
     public static void init() {
         if(Main.SQLMode) {
-            accountMap = DatabaseManager.listAllAccounts().join();
+            accountMap = AccountManagement.listAllAccounts().join();
         } else {
+            accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();
             ConfigurationSection players = file.getConfigurationSection("players");
             for(String uuid : players.getKeys(false)){

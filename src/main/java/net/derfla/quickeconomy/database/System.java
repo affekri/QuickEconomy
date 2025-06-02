@@ -18,6 +18,15 @@ public class System {
 
     static Plugin plugin = Main.getInstance();
 
+    
+    /**
+     * Rolls back the database to a specified point in time, undoing all transactions and additions to database tables made after the given datetime.
+     * 
+     * @param targetDateTime The target datetime to which the database should be rolled back, in a format recognized by the system.
+     * @return A CompletableFuture that completes when the rollback operation has finished, either successfully or with an error.
+     * @throws IllegalStateException if the rollback validation fails.
+     * @throws CompletionException if an error occurs during the rollback process.
+     */
     public static CompletableFuture<Void> rollback(String targetDateTime) {
         // Validate input
         return validateRollbackInput(targetDateTime).thenCompose(isValid -> {
@@ -135,8 +144,18 @@ public class System {
                                         plugin.getLogger().info("Reset account creation dates that are after " + targetDateTime);
                                     }
 
+                                    // 8. Reset BalChange for all accounts
+                                    String resetBalChangeSQL = "UPDATE PlayerAccounts SET BalChange = 0;";
+                                    try (PreparedStatement pstmtResetBalChange = conn.prepareStatement(resetBalChangeSQL)) {
+                                        int rowsUpdated = pstmtResetBalChange.executeUpdate();
+                                        plugin.getLogger().info("Reset BalChange to 0 for " + rowsUpdated + " accounts during rollback.");
+                                    }
+
                                     conn.commit(); // Commit transaction
                                     plugin.getLogger().info("Successfully rolled back database to " + targetDateTime);
+
+                                    // After successful DB commit, clear BalChange in cache
+                                    net.derfla.quickeconomy.util.AccountCache.clearAllCachedBalanceChanges();
 
                                 } catch (SQLException e) {
                                     plugin.getLogger().warning("SQLException during rollback transaction, attempting to rollback...: " + e.getMessage());
@@ -188,6 +207,12 @@ public class System {
         });
     }
 
+    /**
+     * Validates the input for the rollback operation.
+     * 
+     * @param targetDateTime The target datetime to which the database should be rolled back, in a format recognized by the system.
+     * @return A CompletableFuture that resolves to true if the rollback is valid, false otherwise.
+     */
     private static CompletableFuture<Boolean> validateRollbackInput(String targetDateTime) {
         // Validate targetDateTime
         final String targetDateTimeUTC;

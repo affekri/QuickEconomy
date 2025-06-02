@@ -23,6 +23,17 @@ public class Autopay {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Adds a new autopay to the database.
+     * 
+     * @param autopayName The name of the autopay.
+     * @param uuid The UUID of the source player (owner of the autopay).
+     * @param destination The UUID of the destination player.
+     * @param amount The amount of money to be paid with each transaction.
+     * @param inverseFrequency The frequency of the autopay (every x days).
+     * @param timesLeft The number of times the autopay will be executed.
+     * @return A CompletableFuture that completes when the autopay has been added.
+    */
     public static CompletableFuture<Void> addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
                                                      double amount, int inverseFrequency, int timesLeft) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
@@ -71,6 +82,14 @@ public class Autopay {
         });
     }
 
+    /**
+     * Changes the active state of an autopay.
+     * 
+     * @param activeState The new active state of the autopay, true for active, false for inactive.
+     * @param autopayID The ID of the autopay to be updated.
+     * @param uuid The UUID of the source player (owner of the autopay).
+     * @return A CompletableFuture that completes when the autopay has been updated.
+     */
     public static CompletableFuture<Void> stateChangeAutopay(boolean activeState, int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
@@ -99,6 +118,13 @@ public class Autopay {
         });
     }
 
+    /**
+     * Deletes an autopay from the database.
+     * 
+     * @param autopayID The ID of the autopay to be deleted.
+     * @param uuid The UUID of the source player (owner of the autopay).
+     * @return A CompletableFuture that completes when the autopay has been deleted.
+     */
     public static CompletableFuture<Void> deleteAutopay(int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "DELETE FROM Autopays WHERE AutopayID = ? AND Source = ?;";
@@ -122,6 +148,12 @@ public class Autopay {
         });
     }
 
+    /**
+     * Displays the autopays view for a given player.
+     * 
+     * @param uuid The UUID of the player whose autopays view is to be displayed.
+     * @return A CompletableFuture that resolves to a list of autopays.
+     */
     public static CompletableFuture<List<Map<String, Object>>> viewAutopays(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT a.AutopayID, a.AutopayName, a.Amount, pa.PlayerName AS DestinationName, a.InverseFrequency, a.TimesLeft " +

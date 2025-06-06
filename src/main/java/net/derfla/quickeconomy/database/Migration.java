@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.database;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.file.BalanceFile;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
 import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -174,7 +173,7 @@ public class Migration {
         String csvFilePath = "QE_DatabaseExport.csv";
         int batchSize = 100;
 
-        return DatabaseRetryUtil.withRetry(() -> Utility.getConnectionAsync().thenComposeAsync(conn -> {
+        return RetryUtility.withRetry(() -> Utility.getConnectionAsync().thenComposeAsync(conn -> {
             if (conn == null) {
                 plugin.getLogger().severe("Database export failed: Could not obtain database connection.");
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for export."));

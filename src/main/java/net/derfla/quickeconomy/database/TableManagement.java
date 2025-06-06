@@ -30,7 +30,7 @@ public class TableManagement {
 
             String PlayerAccounts = "CREATE TABLE IF NOT EXISTS PlayerAccounts ("
                     + "  UUID char(32) NOT NULL,"
-                    + "  AccountDatetime varchar(23) NOT NULL,"
+                    + "  AccountDatetime DATETIME NOT NULL,"
                     + "  PlayerName varchar(16) NOT NULL,"
                     + "  Balance DECIMAL(19, 2) NOT NULL DEFAULT 0,"
                     + "  BalChange DECIMAL(19, 2) NOT NULL DEFAULT 0,"
@@ -40,7 +40,7 @@ public class TableManagement {
 
             String Transactions = "CREATE TABLE IF NOT EXISTS Transactions ("
                     + "  TransactionID bigint NOT NULL AUTO_INCREMENT,"
-                    + "  TransactionDatetime varchar(23) NOT NULL,"
+                    + "  TransactionDatetime DATETIME NOT NULL,"
                     + "  TransactionType varchar(16) NOT NULL,"
                     + "  Induce varchar(16) NOT NULL,"
                     + "  Source char(32),"

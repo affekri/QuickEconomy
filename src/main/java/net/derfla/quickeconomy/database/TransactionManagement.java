@@ -2,7 +2,6 @@ package net.derfla.quickeconomy.database;
 
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.util.Balances;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
 import net.derfla.quickeconomy.util.TypeChecker;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -26,26 +25,10 @@ public class TransactionManagement {
         String trimmedSource = source != null ? TypeChecker.trimUUID(source) : null;
         String trimmedDestination = destination != null ? TypeChecker.trimUUID(destination) : null;
 
-        // Create final variables for transaction parameters
-        final String finalSource;
-        final String finalDestination;
-        final double finalAmount;
-
-        // Ensure consistent ordering of account updates
-        if (trimmedSource != null && trimmedDestination != null && trimmedSource.compareTo(trimmedDestination) > 0) {
-            finalSource = trimmedDestination;
-            finalDestination = trimmedSource;
-            finalAmount = -amount;
-        } else {
-            finalSource = trimmedSource;
-            finalDestination = trimmedDestination;
-            finalAmount = amount;
-        }
-
         Instant currentTime = Instant.now();
         String currentUTCTimeString = currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
 
-        return DatabaseRetryUtil.withRetry(() -> Utility.executeUpdateAsync(conn -> {
+        return RetryUtility.withRetry(() -> Utility.executeUpdateAsync(conn -> {
             conn.setAutoCommit(false);
             conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 
@@ -58,38 +41,38 @@ public class TransactionManagement {
 
                 // Update source account balance if applicable
                 Double newSourceBalance = null;
-                if (finalSource != null) {
+                if (trimmedSource != null) {
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateSource.setString(1, finalSource);
+                        pstmtUpdateSource.setString(1, trimmedSource);
                         ResultSet rs = pstmtUpdateSource.executeQuery();
                         if (rs.next()) {
-                            newSourceBalance = rs.getDouble(1) - finalAmount;  // Calculate new source balance
+                            newSourceBalance = rs.getDouble(1) - amount;  // Calculate new source balance
                         }
                     }
 
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(sqlUpdateSource)) {
-                        pstmtUpdateSource.setDouble(1, finalAmount);
-                        pstmtUpdateSource.setString(2, finalSource);
+                        pstmtUpdateSource.setDouble(1, amount);
+                        pstmtUpdateSource.setString(2, trimmedSource);
                         pstmtUpdateSource.executeUpdate();
                     }
                 }
 
                 // Update destination account balance if applicable
                 Double newDestinationBalance = null;
-                if (finalDestination != null) {
+                if (trimmedDestination != null) {
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateDestination.setString(1, finalDestination);
+                        pstmtUpdateDestination.setString(1, trimmedDestination);
                         ResultSet rs = pstmtUpdateDestination.executeQuery();
                         if (rs.next()) {
-                            newDestinationBalance = rs.getDouble(1) + finalAmount;  // Calculate new destination balance
+                            newDestinationBalance = rs.getDouble(1) + amount;  // Calculate new destination balance
                         }
                     }
 
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(sqlUpdateDestination)) {
-                        pstmtUpdateDestination.setDouble(1, finalAmount);
-                        pstmtUpdateDestination.setString(2, finalDestination);
+                        pstmtUpdateDestination.setDouble(1, amount);
+                        pstmtUpdateDestination.setString(2, trimmedDestination);
                         pstmtUpdateDestination.executeUpdate();
                     }
                 }
@@ -99,11 +82,11 @@ public class TransactionManagement {
                     pstmtInsertTransaction.setString(1, currentUTCTimeString); // Use the formatted UTC SSS time
                     pstmtInsertTransaction.setString(2, transactType);                   // TransactionType
                     pstmtInsertTransaction.setString(3, induce);                         // Induce
-                    pstmtInsertTransaction.setString(4, finalSource);                  // Source
-                    pstmtInsertTransaction.setString(5, finalDestination);             // Destination
+                    pstmtInsertTransaction.setString(4, trimmedSource);                  // Source
+                    pstmtInsertTransaction.setString(5, trimmedDestination);             // Destination
                     pstmtInsertTransaction.setObject(6, newSourceBalance);               // NewSourceBalance (nullable)
                     pstmtInsertTransaction.setObject(7, newDestinationBalance);          // NewDestinationBalance (nullable)
-                    pstmtInsertTransaction.setDouble(8, finalAmount);                         // Amount
+                    pstmtInsertTransaction.setDouble(8, amount);                         // Amount
                     pstmtInsertTransaction.setInt(9, 1);                               // Passed (always 1 if successful)
                     pstmtInsertTransaction.setString(10, transactionMessage);            // TransactionMessage
                     pstmtInsertTransaction.executeUpdate();
@@ -111,15 +94,15 @@ public class TransactionManagement {
 
                 // Commit the transaction
                 conn.commit();
-                Balances.addPlayerBalanceChange(finalDestination, finalAmount);
+                if (trimmedDestination != null) Balances.addPlayerBalanceChange(trimmedDestination, amount);
             } catch (SQLException e) {
                 conn.rollback();
-                if(finalDestination != null && finalSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + finalSource + " to " + finalDestination + ": " + e.getMessage());
-                } else if (finalSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + finalSource + ": " + e.getMessage());
-                } else if (finalDestination != null) {
-                    plugin.getLogger().severe("Error executing transaction to " + finalDestination + ": " + e.getMessage());
+                if(trimmedDestination != null && trimmedSource != null) {
+                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + " to " + trimmedDestination + ": " + e.getMessage());
+                } else if (trimmedSource != null) {
+                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + ": " + e.getMessage());
+                } else if (trimmedDestination != null) {
+                    plugin.getLogger().severe("Error executing transaction to " + trimmedDestination + ": " + e.getMessage());
                 } else {
                     plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
                 }

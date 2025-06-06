@@ -1,4 +1,4 @@
-package net.derfla.quickeconomy.util;
+package net.derfla.quickeconomy.database;
 
 import java.sql.SQLException;
 import java.sql.SQLTransientException;
@@ -6,7 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
-public class DatabaseRetryUtil {
+public class RetryUtility {
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_DELAY_MS = 1000;
 
@@ -48,10 +48,10 @@ public class DatabaseRetryUtil {
             if (sqlState != null) {
                 // Common transient error states
                 return sqlState.startsWith("08") || // Connection errors
-                       sqlState.startsWith("40") || // Transaction errors
-                       sqlState.startsWith("53");   // Insufficient resources
+                        sqlState.startsWith("40") || // Transaction errors
+                        sqlState.startsWith("53");   // Insufficient resources
             }
         }
         return false;
     }
-} 
+}

@@ -3,7 +3,6 @@ package net.derfla.quickeconomy.database;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.util.DatabaseRetryUtil;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,7 +31,7 @@ public class Utility {
     }
 
     public static <T> CompletableFuture<T> executeQueryAsync(Utility.SQLFunction<Connection, T> queryFunction) {
-        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
+        return RetryUtility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }
@@ -48,7 +47,7 @@ public class Utility {
     }
 
     public static CompletableFuture<Void> executeUpdateAsync(Utility.SQLConsumer<Connection> updateAction) {
-        return DatabaseRetryUtil.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
+        return RetryUtility.withRetry(() -> getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
                 return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection."));
             }

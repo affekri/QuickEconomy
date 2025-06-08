@@ -4,6 +4,7 @@ import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
 import net.derfla.quickeconomy.database.TableManagement;
+import net.derfla.quickeconomy.database.UpgradeUtility;
 import net.derfla.quickeconomy.database.Utility;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
@@ -34,7 +35,6 @@ public class Main extends JavaPlugin {
         registerEvents();
 
         // Config file
-        getConfig().options().copyDefaults(true);
         saveDefaultConfig();
 
         // Database and file usage
@@ -87,6 +87,7 @@ public class Main extends JavaPlugin {
             Utility.connectToDatabase();
             SQLMode = true;
             TableManagement.createTables();
+            if (UpgradeUtility.requiresUpgrade()) UpgradeUtility.startUpgrades();
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);

@@ -54,7 +54,7 @@ public class Balances {
 
     public static void addPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        addPlayerBalanceChange(trimmedUUID, money);
+        if (uuid != null) addPlayerBalanceChange(trimmedUUID, money);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) + money);
     }
 

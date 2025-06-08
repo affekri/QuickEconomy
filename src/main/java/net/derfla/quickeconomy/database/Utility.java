@@ -96,7 +96,7 @@ public class Utility {
             config.setUsername(user);
             config.setPassword(password);
 
-            int poolSize = plugin.getConfig().getInt("poolSize");
+            int poolSize = plugin.getConfig().getInt("database.poolSize");
             if (poolSize < 1 || poolSize > 50) {
                 poolSize = 10;
                 plugin.getLogger().warning("Database pool size must be between 1 and 50, using default (10).");

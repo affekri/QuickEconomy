@@ -24,7 +24,7 @@ public class InventoryClickListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         // Filter out bad events
-        if (event.getInventory() == null || event.getCurrentItem() == null) return;
+        if (event.getCurrentItem() == null) return;
         if (event.getCurrentItem().getType().equals(Material.AIR)) return;
 
         InventoryType inventoryType = event.getClickedInventory().getType();
@@ -85,25 +85,14 @@ public class InventoryClickListener implements Listener {
             // Handle the transaction asynchronously
             CompletableFuture.runAsync(() -> {
                 try {
+                    String playerUUID = String.valueOf(player.getUniqueId());
                     if (owner2.isEmpty()) {
                         // Single owner transaction
-                        Balances.executeTransaction("p2p", "purchase", 
-                            String.valueOf(player.getUniqueId()), owner, cost, "");
+                        Balances.executeTransaction("p2p", "purchase",
+                                playerUUID, owner, cost, "");
                     } else {
-                        // Two owners - execute as a single atomic transaction
-                        String playerUUID = String.valueOf(player.getUniqueId());
-                        // Sort UUIDs to prevent deadlocks (handled in DatabaseManager)
-                        if (playerUUID.compareTo(owner) > 0) {
-                            Balances.executeTransaction("p2p", "purchase", owner, playerUUID, -cost/2, "");
-                        } else {
-                            Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "");
-                        }
-                        
-                        if (owner.compareTo(owner2) > 0) {
-                            Balances.executeTransaction("p2p", "purchase", owner2, owner, cost/2, "");
-                        } else {
-                            Balances.executeTransaction("p2p", "purchase", owner, owner2, cost/2, "");
-                        }
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "");
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner2, cost/2, "");
                     }
 
                     // Update inventory after successful transaction
@@ -114,7 +103,7 @@ public class InventoryClickListener implements Listener {
                             player.getInventory().addItem(boughtItem);
                         } catch (Exception e) {
                             Main.getInstance().getLogger().severe("Error updating inventory after purchase: " + e.getMessage());
-                            // Attempt to rollback the transaction if inventory update fails
+                            // Attempt to roll back the transaction if inventory update fails
                             if (owner2.isEmpty()) {
                                 Balances.executeTransaction("p2p", "rollback", 
                                     owner, String.valueOf(player.getUniqueId()), cost, "inventory_error");

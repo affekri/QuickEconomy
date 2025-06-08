@@ -1,6 +1,8 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.AccountManagement;
+import net.derfla.quickeconomy.database.TransactionManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -17,7 +19,7 @@ public class Balances {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         if (Main.SQLMode) {
-            double balance = DatabaseManager.displayBalance(trimmedUUID).join();
+            double balance = AccountManagement.displayBalance(trimmedUUID).join();
             return balance;
         }
 
@@ -37,7 +39,7 @@ public class Balances {
 
         AccountCache.getPlayerAccount(trimmedUUID).balance(money);
         if (Main.SQLMode) {
-            DatabaseManager.setPlayerBalance(uuid, money, 0).join();
+            AccountManagement.setPlayerBalance(uuid, money, 0).join();
             return;
         }
 
@@ -73,7 +75,7 @@ public class Balances {
 
         if(Main.SQLMode) {
 
-            DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
+            AccountManagement.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
         }
 
@@ -98,7 +100,7 @@ public class Balances {
         if(AccountCache.accountExists(trimmedUUID)) return true;
 
         if(Main.SQLMode) {
-            return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
+            return (boolean) AccountManagement.accountExists(trimmedUUID).join();
 
         }
 
@@ -113,7 +115,7 @@ public class Balances {
         String destinationUUID = TypeChecker.trimUUID(destination);
 
         if(Main.SQLMode) {
-            DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
+            TransactionManagement.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
             if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
             if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
             return;
@@ -132,7 +134,7 @@ public class Balances {
 
         if (Main.SQLMode) {
 
-            DatabaseManager.updatePlayerName(uuid, name).join();
+            AccountManagement.updatePlayerName(uuid, name).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();
@@ -164,7 +166,7 @@ public class Balances {
         AccountCache.addAccount(uuid, name);
 
         if (Main.SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
+            AccountManagement.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();

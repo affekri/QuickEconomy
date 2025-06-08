@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.command;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.TransactionManagement;
 import net.derfla.quickeconomy.util.*;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.kyori.adventure.text.Component;
@@ -187,7 +188,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     }
                 }
                 
-                String transactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page).join());
+                String transactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page).join());
                 
                 // Check if the user has any transactions at all
                 if (page == 1 && transactions.isEmpty()) {
@@ -200,7 +201,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     // Find the total number of pages by checking backwards
                     int lastValidPage = 1;
                     for (int checkPage = page - 1; checkPage >= 1; checkPage--) {
-                        String checkTransactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, checkPage).join());
+                        String checkTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, checkPage).join());
                         if (!checkTransactions.isEmpty()) {
                             lastValidPage = checkPage;
                             break;
@@ -216,7 +217,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                 }
                 
                 // Check if there are more transactions on the next page
-                String nextPageTransactions = String.valueOf(DatabaseManager.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page + 1).join());
+                String nextPageTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page + 1).join());
                 boolean hasNextPage = !nextPageTransactions.isEmpty();
                 
                 // Display transactions with pagination controls

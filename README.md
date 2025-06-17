@@ -33,7 +33,11 @@ The `/bal` command has the same functionality as `/balance`.
 
 ### QuickEconomy  
 
-The `/quickeconomy` command displays helpful information about the plugin. The subcommand 
+The `/quickeconomy` command displays helpful information about the plugin. This command also has some subcommands:  
+`/quickeconomy setup` shows your current plugin setup.  
+`/quickeconomy migrate` lets you migrate from file mode to SQL mode or the other way around.
+`/quickeconomy rollback` lets you reset all balances and transactions to a past date and time. This only works in SQL mode.  
+
 
 ## Signs  
 

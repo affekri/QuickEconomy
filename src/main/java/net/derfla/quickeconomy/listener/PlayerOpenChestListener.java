@@ -1,20 +1,17 @@
 package net.derfla.quickeconomy.listener;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.Shop;
 import net.derfla.quickeconomy.util.BlockOwner;
-import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.Styles;
 import net.derfla.quickeconomy.util.TypeChecker;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.player.PlayerInteractEvent;
 
 public class PlayerOpenChestListener implements Listener {
 
@@ -43,7 +40,7 @@ public class PlayerOpenChestListener implements Listener {
                 String coordinates = chest.getLocation().getBlockX() + "," +
                         chest.getLocation().getBlockY() + "," +
                         chest.getLocation().getBlockZ();
-                DatabaseManager.removeEmptyShop(coordinates);
+                Shop.removeEmptyShop(coordinates);
             }
         }
     }

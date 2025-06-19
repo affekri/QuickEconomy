@@ -3,10 +3,12 @@ package net.derfla.quickeconomy;
 import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
+import net.derfla.quickeconomy.database.TableManagement;
+import net.derfla.quickeconomy.database.UpgradeUtility;
+import net.derfla.quickeconomy.database.Utility;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
 import net.derfla.quickeconomy.util.AccountCache;
-import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -18,7 +20,7 @@ public class Main extends JavaPlugin {
 
 
     public static boolean SQLMode = false;
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private static final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     @Override
     public void onEnable() {
@@ -33,7 +35,6 @@ public class Main extends JavaPlugin {
         registerEvents();
 
         // Config file
-        getConfig().options().copyDefaults(true);
         saveDefaultConfig();
 
         // Database and file usage
@@ -83,9 +84,10 @@ public class Main extends JavaPlugin {
     private void setupSQLMode() {
         getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
         try {
-            DatabaseManager.connectToDatabase();
+            Utility.connectToDatabase();
             SQLMode = true;
-            DatabaseManager.createTables();
+            TableManagement.createTables();
+            if (UpgradeUtility.requiresUpgrade()) UpgradeUtility.startUpgrades();
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
@@ -95,8 +97,8 @@ public class Main extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
-        DatabaseManager.closePool();
-        DatabaseManager.shutdownExecutorService(); // Shutdown async thread handler (for database operations)
+        Utility.closePool();
+        Utility.shutdownExecutorService(); // Shutdown async thread handler (for database operations)
     }
 
     public static Main getInstance() {

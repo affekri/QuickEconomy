@@ -3,12 +3,12 @@
 # QuickEconomy
 
 A lightweight economy plugin for Minecraft servers running PaperMC.  
-**Update 1.1.1 is live!**  
-[Upgrade guide](https://docs.derfla.net/quickeconomy/usage/upgrade/to_1_1/)  
+**Version 1.2 is live!**  
+[Upgrade guide](https://docs.derfla.net/quickeconomy/usage/upgrade/to_1_2/)  
 
 [![GitHub issues](https://img.shields.io/github/issues-raw/affekri/QuickEconomy)](https://github.com/affekri/QuickEconomy/issues)
-[![Modrinth Downloads](https://img.shields.io/modrinth/dt/TT2OA0w5)](https://modrinth.com/plugin/quickeconomy/versions)
-[![Modrinth Version](https://img.shields.io/modrinth/v/TT2OA0w5)](https://modrinth.com/plugin/quickeconomy/versions)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/TT2OA0w5?logo=modrinth)](https://modrinth.com/plugin/quickeconomy/versions)
+[![Modrinth Version](https://img.shields.io/modrinth/v/TT2OA0w5)](https://modrinth.com/plugin/quickeconomy/changelog)
 
 [![QuickEconomy Stats](https://bstats.org/signatures/bukkit/QuickEconomy.svg)](https://bstats.org/plugin/bukkit/QuickEconomy/20985)
 
@@ -33,7 +33,11 @@ The `/bal` command has the same functionality as `/balance`.
 
 ### QuickEconomy  
 
-The `/quickeconomy` command displays helpful information about the plugin. The subcommand 
+The `/quickeconomy` command displays helpful information about the plugin. This command also has some subcommands:  
+`/quickeconomy setup` shows your current plugin setup.  
+`/quickeconomy migrate` lets you migrate from file mode to SQL mode or the other way around.
+`/quickeconomy rollback` lets you reset all balances and transactions to a past date and time. This only works in SQL mode.  
+
 
 ## Signs  
 

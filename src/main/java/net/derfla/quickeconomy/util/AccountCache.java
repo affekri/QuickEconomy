@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.AccountManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
@@ -25,8 +26,9 @@ public class AccountCache {
      */
     public static void init() {
         if(Main.SQLMode) {
-            accountMap = DatabaseManager.listAllAccounts().join();
+            accountMap = AccountManagement.listAllAccounts().join();
         } else {
+            accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();
             ConfigurationSection players = file.getConfigurationSection("players");
             for(String uuid : players.getKeys(false)){
@@ -93,7 +95,21 @@ public class AccountCache {
      * @param uuid The UUID of the player.
      * @return True if the UUID is present in the cache. False if it's not.
      */
-    public static boolean accountExists(String uuid) {
+    public static boolean accountExistsUUID(String uuid) {
         return accountMap.containsKey(uuid);
+    }
+
+    /**
+     * Checks if the provided player name exists in the account cache.
+     * @param playerName The name of the player.
+     * @return True if the name is present in the cache. False if it's not.
+     */
+    public static boolean accountExistsName(String playerName) {
+        for(PlayerAccount account : accountMap.values()) {
+            if (playerName.equals(account.name())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

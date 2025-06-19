@@ -58,6 +58,7 @@ public class PlayerAccount {
      */
     @Override
     public String toString() {
-        return name + ": " + balance + " (Created: " + createdTime + ")";
+        String[] splitTime = createdTime.split(" ");
+        return name + ": " + balance + " (Created: " + splitTime[0] + ")";
     }
 }

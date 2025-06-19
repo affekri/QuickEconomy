@@ -11,26 +11,26 @@ import java.time.ZoneOffset;
 
 public class TypeChecker {
 
-    public static boolean isFloat(String string) {
+    public static boolean isDouble(String string) {
         try {
-            Float.parseFloat(string);
+            Double.parseDouble(string);
         } catch (Exception e) {
             return false;
         }
         return true;
     }
 
-    public static float formatFloat(float inputFloat) {
+    public static double formatDouble(double inputDouble) {
         // Extract integer and decimal parts
-        int integerPart = (int) Math.floor(inputFloat);
-        float decimalPart = inputFloat - integerPart;
+        int integerPart = (int) Math.floor(inputDouble);
+        double decimalPart = inputDouble - integerPart;
 
         // Multiply decimal part by 100 to get two decimal places as integers
         int decimalPartInt = (int) Math.round(decimalPart * 100);
 
         // Combine integer and decimal parts with "."
-        String formattedFloat = String.format("%d.%02d", integerPart, decimalPartInt);
-        return Float.parseFloat(formattedFloat);
+        String formattedDouble = String.format("%d.%02d", integerPart, decimalPartInt);
+        return Double.parseDouble(formattedDouble);
     }
 
     public static String getRawString(Component component) {
@@ -105,7 +105,18 @@ public class TypeChecker {
 
     public static String convertToLocalTime(String dateString) {
         // Parse the input date string to LocalDateTime
-        LocalDateTime localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        LocalDateTime localDateTime;
+        try {
+            // Try parsing with milliseconds first
+            localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+        } catch (Exception e) {
+            try {
+                // Fall back to parsing without milliseconds
+                localDateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } catch (Exception ex) {
+                throw new RuntimeException("Unable to parse date string: " + dateString, ex);
+            }
+        }
         // Convert LocalDateTime to ZonedDateTime in UTC
         ZonedDateTime utcDateTime = localDateTime.atZone(ZoneOffset.UTC);
         // Convert UTC ZonedDateTime to the system's default time zone

@@ -112,4 +112,17 @@ public class AccountCache {
         }
         return false;
     }
+
+    /**
+     * Get all the player names that are present in the account cache.
+     * @return A list with all the names of player accounts stored in the account cache.
+     */
+    public static List<String> getAllPlayerNames() {
+        if (accountMap.isEmpty()) return null;
+        List<String> playersArray = new ArrayList<String>();
+        for (String uuid : accountMap.keySet()) {
+            playersArray.add(accountMap.get(uuid).name());
+        }
+        return playersArray;
+    }
 }

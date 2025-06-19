@@ -94,18 +94,14 @@ public class Balances {
         setPlayerBalanceChange(uuid, getPlayerBalanceChange(uuid) + money);
     }
 
-    public static boolean hasAccount(String uuid) {
+    public static boolean hasAccountUUID(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
-        if(AccountCache.accountExists(trimmedUUID)) return true;
+        return AccountCache.accountExistsUUID(trimmedUUID);
+    }
 
-        if(Main.SQLMode) {
-            return (boolean) AccountManagement.accountExists(trimmedUUID).join();
-
-        }
-
-        FileConfiguration file = BalanceFile.get();
-        return file.contains("players." + trimmedUUID);
+    public static boolean hasAccountName(String playerName) {
+        return AccountCache.accountExistsUUID(playerName);
     }
 
     public static void executeTransaction(String transactType, String induce, String source,

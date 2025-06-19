@@ -39,7 +39,7 @@ public class PlayerJoinListener implements Listener {
         CompletableFuture.runAsync(() -> {
             try {
                 // Check and update account
-                if (Balances.hasAccount(uuid)) {
+                if (Balances.hasAccountUUID(uuid)) {
                     Balances.updatePlayerName(uuid, player.getName());
                 } else {
                     Balances.addAccount(uuid, player.getName());

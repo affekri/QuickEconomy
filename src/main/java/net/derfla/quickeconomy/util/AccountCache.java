@@ -95,7 +95,21 @@ public class AccountCache {
      * @param uuid The UUID of the player.
      * @return True if the UUID is present in the cache. False if it's not.
      */
-    public static boolean accountExists(String uuid) {
+    public static boolean accountExistsUUID(String uuid) {
         return accountMap.containsKey(uuid);
+    }
+
+    /**
+     * Checks if the provided player name exists in the account cache.
+     * @param playerName The name of the player.
+     * @return True if the name is present in the cache. False if it's not.
+     */
+    public static boolean accountExistsName(String playerName) {
+        for(PlayerAccount account : accountMap.values()) {
+            if (playerName.equals(account.name())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

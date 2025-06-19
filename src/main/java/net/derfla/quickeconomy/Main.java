@@ -54,7 +54,7 @@ public class Main extends JavaPlugin {
 
         // Plugin startup logic
         getLogger().info("QuickEconomy has been enabled!");
-        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
+        if(DerflaAPI.updateAvailable()) getLogger().info("A new version of QuickEconomy is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
     }
 
     private void registerEvents() {

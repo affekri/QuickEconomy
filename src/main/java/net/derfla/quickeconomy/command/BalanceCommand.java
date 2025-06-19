@@ -65,8 +65,12 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                         break;
                     }
                     Player player = ((Player) sender).getPlayer();
-
-                    Balances.setPlayerBalance(String.valueOf(player.getUniqueId()), money);
+                    String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+                    if (Balances.getPlayerBalance(playerUUID) == money) {
+                        player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
+                        break;
+                    }
+                    Balances.setPlayerBalance(playerUUID, money);
                     player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
                     break;
                 }

@@ -349,9 +349,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         }
         if (strings.length == 2) {
             if (strings[0].equalsIgnoreCase("list")) {
-                return Bukkit.getOnlinePlayers().stream()
-                        .map(Player::getName)
-                        .filter(player -> player.toLowerCase().startsWith(strings[1]))
+                return AccountCache.getAllPlayerNames().stream()
+                        .filter(player -> player.toLowerCase().startsWith(strings[1].toLowerCase()))
                         .collect(Collectors.toList());
             }
             
@@ -371,9 +370,8 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     .collect(Collectors.toList());
         }
         if (strings.length == 3) {
-            return Bukkit.getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(player -> player.toLowerCase().startsWith(strings[2]))
+            return AccountCache.getAllPlayerNames().stream()
+                    .filter(player -> player.toLowerCase().startsWith(strings[2].toLowerCase()))
                     .collect(Collectors.toList());
         }
         return null;

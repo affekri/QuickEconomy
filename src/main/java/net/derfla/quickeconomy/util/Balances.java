@@ -101,7 +101,7 @@ public class Balances {
     }
 
     public static boolean hasAccountName(String playerName) {
-        return AccountCache.accountExistsUUID(playerName);
+        return AccountCache.accountExistsName(playerName);
     }
 
     public static void executeTransaction(String transactType, String induce, String source,

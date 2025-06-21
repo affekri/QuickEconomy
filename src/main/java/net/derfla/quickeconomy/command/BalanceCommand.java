@@ -160,7 +160,12 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
-                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), targetUUID, money, null);
+                String message = "";
+                if (strings.length >= 4) {
+                    message = String.join(" ", Arrays.copyOfRange(strings, 3, strings.length));
+                }
+
+                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), targetUUID, money, message);
 
                 player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {
@@ -373,6 +378,9 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             return AccountCache.getAllPlayerNames().stream()
                     .filter(player -> player.toLowerCase().startsWith(strings[2].toLowerCase()))
                     .collect(Collectors.toList());
+        }
+        if (strings.length >= 4 && "send".equalsIgnoreCase(strings[0])) {
+            return List.of("<message>");
         }
         return null;
     }

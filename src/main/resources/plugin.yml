@@ -5,11 +5,11 @@ api-version: '1.21.5'
 author: AffeKri
 commands:
   balance:
-    usage: /<command> <subcommand> <float> <player>
+    usage: /<command> <subcommand> <float> <player> <message>
     description: See your balance or send coins to other players.
     permission: quickeconomy.balance
   bal:
-    usage: /<command> <subcommand> <float> <player>
+    usage: /<command> <subcommand> <float> <player> <message>
     description: See your balance or send coins to other players.
     permission: quickeconomy.balance
   quickeconomy:

@@ -95,7 +95,7 @@ public class BankInventory implements InventoryHolder {
                         target.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                         return true;
                     }
-                    Balances.executeTransaction("withdrawal", "bank", String.valueOf(target.getUniqueId()), null, exchangeRate * diamondAmount, "");
+                    Balances.executeTransaction("withdrawal", "bank", String.valueOf(target.getUniqueId()), null, exchangeRate * diamondAmount, "Bank withdrawal");
                     target.getInventory().addItem(new ItemStack(Material.DIAMOND, diamondAmount));
                     return true;
                 case GOLD_INGOT:
@@ -122,7 +122,7 @@ public class BankInventory implements InventoryHolder {
             itemAmount = 1;
             target.getInventory().removeItem(new ItemStack(itemStack.getType(), 1));
         }
-        Balances.executeTransaction("deposit", "bank", null, String.valueOf(target.getUniqueId()), itemAmount * exchangeRate, "");
+        Balances.executeTransaction("deposit", "bank", null, String.valueOf(target.getUniqueId()), itemAmount * exchangeRate, "Bank deposit");
         return true;
 
 

@@ -89,10 +89,10 @@ public class InventoryClickListener implements Listener {
                     if (owner2.isEmpty()) {
                         // Single owner transaction
                         Balances.executeTransaction("p2p", "purchase",
-                                playerUUID, owner, cost, "");
+                                playerUUID, owner, cost, "Shop purchase");
                     } else {
-                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "");
-                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner2, cost/2, "");
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "Shop purchase");
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner2, cost/2, "Shop purchase");
                     }
 
                     // Update inventory after successful transaction

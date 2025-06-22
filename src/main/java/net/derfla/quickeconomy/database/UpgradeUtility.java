@@ -37,7 +37,7 @@ public class UpgradeUtility {
      * @return Returns true if current database version is older than the latest introduced database version.
      */
     public static boolean requiresUpgrade() {
-        String latestDatabaseVersion = "1.2";
+        String latestDatabaseVersion = "1.3";
         return TypeChecker.isNewerVersion(latestDatabaseVersion, getDatabaseVersion());
     }
 
@@ -52,6 +52,8 @@ public class UpgradeUtility {
             switch (getDatabaseVersion()) {
                 case "1.1":
                     upgradeToV1o2().join();
+                case "1.2":
+                    upgradeToV1o3().join();
             }
         }
         plugin.getLogger().info("Database upgrade finished.");
@@ -113,6 +115,57 @@ public class UpgradeUtility {
                 plugin.getConfig().set("database.version", "1.2");
                 plugin.saveConfig();
                 plugin.getLogger().info("Database table upgrade process to 1.2 completed.");
+            }
+        });
+    }
+
+    /**
+     * Upgrade the database to align with the changes implemented in the 1.3 version.
+     */
+    private static CompletableFuture<Void> upgradeToV1o3() {
+        List<String> tableUpgradeQueries = new ArrayList<>();
+        String removeForeignKeysConstraints = "ALTER TABLE Transactions DROP FOREIGN KEY transactions_ibfk_1, DROP FOREIGN KEY transactions_ibfk_2;";
+        tableUpgradeQueries.add(removeForeignKeysConstraints);
+        String changeNullToBank = "UPDATE transactions set destination = 'Bank' WHERE destination is null; UPDATE transactions t SET t.source = 'Bank' WHERE t.source is null;";
+        tableUpgradeQueries.add(changeNullToBank);
+
+        return Utility.getConnectionAsync().thenCompose(conn -> {
+            if (conn == null) {
+                plugin.getLogger().severe("Failed to get connection for 'upgrade to 1.3'. Upgrade will not be completed.");
+                return CompletableFuture.failedFuture(new SQLException("Failed to obtain database connection for upgradeToV1o3."));
+            }
+
+            CompletableFuture<Void> allUpgradesFuture = CompletableFuture.completedFuture(null);
+
+            for (String query : tableUpgradeQueries) {
+                final String currentQuery = query;
+                allUpgradesFuture = allUpgradesFuture.thenCompose(v ->
+                        CompletableFuture.runAsync(() -> {
+                            try (Statement statement = conn.createStatement()) {
+                                statement.executeUpdate(currentQuery);
+                            } catch (SQLException e) {
+                                plugin.getLogger().severe("SQL Error when executing upgrade query!");
+                                throw new CompletionException(e);
+                            }
+                        }, executorService)
+                );
+            }
+            return allUpgradesFuture.whenComplete((res, ex) -> {
+                try {
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
+                    }
+                } catch (SQLException e) {
+                    plugin.getLogger().warning("Failed to close connection after upgradeTo1o3 operations: " + e.getMessage());
+                }
+            });
+        }).whenComplete((result, ex) -> {
+            if (ex != null) {
+                plugin.getLogger().severe("Error during upgradeToV1o3 database operations: " + ex.getMessage());
+            } else {
+                plugin.getConfig().set("database.version", "1.3");
+                plugin.saveConfig();
+                plugin.getLogger().info("Database table upgrade process to 1.3 completed.");
             }
         });
     }

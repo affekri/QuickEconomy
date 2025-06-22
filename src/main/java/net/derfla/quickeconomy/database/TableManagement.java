@@ -51,13 +51,7 @@ public class TableManagement {
                     + "  Passed tinyint(1),"
                     + "  PassedReason varchar(16) DEFAULT NULL,"
                     + "  TransactionMessage varchar(32),"
-                    + "  PRIMARY KEY (TransactionID),";
-            // MySQL specific foreign key syntax, for SQLite this might need adjustment
-            if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
-                Transactions += "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                        + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)";
-            }
-            Transactions += ");";
+                    + "  PRIMARY KEY (TransactionID));";
             tableCreationQueries.add(Transactions);
 
             String Autopays = "CREATE TABLE IF NOT EXISTS Autopays ("

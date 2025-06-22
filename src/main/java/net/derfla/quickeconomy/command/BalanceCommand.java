@@ -153,20 +153,30 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     break;
                 }
 
-                String targetUUID = AccountCache.getUUID(strings[2]);
+                String targetUUID = TypeChecker.trimUUID(AccountCache.getUUID(strings[2]));
 
                 Player player = ((Player) sender).getPlayer();
-                if (Balances.getPlayerBalance(String.valueOf(player.getUniqueId())) < money) {
+                String trimmedPlayerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+                if (Balances.getPlayerBalance(trimmedPlayerUUID) < money) {
                     player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
-                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), targetUUID, money, null);
+                String message = "";
+                if (strings.length >= 4) {
+                    message = String.join(" ", Arrays.copyOfRange(strings, 3, strings.length));
+                }
+
+                Balances.executeTransaction("p2p", "command", trimmedPlayerUUID, targetUUID, money, message);
 
                 player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {
                     // Alerts the receiving player if it's online
                     Player targetPlayer = Bukkit.getPlayer(strings[2]);
-                    targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
+                    if(message.isEmpty()) {
+                        targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
+                    } else {
+                        targetPlayer.sendMessage(Component.translatable("balcommand.send.receivemesssage", Component.text(money), Component.text(player.getName()), Component.text(message)).style(Styles.INFOSTYLE));
+                    }
                     break;
                 }
 
@@ -373,6 +383,9 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             return AccountCache.getAllPlayerNames().stream()
                     .filter(player -> player.toLowerCase().startsWith(strings[2].toLowerCase()))
                     .collect(Collectors.toList());
+        }
+        if (strings.length >= 4 && "send".equalsIgnoreCase(strings[0])) {
+            return List.of("<message>");
         }
         return null;
     }

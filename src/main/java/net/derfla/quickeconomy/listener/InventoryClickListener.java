@@ -85,14 +85,14 @@ public class InventoryClickListener implements Listener {
             // Handle the transaction asynchronously
             CompletableFuture.runAsync(() -> {
                 try {
-                    String playerUUID = String.valueOf(player.getUniqueId());
+                    String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
                     if (owner2.isEmpty()) {
                         // Single owner transaction
                         Balances.executeTransaction("p2p", "purchase",
-                                playerUUID, owner, cost, "");
+                                playerUUID, owner, cost, "Shop purchase");
                     } else {
-                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "");
-                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner2, cost/2, "");
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner, cost/2, "Shop purchase");
+                        Balances.executeTransaction("p2p", "purchase", playerUUID, owner2, cost/2, "Shop purchase");
                     }
 
                     // Update inventory after successful transaction
@@ -106,12 +106,12 @@ public class InventoryClickListener implements Listener {
                             // Attempt to roll back the transaction if inventory update fails
                             if (owner2.isEmpty()) {
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner, String.valueOf(player.getUniqueId()), cost, "inventory_error");
+                                    owner, playerUUID, cost, "inventory_error");
                             } else {
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner, String.valueOf(player.getUniqueId()), cost/2, "inventory_error");
+                                    owner, playerUUID, cost/2, "inventory_error");
                                 Balances.executeTransaction("p2p", "rollback", 
-                                    owner2, owner, cost/2, "inventory_error");
+                                    owner2, playerUUID, cost/2, "inventory_error");
                             }
                         }
                     });

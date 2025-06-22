@@ -153,10 +153,11 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     break;
                 }
 
-                String targetUUID = AccountCache.getUUID(strings[2]);
+                String targetUUID = TypeChecker.trimUUID(AccountCache.getUUID(strings[2]));
 
                 Player player = ((Player) sender).getPlayer();
-                if (Balances.getPlayerBalance(String.valueOf(player.getUniqueId())) < money) {
+                String trimmedPlayerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+                if (Balances.getPlayerBalance(trimmedPlayerUUID) < money) {
                     player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                     break;
                 }
@@ -165,7 +166,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
                     message = String.join(" ", Arrays.copyOfRange(strings, 3, strings.length));
                 }
 
-                Balances.executeTransaction("p2p", "command", String.valueOf(player.getUniqueId()), targetUUID, money, message);
+                Balances.executeTransaction("p2p", "command", trimmedPlayerUUID, targetUUID, money, message);
 
                 player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
                 if (Bukkit.getPlayer(strings[2]) != null) {

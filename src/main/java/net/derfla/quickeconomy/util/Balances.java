@@ -101,24 +101,45 @@ public class Balances {
     }
 
     public static boolean hasAccountName(String playerName) {
-        return AccountCache.accountExistsUUID(playerName);
+        return AccountCache.accountExistsName(playerName);
     }
 
+    /**
+     * Create a transaction between two players or one player and a 'null' account.
+     * This is the preferred way of interacting with player balances. Both for SQL and file mode.
+     * 'Null accounts' are accounts marked as n in the transactType parameter. These are accounts that do not exist in the database/balance file.
+     * Please note that this method does not handle any kind of messaging to either the source or destination. Please handle that separately.
+     * @param transactType Define what kind of transaction this is. Accepted values are 'p2p', 'p2n' and 'n2p'.
+     * @param induce What is executing the transaction. Could be a command.
+     * @param source Where coins will be drawn from. If it is a 'p2x' transaction, this has to be a trimmed player UUID.
+     * @param destination Where coins will be sent to. If it is a 'x2p' transaction, this has to be a trimmed player UUID.
+     * @param amount The amount of coins that will be transferred.
+     * @param transactionMessage Optional message to explain the transaction.
+     */
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
-
-        String sourceUUID = TypeChecker.trimUUID(source);
-        String destinationUUID = TypeChecker.trimUUID(destination);
+        if (!("p2p".equalsIgnoreCase(transactType) || "p2n".equalsIgnoreCase(transactType) || "n2p".equalsIgnoreCase(transactType))) {
+            throw new IllegalArgumentException("Invalid transaction type! Allowed values are 'p2p', 'p2n' and 'n2p'");
+        }
+        if (transactType.charAt(0) == 'p' && source.length() != 32) {
+            throw new IllegalArgumentException("This transaction type requires the source parameter to be a trimmed player UUID!");
+        }
+        if (transactType.charAt(2) == 'p' && destination.length() != 32) {
+            throw new IllegalArgumentException("This transaction type requires the destination parameter to be a trimmed player UUID!");
+        }
 
         if(Main.SQLMode) {
-            TransactionManagement.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
-            if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
-            if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
+            // Execute the transaction for SQL mode
+            TransactionManagement.executeTransaction(transactType.toLowerCase(), induce, source, destination, amount, transactionMessage).join();
+
+            // Update the account cache for SQL mode. For file mode account cache will be updated in setPlayerBalance.
+            if (transactType.charAt(0) == 'p') AccountCache.getPlayerAccount(source).balance(AccountCache.getPlayerAccount(source).balance() - amount);
+            if (transactType.charAt(2) == 'p') AccountCache.getPlayerAccount(destination).balance(AccountCache.getPlayerAccount(destination).balance() + amount);
             return;
         }
-        if (source != null)
+        if (transactType.charAt(0) == 'p')
             subPlayerBalance(source, amount);
-        if (destination != null)
+        if (transactType.charAt(2) == 'p')
             addPlayerBalance(destination, amount);
 
     }

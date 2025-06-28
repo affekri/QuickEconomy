@@ -1,5 +1,6 @@
 package net.derfla.quickeconomy;
 
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
@@ -25,11 +26,13 @@ public class Main extends JavaPlugin {
     @Override
     public void onEnable() {
 
-        // Set command executors
-        getCommand("balance").setExecutor(new BalanceCommand());
-        getCommand("bal").setExecutor(new BalanceCommand());
-        getCommand("quickeconomy").setExecutor(new QuickeconomyCommand());
-        getCommand("bank").setExecutor(new BankCommand());
+        // Register commands
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
+            commands.registrar().register(BankCommand.createCommand().build());
+            commands.registrar().register(QuickeconomyCommand.createCommand().build());
+            commands.registrar().register(BalanceCommand.createCommand().build());
+            commands.registrar().register(BalanceCommand.createShortCommand().build());
+        });
 
         // Register events
         registerEvents();

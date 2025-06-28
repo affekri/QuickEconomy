@@ -1,0 +1,4 @@
+name: QuickEconomy
+version: '${project.version}'
+main: net.derfla.quickeconomy.Main
+api-version: '1.21.6'

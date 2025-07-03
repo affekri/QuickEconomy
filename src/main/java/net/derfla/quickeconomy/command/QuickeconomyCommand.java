@@ -18,16 +18,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.sql.Timestamp;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class QuickeconomyCommand {
 
@@ -37,7 +29,7 @@ public class QuickeconomyCommand {
      * Create the /quickeconomy command. Command logic is handled separately, in private methods in this class, for clarity.
      */
     public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
-        return Commands.literal("quickeconomy").requires(sender -> sender.getSender().hasPermission("quickeconomy.bank.command"))
+        return Commands.literal("quickeconomy").requires(sender -> sender.getSender().hasPermission("quickeconomy.help"))
                 .executes(QuickeconomyCommand::runPluginInfoLogic)
                 .then(Commands.literal("migrate").requires(sender -> sender.getSender().hasPermission("quickeconomy.migrate"))
                         .executes(QuickeconomyCommand::runMigrateLogic)
@@ -45,8 +37,10 @@ public class QuickeconomyCommand {
                         .then(Commands.argument("year", IntegerArgumentType.integer(1900, 9999))
                             .then(Commands.argument("month", IntegerArgumentType.integer(1, 12))
                                 .then(Commands.argument("day", IntegerArgumentType.integer(1,31))
-                                    .then(Commands.argument("time", StringArgumentType.greedyString())
-                        .executes(QuickeconomyCommand::runRollbackLogic))))))
+                                    .then(Commands.argument("hour", IntegerArgumentType.integer(0, 23))
+                                            .then(Commands.argument("minute", IntegerArgumentType.integer(0, 59))
+                                                    .then(Commands.argument("second", IntegerArgumentType.integer(0, 59))
+                        .executes(QuickeconomyCommand::runRollbackLogic))))))))
                 .then(Commands.literal("setup").requires(sender -> sender.getSender().hasPermission("quickeconomy.setup"))
                         .executes(QuickeconomyCommand::runSetupLogic));
     }
@@ -131,9 +125,11 @@ public class QuickeconomyCommand {
             String year = String.valueOf(ctx.getArgument("year", Integer.class));
             String month = String.format("%02d", ctx.getArgument("month", Integer.class));
             String day = String.format("%02d", ctx.getArgument("day", Integer.class));
-            String time = ctx.getArgument("time", String.class);
+            String hour = String.format("%02d", ctx.getArgument("hour", Integer.class));
+            String minute = String.format("%02d", ctx.getArgument("minute", Integer.class));
+            String second = String.format("%02d", ctx.getArgument("second", Integer.class));
 
-            timestampString = year + "-" + month + "-" + day + " " + time;
+            timestampString = year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
 
             // Validate that the timestamp can be parsed
             Timestamp.valueOf(timestampString);

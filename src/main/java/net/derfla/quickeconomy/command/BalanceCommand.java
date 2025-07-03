@@ -1,392 +1,343 @@
 package net.derfla.quickeconomy.command;
 
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.command.argument.AccountArgument;
 import net.derfla.quickeconomy.database.TransactionManagement;
+import net.derfla.quickeconomy.model.PlayerAccount;
 import net.derfla.quickeconomy.util.*;
-import net.derfla.quickeconomy.file.BalanceFile;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.*;
 
-public class BalanceCommand implements CommandExecutor, TabCompleter {
+public class BalanceCommand {
 
-    @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
-        if (strings.length == 0) {
-            if (!(sender instanceof Player)) {
-                sender.sendMessage("You can only see your balance as a player!");
-                return true;
-            }
-            Player player = ((Player) sender).getPlayer();
-            player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
-            return true;
-        }
-        double money = 0;
-        boolean moneySet;
-        try {
-            money = Double.parseDouble(strings[1]);
-            moneySet = true;
-        } catch (Exception e) {
-            moneySet = false;
-        }
+    /**
+     * Create the /balance command. Command logic is handled separately for clarity and reusability.
+     */
+    public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
+        return Commands.literal("balance").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance")) .executes(BalanceCommand::runBalanceLogic)
 
-        switch (strings[0].toLowerCase()) {
-            case "set":
-                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (!moneySet) {
-                    sender.sendMessage(Component.translatable("provide.number", Styles.ERRORSTYLE));
-                    break;
-                }
+                .then(Commands.literal("set").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSetLogic))
+                        .executes(BalanceCommand::runSetLogic)))
 
+                .then(Commands.literal("add").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runAddLogic))
+                        .executes(BalanceCommand::runAddLogic)))
 
-                if (strings.length == 2) {
-                    if (!(sender instanceof Player)) {
-                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
-                        break;
-                    }
-                    Player player = ((Player) sender).getPlayer();
-                    String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
-                    if (Balances.getPlayerBalance(playerUUID) == money) {
-                        player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
-                        break;
-                    }
-                    Balances.setPlayerBalance(playerUUID, money);
-                    player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
-                    break;
-                }
-                Balances.setPlayerBalance(AccountCache.getUUID(strings[2]), money);
-                sender.sendMessage(Component.translatable("balcommand.set", Component.text(strings[2]), Component.text(money)).style(Styles.INFOSTYLE));
-                break;
+                .then(Commands.literal("sub").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSubLogic))
+                        .executes(BalanceCommand::runSubLogic)))
 
+                .then(Commands.literal("send").requires(sender -> sender.getExecutor() instanceof Player)
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSendLogic)
+                                        .then(Commands.argument("message", StringArgumentType.greedyString())
+                                                .executes(BalanceCommand::runSendLogic)))))
 
-            case "add":
-                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (!moneySet) {
-                    sender.sendMessage(Component.translatable("provide.number", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (strings.length == 2) {
-                    if (!(sender instanceof Player)) {
-                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
-                        break;
-                    }
-                    Player player = ((Player) sender).getPlayer();
+                .then(Commands.literal("transactions").requires(sender -> sender.getExecutor() instanceof Player)
+                        .then(Commands.argument("page", IntegerArgumentType.integer(1)))
+                        .executes(BalanceCommand::runTransactionLogic).executes(BalanceCommand::runTransactionLogic))
 
-                    Balances.addPlayerBalance(String.valueOf(player.getUniqueId()), money);
-                    player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
-                    break;
-                }
-                Balances.addPlayerBalance(AccountCache.getUUID(strings[2]), money);
-                sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
-                break;
-
-            case "subtract":
-                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.modifyall"))) {
-                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (!moneySet) {
-                    sender.sendMessage(Component.translatable("provide.number", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (strings.length == 2) {
-                    if (!(sender instanceof Player)) {
-                        sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
-                        break;
-                    }
-                    Player player = ((Player) sender).getPlayer();
-                    Balances.subPlayerBalance(String.valueOf(player.getUniqueId()), money);
-                    player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
-                    break;
-                }
-                Balances.subPlayerBalance(AccountCache.getUUID(strings[2]), money);
-                sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
-                break;
-
-            case "send":
-                if (!(sender instanceof Player)) {
-                    sender.sendMessage(Component.translatable("balcommand.send.notplayer", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (!moneySet) {
-                    sender.sendMessage(Component.translatable("provide.number", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (strings.length == 2) {
-                    sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (money <= 0) {
-                    sender.sendMessage(Component.translatable("balcommand.send.negative", Styles.ERRORSTYLE));
-                    break;
-                }
-                if (strings[2].equals(sender.getName())) {
-                    sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
-                    break;
-                }
-
-                if (!Balances.hasAccountName(strings[2])) {
-                    sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[2])).style(Styles.ERRORSTYLE));
-                    break;
-                }
-
-                String targetUUID = TypeChecker.trimUUID(AccountCache.getUUID(strings[2]));
-
-                Player player = ((Player) sender).getPlayer();
-                String trimmedPlayerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
-                if (Balances.getPlayerBalance(trimmedPlayerUUID) < money) {
-                    player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
-                    break;
-                }
-                String message = "";
-                if (strings.length >= 4) {
-                    message = String.join(" ", Arrays.copyOfRange(strings, 3, strings.length));
-                }
-
-                Balances.executeTransaction("p2p", "command", trimmedPlayerUUID, targetUUID, money, message);
-
-                player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(strings[2])).style(Styles.INFOSTYLE));
-                if (Bukkit.getPlayer(strings[2]) != null) {
-                    // Alerts the receiving player if it's online
-                    Player targetPlayer = Bukkit.getPlayer(strings[2]);
-                    if(message.isEmpty()) {
-                        targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
-                    } else {
-                        targetPlayer.sendMessage(Component.translatable("balcommand.send.receivemesssage", Component.text(money), Component.text(player.getName()), Component.text(message)).style(Styles.INFOSTYLE));
-                    }
-                    break;
-                }
-
-                break;
-            case "transactions":
-                if (!(sender instanceof Player)) {
-                    sender.sendMessage(Component.translatable("balcommand.send.notplayer", Styles.ERRORSTYLE));
-                    break;
-                }
-                Player transactionsPlayer = (Player) sender;
-                if(!Main.SQLMode) {
-                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                    break;
-                }
-                
-                // Parse page number from arguments
-                int page = 1;
-                if (strings.length > 1) {
-                    try {
-                        page = Integer.parseInt(strings[1]);
-                        if (page < 1) page = 1;
-                    } catch (NumberFormatException e) {
-                        page = 1;
-                    }
-                }
-                
-                String transactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page).join());
-                
-                // Check if the user has any transactions at all
-                if (page == 1 && transactions.isEmpty()) {
-                    transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
-                    break;
-                }
-                
-                // If not page 1 and no transactions, check if this is an invalid page number
-                if (page > 1 && transactions.isEmpty()) {
-                    // Find the total number of pages by checking backwards
-                    int lastValidPage = 1;
-                    for (int checkPage = page - 1; checkPage >= 1; checkPage--) {
-                        String checkTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, checkPage).join());
-                        if (!checkTransactions.isEmpty()) {
-                            lastValidPage = checkPage;
-                            break;
-                        }
-                    }
-                    
-                    // If we found a valid page, this means the requested page is invalid
-                    if (lastValidPage < page) {
-                        transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page.invalid", 
-                            Component.text(page), Component.text(lastValidPage)).style(Styles.ERRORSTYLE));
-                        break;
-                    }
-                }
-                
-                // Check if there are more transactions on the next page
-                String nextPageTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page + 1).join());
-                boolean hasNextPage = !nextPageTransactions.isEmpty();
-                
-                // Display transactions with pagination controls
-                transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page", Component.text(page)).style(Styles.INFOSTYLE));
-                transactionsPlayer.sendMessage(transactions);
-                
-                // Add navigation arrows
-                Component navigation = Component.empty();
-                
-                // Previous page arrow (only show if not on page 1)
-                if (page > 1) {
-                    Component prevArrow = Component.translatable("balcommand.transactions.previous")
-                        .style(Styles.INFOSTYLE)
-                        .clickEvent(ClickEvent.runCommand("/bal transactions " + (page - 1)))
-                        .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.previous.hover", Component.text(page - 1))));
-                    navigation = navigation.append(prevArrow);
-                    
-                    // Add space separator if both arrows will be present
-                    if (hasNextPage) {
-                        navigation = navigation.append(Component.text("  ").style(Styles.BODY));
-                    }
-                }
-                
-                // Next page arrow (only show if there are more transactions)
-                if (hasNextPage) {
-                    Component nextArrow = Component.translatable("balcommand.transactions.next")
-                        .style(Styles.INFOSTYLE)
-                        .clickEvent(ClickEvent.runCommand("/bal transactions " + (page + 1)))
-                        .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.next.hover", Component.text(page + 1))));
-                    navigation = navigation.append(nextArrow);
-                }
-                
-                // Only send navigation if there are arrows to show
-                if (page > 1 || hasNextPage) {
-                    transactionsPlayer.sendMessage(navigation);
-                }
-                break;
-            case "list":
-                if (sender instanceof  Player && !(sender.hasPermission("quickeconomy.balance.seeall"))) {
-                    sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                    break;
-                }
-                if(strings.length == 1) {
-                    if(Main.SQLMode) {
-                        sender.sendMessage(" " + AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
-                    } else {
-                        // List all balances in file mode
-                        FileConfiguration file = BalanceFile.get();
-                        if (file == null) {
-                            sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                            break;
-                        }
-                        ConfigurationSection players = file.getConfigurationSection("players");
-                        if (players == null) {
-                            sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                            break;
-                        }
-                        StringBuilder balanceList = new StringBuilder();
-                        for (String uuid : players.getKeys(false)) {
-                            String name = players.getString(uuid + ".name");
-                            double balance = players.getDouble(uuid + ".balance");
-                            if (name != null && balance > 0) {
-                                balanceList.append(name).append(": ").append(balance).append("\n");
-                            }
-                        }
-                        if (balanceList.length() > 0) {
-                            sender.sendMessage(balanceList.toString());
-                        } else {
-                            sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                        }
-                    }
-                    break;
-                }
-                // Handle /bal list playername case
-                if(strings.length == 2) {
-                    if (!Balances.hasAccountName(strings[1])) {
-                        sender.sendMessage(Component.translatable("player.notexists", Component.text(strings[1])).style(Styles.ERRORSTYLE));
-                        break;
-                    }
-                    String checkPlayer;
-                    if (Bukkit.getServer().getPlayerExact(strings[1]) != null) {
-                        checkPlayer = Bukkit.getServer().getPlayerExact(strings[1]).getUniqueId().toString();
-                    } else checkPlayer = AccountCache.getUUID(strings[1]);
-                    double balance = Balances.getPlayerBalance(TypeChecker.trimUUID(checkPlayer));
-                    if (balance == 0.0) {
-                        sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(strings[1])).style(Styles.ERRORSTYLE));
-                        break;
-                    }
-                    // Ensure translation is available for the sender if they are a player
-                    if (sender instanceof Player) {
-                        Translation.init((Player) sender);
-                    }
-                    sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(strings[1]), Component.text(balance)).style(Styles.INFOSTYLE));
-                    break;
-                }
-                sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                break;
-
-            default:
-                sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                break;
-        }
-        return true;
+                .then(Commands.literal("list").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.seeall"))
+                        .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runListLogic))
+                        .executes(BalanceCommand::runListLogic));
     }
 
+    /**
+     * Create the /bal command. Command logic is handled separately for clarity and reusability.
+     */
+    public static LiteralArgumentBuilder<CommandSourceStack> createShortCommand() {
+        return Commands.literal("bal").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance")) .executes(BalanceCommand::runBalanceLogic)
 
-    @Override
-    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-        if (strings.length == 1) {
-            List<String> returnList = new ArrayList<>(Collections.singletonList("send"));
-            if(Main.SQLMode) {
-                returnList.add("transactions");
-            }
-            if (sender.hasPermission("quickeconomy.balance.seeall") || !(sender instanceof Player)) {
-                returnList.add("list");
-            }
-            if (sender.hasPermission("quickeconomy.balance.modifyall") || ! (sender instanceof Player)) {
-                List<String> subCommands = Arrays.asList("set", "add", "subtract");
-                returnList.addAll(subCommands);
-            }
-            return returnList.stream()
-                    .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[0]))
-                    .collect(Collectors.toList());
+                .then(Commands.literal("set").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSetLogic))
+                                .executes(BalanceCommand::runSetLogic)))
+
+                .then(Commands.literal("add").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runAddLogic))
+                                .executes(BalanceCommand::runAddLogic)))
+
+                .then(Commands.literal("sub").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSubLogic))
+                                .executes(BalanceCommand::runSubLogic)))
+
+                .then(Commands.literal("send").requires(sender -> sender.getExecutor() instanceof Player)
+                        .then(Commands.argument("money", DoubleArgumentType.doubleArg(0.1))
+                                .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runSendLogic)
+                                        .then(Commands.argument("message", StringArgumentType.greedyString())
+                                                .executes(BalanceCommand::runSendLogic)))))
+
+                .then(Commands.literal("transactions").requires(sender -> sender.getExecutor() instanceof Player)
+                        .then(Commands.argument("page", IntegerArgumentType.integer(1)))
+                        .executes(BalanceCommand::runTransactionLogic).executes(BalanceCommand::runTransactionLogic))
+
+                .then(Commands.literal("list").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.seeall"))
+                        .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runListLogic))
+                        .executes(BalanceCommand::runListLogic));
+    }
+
+    private static int runBalanceLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+            sender.sendMessage("You can only see your balance as a player!");
+            return Command.SINGLE_SUCCESS;
         }
-        if (strings.length == 2) {
-            if (strings[0].equalsIgnoreCase("list")) {
-                return AccountCache.getAllPlayerNames().stream()
-                        .filter(player -> player.toLowerCase().startsWith(strings[1].toLowerCase()))
-                        .collect(Collectors.toList());
+        player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runSetLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        double money = ctx.getArgument("money", Double.class);
+        PlayerAccount targetPlayer;
+        try {
+            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+        } catch (Exception e) {
+            targetPlayer = null;
+        }
+
+
+        if (targetPlayer == null ) {
+            // Handle player setting their own balance
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
+                return Command.SINGLE_SUCCESS;
             }
-            
-            if (strings[0].equalsIgnoreCase("transactions")) {
-                // Suggest page numbers for transactions
-                return Stream.of("1", "2", "3", "4", "5")
-                        .filter(pageNum -> pageNum.startsWith(strings[1]))
-                        .collect(Collectors.toList());
+            String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+            if (Balances.getPlayerBalance(playerUUID) == money) {
+                player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
+                return Command.SINGLE_SUCCESS;
+            }
+            Balances.setPlayerBalance(playerUUID, money);
+            player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+        // Handle setting other players balance
+        Balances.setPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
+        sender.sendMessage(Component.translatable("balcommand.set", Component.text(targetPlayer.name()), Component.text(money)).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runAddLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        double money = ctx.getArgument("money", Double.class);
+        PlayerAccount targetPlayer;
+        try {
+            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+        } catch (Exception e) {
+            targetPlayer = null;
+        }
+
+        if (targetPlayer == null) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
+                return Command.SINGLE_SUCCESS;
+            }
+            Balances.addPlayerBalance(String.valueOf(player.getUniqueId()), money);
+            player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+        Balances.addPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
+        sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runSubLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        double money = ctx.getArgument("money", Double.class);
+        PlayerAccount targetPlayer;
+        try {
+            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+        } catch (Exception e) {
+            targetPlayer = null;
+        }
+
+        if (targetPlayer == null) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
+                return Command.SINGLE_SUCCESS;
+            }
+            Player player = ((Player) sender).getPlayer();
+            Balances.subPlayerBalance(String.valueOf(player.getUniqueId()), money);
+            player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+        Balances.subPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
+        sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runSendLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        double money = ctx.getArgument("money", Double.class);
+        PlayerAccount account = ctx.getArgument("player", PlayerAccount.class);
+        String message;
+        try {
+            message = ctx.getArgument("message", String.class);
+        } catch (Exception e) {
+            message = "";
+        }
+        Player player = (Player) ctx.getSource().getExecutor();
+
+        if (account.name().equals(player.getName())) {
+            sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+
+        String targetUUID = AccountCache.getUUID(account.name());
+        UUID convertedUUID = UUID.fromString(TypeChecker.untrimUUID(targetUUID));
+
+        String trimmedPlayerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
+        if (Balances.getPlayerBalance(trimmedPlayerUUID) < money) {
+            player.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+
+        Balances.executeTransaction("p2p", "command", trimmedPlayerUUID, targetUUID, money, message);
+
+        player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(account.name())).style(Styles.INFOSTYLE));
+        if (Bukkit.getPlayer(convertedUUID) != null) {
+            // Alerts the receiving player if it's online
+            Player targetPlayer = Bukkit.getPlayer(convertedUUID);
+            if(message.isEmpty()) {
+                targetPlayer.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
+            } else {
+                targetPlayer.sendMessage(Component.translatable("balcommand.send.receivemesssage", Component.text(money), Component.text(player.getName()), Component.text(message)).style(Styles.INFOSTYLE));
+            }
+            return Command.SINGLE_SUCCESS;
+        }
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runTransactionLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        Player transactionsPlayer = (Player) ctx.getSource().getExecutor();
+        int page;
+        try {
+            page = ctx.getArgument("page", Integer.class);
+        } catch (Exception e) {
+            page = 1;
+        }
+
+        if(!Main.SQLMode) {
+            sender.sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+
+        String transactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page).join());
+
+        // Check if the user has any transactions at all
+        if (page == 1 && transactions.isEmpty()) {
+            transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.empty", Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+
+        // If not page 1 and no transactions, check if this is an invalid page number
+        if (page > 1 && transactions.isEmpty()) {
+            // Find the total number of pages by checking backwards
+            int lastValidPage = 1;
+            for (int checkPage = page - 1; checkPage >= 1; checkPage--) {
+                String checkTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, checkPage).join());
+                if (!checkTransactions.isEmpty()) {
+                    lastValidPage = checkPage;
+                    break;
+                }
             }
 
-            String balance;
-            if (sender instanceof Player) {
-                balance = String.valueOf(Balances.getPlayerBalance(String.valueOf(((Player) sender).getUniqueId())));
-            } else balance = "1001";
-            return Stream.of("10", "100", "1000", balance)
-                    .filter(amount -> amount.startsWith(strings[1]))
-                    .collect(Collectors.toList());
+            // If we found a valid page, this means the requested page is invalid
+            if (lastValidPage < page) {
+                transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page.invalid",
+                        Component.text(page), Component.text(lastValidPage)).style(Styles.ERRORSTYLE));
+                return Command.SINGLE_SUCCESS;
+            }
         }
-        if (strings.length == 3) {
-            return AccountCache.getAllPlayerNames().stream()
-                    .filter(player -> player.toLowerCase().startsWith(strings[2].toLowerCase()))
-                    .collect(Collectors.toList());
+
+        // Check if there are more transactions on the next page
+        String nextPageTransactions = String.valueOf(TransactionManagement.displayTransactionsView(String.valueOf(transactionsPlayer.getUniqueId()), true, page + 1).join());
+        boolean hasNextPage = !nextPageTransactions.isEmpty();
+
+        // Display transactions with pagination controls
+        transactionsPlayer.sendMessage(Component.translatable("balcommand.transactions.page", Component.text(page)).style(Styles.INFOSTYLE));
+        transactionsPlayer.sendMessage(transactions);
+
+        // Add navigation arrows
+        Component navigation = Component.empty();
+
+        // Previous page arrow (only show if not on page 1)
+        if (page > 1) {
+            Component prevArrow = Component.translatable("balcommand.transactions.previous")
+                    .style(Styles.INFOSTYLE)
+                    .clickEvent(ClickEvent.runCommand("/bal transactions " + (page - 1)))
+                    .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.previous.hover", Component.text(page - 1))));
+            navigation = navigation.append(prevArrow);
+
+            // Add space separator if both arrows will be present
+            if (hasNextPage) {
+                navigation = navigation.append(Component.text("  ").style(Styles.BODY));
+            }
         }
-        if (strings.length >= 4 && "send".equalsIgnoreCase(strings[0])) {
-            return List.of("<message>");
+
+        // Next page arrow (only show if there are more transactions)
+        if (hasNextPage) {
+            Component nextArrow = Component.translatable("balcommand.transactions.next")
+                    .style(Styles.INFOSTYLE)
+                    .clickEvent(ClickEvent.runCommand("/bal transactions " + (page + 1)))
+                    .hoverEvent(HoverEvent.showText(Component.translatable("balcommand.transactions.next.hover", Component.text(page + 1))));
+            navigation = navigation.append(nextArrow);
         }
-        return null;
+
+        // Only send navigation if there are arrows to show
+        if (page > 1 || hasNextPage) {
+            transactionsPlayer.sendMessage(navigation);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runListLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        PlayerAccount targetPlayer;
+        try {
+            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+        } catch (Exception e) {
+            targetPlayer = null;
+        }
+
+        if(targetPlayer == null) {
+            sender.sendMessage(" " + AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+            return Command.SINGLE_SUCCESS;
+        }
+        // Handle /bal list playername case
+        if (!Balances.hasAccountName(targetPlayer.name())) {
+            sender.sendMessage(Component.translatable("player.notexists", Component.text(targetPlayer.name())).style(Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+        double balance = Balances.getPlayerBalance(AccountCache.getUUID(targetPlayer.name()));
+        if (balance == 0.0) {
+            sender.sendMessage(Component.translatable("balcommand.see.other.error", Component.text(targetPlayer.name())).style(Styles.ERRORSTYLE));
+            return Command.SINGLE_SUCCESS;
+        }
+        sender.sendMessage(Component.translatable("balcommand.see.other", Component.text(targetPlayer.name()), Component.text(balance)).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
     }
 }

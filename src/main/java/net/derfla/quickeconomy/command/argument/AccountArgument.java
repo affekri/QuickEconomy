@@ -11,6 +11,7 @@ import io.papermc.paper.command.brigadier.MessageComponentSerializer;
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType;
 import net.derfla.quickeconomy.model.PlayerAccount;
 import net.derfla.quickeconomy.util.AccountCache;
+import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 
 import java.util.concurrent.CompletableFuture;
@@ -24,7 +25,7 @@ public final class AccountArgument implements CustomArgumentType.Converted<Playe
 
 
     private static final DynamicCommandExceptionType ERROR_NOT_ACCOUNT = new DynamicCommandExceptionType(name -> {
-        return MessageComponentSerializer.message().serialize(Component.text(name + " does not seem to exist on this server!"));
+        return MessageComponentSerializer.message().serialize(Component.translatable("player.notexists", Component.text(name.toString())).style(Styles.ERRORSTYLE));
     });
 
     @Override

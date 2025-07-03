@@ -1,4 +1,63 @@
 name: QuickEconomy
 version: '${project.version}'
 main: net.derfla.quickeconomy.Main
-api-version: '1.21.6'
+api-version: '1.21.7'
+authors:
+  - AffeKri
+description: A lightweight economy plugin. For Minecraft servers running PaperMC.
+website: https://docs.derfla.net/quickeconomy/
+permissions:
+  quickeconomy.balance:
+    description: Allows the player to use the balance command and see their own balance.
+    default: true
+  quickeconomy.balance.seeall:
+    description: Allows the player to see all players balances.
+    default: false
+    children: [quickeconomy.balance]
+  quickeconomy.balance.modifyall:
+    description: Allows the player to modify all player balances.
+    default: false
+    children: [quickeconomy.balance]
+  quickeconomy.help:
+    description: Allows the player to use the quickeconomy command and get a help message.
+    default: true
+  quickeconomy.shop:
+    description: Allows the player to use shops.
+    default: true
+  quickeconomy.shop.create:
+    description: Allows the player to create shops.
+    default: true
+    children:
+      - quickeconomy.shop
+  quickeconomy.shop.destroyall:
+    description: Allows the player to remove all shops, not exclusively theirs.
+    default: false
+    children:
+      - quickeconomy.shop
+      - quickeconomy.shop.create
+  quickeconomy.bank:
+    description: Allows the player to use banks.
+    default: true
+  quickeconomy.bank.command:
+    description: Allows the player to open a bank with a command.
+    default: false
+  quickeconomy.bank.create:
+    description: Allows the player to create banks.
+    default: false
+    children:
+      - quickeconomy.bank
+  quickeconomy.bank.destroy:
+    description: Allows the player to destroy banks.
+    default: false
+    children:
+      - quickeconomy.bank
+      - quickeconomy.bank.create
+  quickeconomy.rollback:
+    description: Allows the player to perform rollbacks on transactions.
+    default: false
+  quickeconomy.migrate:
+    description: Allows the player to migrate between file- and SQL-mode.
+    default: false
+  quickeconomy.setup:
+    description: Allows the player to see the current plugin setup.
+    default: false

@@ -109,82 +109,66 @@ public class BalanceCommand {
     private static int runSetLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
-        PlayerAccount targetPlayer;
+        String playerUUID;
         try {
-            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            playerUUID = AccountCache.getUUID(targetPlayer.name());
         } catch (Exception e) {
-            targetPlayer = null;
-        }
-
-
-        if (targetPlayer == null ) {
             // Handle player setting their own balance
             if (!(sender instanceof Player player)) {
                 sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                 return Command.SINGLE_SUCCESS;
             }
-            String playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
-            if (Balances.getPlayerBalance(playerUUID) == money) {
-                player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
-                return Command.SINGLE_SUCCESS;
-            }
-            Balances.setPlayerBalance(playerUUID, money);
-            player.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
-            return Command.SINGLE_SUCCESS;
+            playerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
         }
-        // Handle setting other players balance
-        Balances.setPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
-        sender.sendMessage(Component.translatable("balcommand.set", Component.text(targetPlayer.name()), Component.text(money)).style(Styles.INFOSTYLE));
+        double balance = Balances.getPlayerBalance(playerUUID);
+        double difference = Math.abs(balance - money);
+        if (balance < money) {
+            Balances.executeTransaction("n2p", "command", "Server", playerUUID, difference, "Balance added by command.");
+        } else {
+            Balances.executeTransaction("p2n", "command", playerUUID, "Server", difference, "Balance subtracted by command.");
+        }
+        sender.sendMessage(Component.translatable("balcommand.moneyset", Styles.INFOSTYLE));
         return Command.SINGLE_SUCCESS;
     }
 
     private static int runAddLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
-        PlayerAccount targetPlayer;
         try {
-            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            Balances.executeTransaction("n2p", "command", "Server", AccountCache.getUUID(targetPlayer.name()), money, "Balance added by command.");
+            sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
+            return Command.SINGLE_SUCCESS;
         } catch (Exception e) {
-            targetPlayer = null;
-        }
-
-        if (targetPlayer == null) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                 return Command.SINGLE_SUCCESS;
             }
-            Balances.addPlayerBalance(String.valueOf(player.getUniqueId()), money);
+            Balances.executeTransaction("n2p", "command", "Server", TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), money, "Balance added by command.");
             player.sendMessage(Component.translatable("balcommand.add.self", Component.text(money)).style(Styles.INFOSTYLE));
             return Command.SINGLE_SUCCESS;
         }
-        Balances.addPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
-        sender.sendMessage(Component.translatable("balcommand.add", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
-        return Command.SINGLE_SUCCESS;
     }
 
     private static int runSubLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
-        PlayerAccount targetPlayer;
         try {
-            targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
+            Balances.executeTransaction("p2n", "command", AccountCache.getUUID(targetPlayer.name()), "Server", money, "Balance subtracted by command.");
+            sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
+            return Command.SINGLE_SUCCESS;
         } catch (Exception e) {
-            targetPlayer = null;
-        }
-
-        if (targetPlayer == null) {
             if (!(sender instanceof Player)) {
                 sender.sendMessage(Component.translatable("provide.player", Styles.ERRORSTYLE));
                 return Command.SINGLE_SUCCESS;
             }
             Player player = ((Player) sender).getPlayer();
-            Balances.subPlayerBalance(String.valueOf(player.getUniqueId()), money);
+            Balances.executeTransaction("p2n", "command", TypeChecker.trimUUID(String.valueOf(player.getUniqueId())), "Server", money, "Balance subtracted by command.");
             player.sendMessage(Component.translatable("balcommand.sub.self", Component.text(money)).style(Styles.INFOSTYLE));
             return Command.SINGLE_SUCCESS;
         }
-        Balances.subPlayerBalance(AccountCache.getUUID(targetPlayer.name()), money);
-        sender.sendMessage(Component.translatable("balcommand.sub", Component.text(money), Component.text(targetPlayer.name())).style(Styles.INFOSTYLE));
-        return Command.SINGLE_SUCCESS;
     }
 
     private static int runSendLogic(CommandContext<CommandSourceStack> ctx) {

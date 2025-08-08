@@ -18,14 +18,66 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Implementation of a bank GUI system that allows players to convert between currency and physical diamonds.
+ * This class creates and manages an interactive inventory interface for banking operations including
+ * deposits, withdrawals, and balance checking.
+ * 
+ * <p>The bank system operates on an exchange rate between in-game currency and diamonds:
+ * <ul>
+ *   <li><strong>Withdraw:</strong> Convert currency to diamonds (deduct from balance, give diamonds)</li>
+ *   <li><strong>Deposit:</strong> Convert diamonds to currency (remove diamonds, add to balance)</li>
+ *   <li><strong>Balance Check:</strong> Display current player balance</li>
+ * </ul>
+ * </p>
+ * 
+ * <p>The GUI consists of a 3x9 inventory with three main action items:
+ * <ul>
+ *   <li><strong>Diamond (Slot 13):</strong> Withdraw operation - left click for stack (64), right click for single</li>
+ *   <li><strong>Gold Ingot (Slot 11):</strong> Deposit instruction item</li>
+ *   <li><strong>Gold Block (Slot 15):</strong> Balance check operation</li>
+ * </ul>
+ * </p>
+ * 
+ * <p>For deposits, players click diamonds in their inventory rather than the deposit item itself.
+ * The exchange rate is configurable through the plugin's config.yml file.</p>
+ * 
+ * <p><strong>Thread Safety:</strong> This class should only be accessed from the main server thread
+ * as it interacts with Bukkit's inventory and player APIs.</p>
+ * 
+ * @author QuickEconomy
+ * @version 1.0
+ * @since 1.0
+ * @see InventoryHolder
+ * @see Balances
+ */
 public class BankInventory implements InventoryHolder {
 
+    /** The inventory instance representing the bank GUI */
     private final Inventory inventory = Bukkit.createInventory(this, 3 * 9, Component.text("Bank"));
+    
+    /** The player who opened this bank inventory */
     private final Player target;
 
     static Plugin plugin = Main.getInstance();
 
 
+    /**
+     * Creates a new bank inventory GUI for the specified player and immediately opens it.
+     * This constructor sets up all the interactive elements including withdraw, deposit instruction,
+     * and balance check items with appropriate styling and tooltips.
+     * 
+     * <p>The constructor performs the following setup:
+     * <ul>
+     *   <li>Creates styled GUI items with custom names and lore text</li>
+     *   <li>Places items in specific inventory slots for optimal layout</li>
+     *   <li>Automatically opens the inventory for the player</li>
+     * </ul>
+     * </p>
+     * 
+     * @param player the player for whom to create and open the bank inventory
+     * @throws IllegalArgumentException if player is null
+     */
     public BankInventory(Player player) {
         this.target = player;
         // Creating styles for the text
@@ -77,6 +129,30 @@ public class BankInventory implements InventoryHolder {
         player.openInventory(inventory);
     }
 
+    /**
+     * Handles player interactions with the bank inventory, processing both GUI clicks and diamond deposits.
+     * This method determines the appropriate banking operation based on the clicked item and click type.
+     * 
+     * <p>Supported operations:
+     * <ul>
+     *   <li><strong>Withdraw (Diamond click):</strong> Left click = 64 diamonds, Right click = 1 diamond</li>
+     *   <li><strong>Deposit Instruction (Gold Ingot click):</strong> Shows help message for depositing</li>
+     *   <li><strong>Balance Check (Gold Block click):</strong> Displays current balance and closes GUI</li>
+     *   <li><strong>Diamond Deposit:</strong> Converts player's diamonds to currency</li>
+     * </ul>
+     * </p>
+     * 
+     * <p>The method validates player inventory space for withdrawals and sufficient balance before
+     * processing transactions. All currency operations use the configured exchange rate.</p>
+     * 
+     * @param itemStack the item that was clicked
+     * @param bankInventory true if the click occurred within the bank GUI, false if in player inventory
+     * @param clickType the type of click (left, right, etc.)
+     * @return true if the interaction was handled successfully, false if it should be cancelled or ignored
+     * 
+     * @see ClickType
+     * @see Balances#executeTransaction(String, String, String, String, double, String)
+     */
     public Boolean trigger(ItemStack itemStack, boolean bankInventory, ClickType clickType) {
         double exchangeRate = getExchangeRate();
         //check if the clicked item is in the BankInventory
@@ -128,11 +204,27 @@ public class BankInventory implements InventoryHolder {
 
     }
 
+    /**
+     * Returns the inventory instance for this bank GUI.
+     * Required implementation of the {@link InventoryHolder} interface.
+     * 
+     * @return the bank inventory instance
+     */
     @Override
     public Inventory getInventory() {
         return this.inventory;
     }
 
+    /**
+     * Retrieves the diamond-to-currency exchange rate from the plugin configuration.
+     * This rate determines how much currency is equivalent to one diamond in banking operations.
+     * 
+     * <p>The method attempts to read the "exchangeRate" value from config.yml and validates
+     * that it's a proper numeric value. If the configuration is missing or invalid,
+     * it defaults to 10.0 and logs a warning.</p>
+     * 
+     * @return the exchange rate as a double value (defaults to 10.0 if not configured)
+     */
     private static double getExchangeRate() {
         double exchangeRate = 10;
         if (plugin.getConfig().contains("exchangeRate") && plugin.getConfig().getString("exchangeRate") != null) {

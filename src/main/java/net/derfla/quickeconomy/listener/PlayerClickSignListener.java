@@ -13,8 +13,19 @@ import org.bukkit.event.player.PlayerInteractEvent;
 
 import java.util.List;
 
+/**
+ * Listener class that handles sign click events.
+ * Manages interactions with bank and shop signs, opening appropriate inventories.
+ */
 public class PlayerClickSignListener implements Listener {
 
+    /**
+     * Handles the event when a player right-clicks on a sign.
+     * Processes interactions with bank and shop signs, opening bank inventories for banking operations
+     * and shop inventories for purchasing items. Performs permission checks and validates sign integrity.
+     *
+     * @param event The PlayerInteractEvent containing information about the sign interaction
+     */
     @EventHandler
     public void onPlayerClickSign(PlayerInteractEvent event){
         Player player = event.getPlayer();

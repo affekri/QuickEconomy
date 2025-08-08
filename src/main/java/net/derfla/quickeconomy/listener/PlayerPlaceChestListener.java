@@ -10,8 +10,19 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
 
+/**
+ * Listener class that handles chest placement events.
+ * Prevents players from creating double chests when one of the chests is already used as a shop.
+ */
 public class PlayerPlaceChestListener implements Listener {
 
+    /**
+     * Handles the event when a player places a chest block.
+     * Prevents the creation of double chests when one of the chests is already
+     * configured as a shop chest, maintaining shop functionality and preventing conflicts.
+     *
+     * @param event The BlockPlaceEvent containing information about the chest placement
+     */
     @EventHandler
     public void onPlayerPlaceChest (BlockPlaceEvent event) {
         // Check if making a shop chest to a double

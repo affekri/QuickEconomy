@@ -9,8 +9,19 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
 
+/**
+ * Listener class that handles hopper placement events.
+ * Prevents players from placing hoppers that would interfere with locked shop chests.
+ */
 public class PlayerPlaceHopperListener implements Listener {
 
+    /**
+     * Handles the event when a player places a hopper block.
+     * Prevents hoppers from being placed on top of locked shop chests to maintain
+     * shop integrity and prevent unauthorized item extraction.
+     *
+     * @param event The BlockPlaceEvent containing information about the hopper placement
+     */
     @EventHandler
     public void onPlayerPlaceHopper (BlockPlaceEvent event) {
         if (event.getBlockPlaced() == null)  return;

@@ -17,10 +17,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static net.derfla.quickeconomy.database.AccountManagement.displayBalanceSync;
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
+/**
+ * Database-wide operations that affect multiple tables, such as rollback logic.
+ * <p>
+ * Methods are asynchronous to avoid blocking the main server thread.
+ */
 public class System {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Roll back the database state to the specified timestamp.
+     * <p>
+     * Reverts balances by replaying successful transactions in reverse order,
+     * then prunes transactions, autopays, and future account creation timestamps
+     * after the provided datetime.
+     *
+     * @param targetDateTime local datetime string (yyyy-MM-dd HH:mm:ss)
+     * @return a future that completes when the rollback logic is finished
+     */
     public static CompletableFuture<Void> rollback(String targetDateTime) {
         // Validate input
         return validateRollbackInput(targetDateTime).thenCompose(isValid -> {
@@ -165,6 +180,13 @@ public class System {
         });
     }
 
+    /**
+     * Validate the rollback input by checking format and confirming there are
+     * transactions after the provided timestamp.
+     *
+     * @param targetDateTime local datetime string (yyyy-MM-dd HH:mm:ss)
+     * @return a future that completes with {@code true} if rollback can proceed
+     */
     private static CompletableFuture<Boolean> validateRollbackInput(String targetDateTime) {
         // Validate targetDateTime
         final String targetDateTimeUTC;
@@ -199,6 +221,14 @@ public class System {
     }
 
     // Synchronous method for rollback purposes
+    /**
+     * Synchronous helper to retrieve a player's BalChange value in an existing transaction.
+     *
+     * @param conn active SQL connection
+     * @param uuid player UUID, with or without dashes
+     * @return the BalChange value, or 0.0 if absent
+     * @throws SQLException if an SQL error occurs
+     */
     private static double getPlayerBalanceChangeSync(Connection conn, String uuid) throws SQLException {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
@@ -214,6 +244,15 @@ public class System {
     }
 
     // Synchronous method for rollback purposes
+    /**
+     * Synchronous helper to set a player's balance and change within an existing transaction.
+     *
+     * @param conn    active SQL connection
+     * @param uuid    player UUID, with or without dashes
+     * @param balance new balance value
+     * @param change  new change value
+     * @throws SQLException if an SQL error occurs
+     */
     private static void setPlayerBalanceSync(Connection conn, @NotNull String uuid, double balance, double change) throws SQLException {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET Balance = ?, BalChange = ? WHERE UUID = ?;";

@@ -19,10 +19,28 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 
 
+/**
+ * Database access layer for player account records.
+ * <p>
+ * Provides asynchronous CRUD-style operations for the {@code PlayerAccounts} table
+ * and related convenience queries used throughout the plugin. Methods return
+ * {@link java.util.concurrent.CompletableFuture} to avoid blocking the main server thread.
+ */
 public class AccountManagement {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Create a new player account if one does not already exist, and create the
+     * per-player transactions view afterwards.
+     *
+     * @param uuid        the player's UUID, with or without dashes
+     * @param playerName  the player's current name
+     * @param balance     initial balance to set
+     * @param change      initial balance change snapshot
+     * @param callback    optional callback that will be invoked after the insert completes
+     * @return a future completing when the account is created and view ensured, or immediately if the account already exists
+     */
     public static CompletableFuture<Void> addAccount(@NotNull String uuid, @NotNull String playerName, double balance, double change, Consumer<Void> callback) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         Instant currentTime = Instant.now();
@@ -58,6 +76,12 @@ public class AccountManagement {
                 });
     }
 
+    /**
+     * Check whether an account exists for the given UUID.
+     *
+     * @param uuid the player's UUID, with or without dashes
+     * @return a future that completes with {@code true} if an account exists; {@code false} otherwise
+     */
     public static CompletableFuture<Boolean> accountExists(@NotNull String uuid) {
         String sql = "SELECT COUNT(*) FROM PlayerAccounts WHERE UUID = ?";
         String trimmedUuid = TypeChecker.trimUUID(uuid);
@@ -75,6 +99,13 @@ public class AccountManagement {
         });
     }
 
+    /**
+     * Update the stored player name for the given UUID if it has changed.
+     *
+     * @param uuid           the player's UUID, with or without dashes
+     * @param newPlayerName  the new player name to store
+     * @return a future that completes when the update has been applied or no-op'ed if unchanged/nonexistent
+     */
     public static CompletableFuture<Void> updatePlayerName(String uuid, String newPlayerName) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
@@ -124,6 +155,12 @@ public class AccountManagement {
         });
     }
 
+    /**
+     * Retrieve the current balance for the given UUID.
+     *
+     * @param uuid the player's UUID, with or without dashes
+     * @return a future that completes with the current balance, or 0.0 when not found
+     */
     public static CompletableFuture<Double> displayBalance(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
@@ -142,6 +179,14 @@ public class AccountManagement {
     }
 
     // Synchronous method for rollback purposes
+    /**
+     * Synchronous helper used by transactional logic to fetch a player's balance within an existing connection.
+     *
+     * @param conn active SQL connection participating in a broader transaction
+     * @param uuid the player's UUID, with or without dashes
+     * @return the current balance, or 0.0 when not found
+     * @throws SQLException if an SQL error occurs
+     */
     static double displayBalanceSync(Connection conn, @NotNull String uuid) throws SQLException {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT Balance FROM PlayerAccounts WHERE UUID = ?";
@@ -156,6 +201,14 @@ public class AccountManagement {
         return 0.0; // Return 0 if no balance found
     }
 
+    /**
+     * Set a player's balance and balance change snapshot.
+     *
+     * @param uuid    the player's UUID, with or without dashes
+     * @param balance the new balance to set
+     * @param change  the new balance change value to set
+     * @return a future that completes when the update has been applied
+     */
     public static CompletableFuture<Void> setPlayerBalance(@NotNull String uuid, double balance, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
@@ -181,6 +234,12 @@ public class AccountManagement {
         });
     }
 
+    /**
+     * Get the last recorded balance change value for an account.
+     *
+     * @param uuid the player's UUID, with or without dashes
+     * @return a future that completes with the change value, or 0.0 when absent
+     */
     public static CompletableFuture<Double> getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         String sql = "SELECT BalChange FROM PlayerAccounts WHERE UUID = ?";
@@ -198,6 +257,13 @@ public class AccountManagement {
         });
     }
 
+    /**
+     * Update the balance change value for an account.
+     *
+     * @param uuid   the player's UUID, with or without dashes
+     * @param change the new change value to record
+     * @return a future that completes when the update has been applied
+     */
     public static CompletableFuture<Void> setPlayerBalanceChange(@NotNull String uuid, double change) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE PlayerAccounts SET BalChange = ? WHERE UUID = ?;";
@@ -216,6 +282,11 @@ public class AccountManagement {
     }
 
 
+    /**
+     * Retrieve all accounts from the database.
+     *
+     * @return a future that completes with a map keyed by trimmed UUID, where each value is a {@link PlayerAccount}
+     */
     public static CompletableFuture<HashMap<String, PlayerAccount>> listAllAccounts() {
         String sql = "SELECT UUID, PlayerName, Balance, BalChange, AccountDatetime AS Created FROM PlayerAccounts";
 
@@ -240,6 +311,12 @@ public class AccountManagement {
         });
     }
 
+    /**
+     * Look up a UUID by the stored player name.
+     *
+     * @param playerName the player name to search for
+     * @return a future that completes with the UUID string when found, or {@code null} if not found
+     */
     public static CompletableFuture<String> getUUID(String playerName) {
         String sql = "SELECT UUID FROM PlayerAccounts WHERE PlayerName = ?";
 

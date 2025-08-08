@@ -19,10 +19,27 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+/**
+ * Database operations for managing recurring automatic payments (Autopays).
+ * <p>
+ * Supports creating, listing, toggling active state, and deleting autopay rules.
+ * All operations are asynchronous and intended to run off the main server thread.
+ */
 public class Autopay {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Add a new autopay rule for a source player to pay a destination player.
+     *
+     * @param autopayName      human-friendly name of the autopay rule
+     * @param uuid             source player's UUID, with or without dashes
+     * @param destination      destination player's UUID, with or without dashes
+     * @param amount           amount to transfer per execution; must be non-negative
+     * @param inverseFrequency frequency expressed as an inverse (e.g., every N ticks); must be non-negative
+     * @param timesLeft        number of executions remaining; 0 means indefinite
+     * @return a future that completes when the rule has been created
+     */
     public static CompletableFuture<Void> addAutopay(String autopayName, @NotNull String uuid, @NotNull String destination,
                                                      double amount, int inverseFrequency, int timesLeft) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
@@ -71,6 +88,12 @@ public class Autopay {
         });
     }
 
+    /**
+     * List autopay rules owned by the given source UUID, newest first.
+     *
+     * @param uuid source player's UUID, with or without dashes
+     * @return a future that completes with a list of column-name-to-value maps for each autopay row
+     */
     public static CompletableFuture<List<Map<String, Object>>> viewAutopays(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "SELECT a.AutopayID, a.AutopayName, a.Amount, pa.PlayerName AS DestinationName, a.InverseFrequency, a.TimesLeft " +
@@ -103,6 +126,14 @@ public class Autopay {
         });
     }
 
+    /**
+     * Activate or deactivate an autopay rule by id for the given owner.
+     *
+     * @param activeState whether the autopay should be active
+     * @param autopayID   id of the autopay rule
+     * @param uuid        owner/source player's UUID, with or without dashes
+     * @return a future that completes when the change has been persisted
+     */
     public static CompletableFuture<Void> stateChangeAutopay(boolean activeState, int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "UPDATE Autopays SET Active = ? WHERE AutopayID = ? AND Source = ?;";
@@ -131,6 +162,13 @@ public class Autopay {
         });
     }
 
+    /**
+     * Delete an autopay rule by id if it belongs to the given owner.
+     *
+     * @param autopayID id of the autopay rule
+     * @param uuid      owner/source player's UUID, with or without dashes
+     * @return a future that completes when the rule has been removed
+     */
     public static CompletableFuture<Void> deleteAutopay(int autopayID, @NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String sql = "DELETE FROM Autopays WHERE AutopayID = ? AND Source = ?;";

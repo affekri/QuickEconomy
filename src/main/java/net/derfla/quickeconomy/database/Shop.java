@@ -14,10 +14,25 @@ import java.util.concurrent.CompletionException;
 
 import static net.derfla.quickeconomy.database.TableManagement.createEmptyShopsView;
 
+/**
+ * Database operations for managing unclaimed or "empty" shops.
+ * <p>
+ * Supports registering coordinates, ownership updates, per-player views,
+ * listing, and deletion. All operations are asynchronous.
+ */
 public class Shop {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Insert an empty shop or update owners if the coordinates already exist.
+     * Ensures owner-specific views are created or refreshed.
+     *
+     * @param coordinates shop coordinate key
+     * @param owner1      primary owner UUID (trimmed or dashed)
+     * @param owner2      secondary owner UUID (optional; empty if none)
+     * @return a future that completes with {@code true} if an existing row was updated, {@code false} if a new row was inserted
+     */
     public static CompletableFuture<Boolean> insertEmptyShop(@NotNull String coordinates, @NotNull String owner1, String owner2) {
         String Owner1 = TypeChecker.trimUUID(owner1);
         final String Owner2 = !owner2.isEmpty() ? TypeChecker.trimUUID(owner2) : "";
@@ -67,6 +82,12 @@ public class Shop {
         });
     }
 
+    /**
+     * Test whether an empty shop is registered for the given coordinates.
+     *
+     * @param coordinates shop coordinate key
+     * @return a future that completes with {@code true} if found; {@code false} otherwise
+     */
     private static CompletableFuture<Boolean> emptyShopExists(@NotNull String coordinates) {
         String sql = "SELECT COUNT(*) FROM EmptyShops WHERE Coordinates = ?";
 
@@ -84,6 +105,12 @@ public class Shop {
     }
 
 
+    /**
+     * Retrieve the list of empty shop coordinates for the given owner via a per-player view.
+     *
+     * @param uuid owner UUID (trimmed or dashed)
+     * @return a future that completes with a list of coordinate strings; empty if the view does not exist
+     */
     public static CompletableFuture<List<String>> displayEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_EmptyShops_" + trimmedUuid;
@@ -121,6 +148,12 @@ public class Shop {
         });
     }
 
+    /**
+     * Remove an empty shop registration for the given coordinates.
+     *
+    * @param coordinates shop coordinate key
+     * @return a future that completes when the row is deleted (no-op if absent)
+     */
     public static CompletableFuture<Void> removeEmptyShop(String coordinates) {
         String sql = "DELETE FROM EmptyShops WHERE Coordinates = ?;";
 

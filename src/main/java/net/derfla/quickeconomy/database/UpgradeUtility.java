@@ -13,6 +13,12 @@ import java.util.concurrent.CompletionException;
 
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
+/**
+ * Utilities for upgrading the QuickEconomy database schema across plugin versions.
+ * <p>
+ * Contains sequential upgrade steps and helpers to check or bump the version stored
+ * in the plugin configuration.
+ */
 public class UpgradeUtility {
 
     static Plugin plugin = Main.getInstance();
@@ -21,6 +27,12 @@ public class UpgradeUtility {
      * Gets the version of the database. Using the 'database.version' property in the config file.
      * If the property doesn't exist it will assume the database version is 1.1 since that is the last version before the property was introduced.
      * @return Returns the database version in string format.
+     */
+    /**
+     * Get the current database version from configuration.
+     * Defaults to 1.1 for pre-versioned databases.
+     *
+     * @return version string
      */
     private static String getDatabaseVersion() {
         String databaseVersion;
@@ -36,6 +48,11 @@ public class UpgradeUtility {
      * Check if upgrades are needed for the database.
      * @return Returns true if current database version is older than the latest introduced database version.
      */
+    /**
+     * Determine whether the database requires an upgrade.
+     *
+     * @return true if the configured version is older than the latest supported version
+     */
     public static boolean requiresUpgrade() {
         String latestDatabaseVersion = "1.3";
         return TypeChecker.isNewerVersion(latestDatabaseVersion, getDatabaseVersion());
@@ -45,6 +62,9 @@ public class UpgradeUtility {
      * Starts the upgrade process. Currently, it is only set up to upgrade to 1.2.
      * However, plan is to add future upgrades here as well to make skipping versions possible.
      * As this will upgrade to each new version sequentially.
+     */
+    /**
+     * Run pending upgrades until the database is up-to-date.
      */
     public static void startUpgrades() {
         while (requiresUpgrade()) {
@@ -61,6 +81,11 @@ public class UpgradeUtility {
 
     /**
      * Upgrades the database to align with the new changes introduced in the 1.2 version.
+     */
+    /**
+     * Upgrade schema and types to match 1.2 requirements.
+     *
+     * @return a future that completes when the 1.2 upgrade finishes
      */
     private static CompletableFuture<Void> upgradeToV1o2() {
         List<String> tableUpgradeQueries = new ArrayList<>();
@@ -121,6 +146,11 @@ public class UpgradeUtility {
 
     /**
      * Upgrade the database to align with the changes implemented in the 1.3 version.
+     */
+    /**
+     * Upgrade schema and data to match 1.3 requirements.
+     *
+     * @return a future that completes when the 1.3 upgrade finishes
      */
     private static CompletableFuture<Void> upgradeToV1o3() {
         List<String> tableUpgradeQueries = new ArrayList<>();

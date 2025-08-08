@@ -1,18 +1,23 @@
 package net.derfla.quickeconomy.command;
 
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 import net.derfla.quickeconomy.Main;
-import net.derfla.quickeconomy.util.DatabaseManager;
+import net.derfla.quickeconomy.database.Migration;
+import net.derfla.quickeconomy.database.System;
+import net.derfla.quickeconomy.database.TableManagement;
+import net.derfla.quickeconomy.database.Utility;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabExecutor;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.sql.Timestamp;
 import java.time.LocalDate;
@@ -22,31 +27,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Main command executor for the QuickEconomy plugin.
- * Handles administrative commands including data migration, rollback operations, and setup information.
- * Implements TabExecutor for both command execution and tab completion functionality.
- */
 public class QuickeconomyCommand implements TabExecutor {
 
-    /** Static reference to the main plugin instance for accessing configuration and logging. */
     static Plugin plugin = Main.getInstance();
 
-    /**
-     * Executes the main QuickEconomy command with various administrative subcommands.
-     * 
-     * Supported operations:
-     * - migrate: Switches between file and database storage modes
-     * - rollback [year] [month] [day] [time]: Rolls back database to a specific timestamp (SQL mode only)
-     * - setup: Shows current plugin configuration and version information
-     * - No arguments: Displays help information based on user permissions
-     *
-     * @param sender  The command sender
-     * @param command The command that was executed
-     * @param string  The alias used to call this command
-     * @param strings The arguments passed to the command
-     * @return true if the command was handled successfully, false otherwise
-     */
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         if (strings.length >= 1) {
@@ -174,19 +158,6 @@ public class QuickeconomyCommand implements TabExecutor {
 
     }
 
-    /**
-     * Provides tab completion suggestions for the QuickEconomy command.
-     * 
-     * Tab completion behavior:
-     * - First argument: Suggests available subcommands (migrate, rollback, setup) based on permissions
-     * - For rollback command: Suggests date/time components in sequence (year, month, day, time format)
-     *
-     * @param sender  The command sender requesting tab completion
-     * @param command The command being tab completed
-     * @param s       The alias used to call this command
-     * @param strings The arguments typed so far
-     * @return A list of possible completions, or empty list if no completions are available
-     */
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if(strings.length == 1){
@@ -204,24 +175,48 @@ public class QuickeconomyCommand implements TabExecutor {
                     .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[0]))
                     .collect(Collectors.toList());
         }
-        if(strings[0].equalsIgnoreCase("rollback") && sender.hasPermission("quickeconomy.rollback")) {
-            switch (strings.length) {
-                case 2:
-                    return Stream.of(String.valueOf(LocalDate.now().getYear()))
-                            .filter(subCommand -> subCommand.startsWith(strings[1]))
-                            .collect(Collectors.toList());
-                case 3:
-                    return Stream.of(String.format("%02d", LocalDate.now().getMonthValue()))
-                            .filter(subCommand -> subCommand.startsWith(strings[2]))
-                            .collect(Collectors.toList());
-                case 4:
-                    return Stream.of(String.format("%02d", LocalDate.now().getDayOfMonth()))
-                            .filter(subCommand -> subCommand.startsWith(strings[3]))
-                            .collect(Collectors.toList());
-                case 5:
-                    return Collections.singletonList("hh:mm:ss");
-            }
+
+        String timestampString;
+        try {
+            // Zero-pad month and day to ensure correct format
+            String year = String.valueOf(ctx.getArgument("year", Integer.class));
+            String month = String.format("%02d", ctx.getArgument("month", Integer.class));
+            String day = String.format("%02d", ctx.getArgument("day", Integer.class));
+            String hour = String.format("%02d", ctx.getArgument("hour", Integer.class));
+            String minute = String.format("%02d", ctx.getArgument("minute", Integer.class));
+            String second = String.format("%02d", ctx.getArgument("second", Integer.class));
+
+            timestampString = year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
+
+            // Validate that the timestamp can be parsed
+            Timestamp.valueOf(timestampString);
+        } catch (Exception e) {
+            sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
+            plugin.getLogger().info("Rollback failed: " + e.getMessage());
+            return Command.SINGLE_SUCCESS;
         }
-        return Collections.emptyList();
+
+        // Execute rollback asynchronously and handle the result
+        System.rollback(timestampString).whenComplete((result, ex) -> {
+            if (ex != null) {
+                sender.sendMessage(Component.translatable("qecommand.rollback.fail").style(Styles.ERRORSTYLE));
+                plugin.getLogger().info("Rollback failed: " + ex.getMessage());
+            } else {
+                sender.sendMessage(Component.translatable("qecommand.rollback.success").style(Styles.INFOSTYLE));
+                plugin.getLogger().info("Rollback complete to " + timestampString);
+            }
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int runSetupLogic(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String storageMethod = Main.SQLMode ? "SQL Server" : "File";
+        String connections = Main.SQLMode ? "(" + Utility.dataSource.getMaximumPoolSize() + ")" : "";
+        sender.sendMessage(Component.translatable("qecommand.setup", Component.text(storageMethod + " " + connections), Component.text(plugin.getPluginMeta().getVersion())).style(Styles.INFOSTYLE));
+        if(DerflaAPI.updateAvailable()) {
+            sender.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
+        }
+        return Command.SINGLE_SUCCESS;
     }
 }

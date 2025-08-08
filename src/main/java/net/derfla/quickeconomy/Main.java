@@ -1,12 +1,15 @@
 package net.derfla.quickeconomy;
 
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.derfla.quickeconomy.command.BalanceCommand;
 import net.derfla.quickeconomy.command.BankCommand;
 import net.derfla.quickeconomy.command.QuickeconomyCommand;
+import net.derfla.quickeconomy.database.TableManagement;
+import net.derfla.quickeconomy.database.UpgradeUtility;
+import net.derfla.quickeconomy.database.Utility;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.listener.*;
 import net.derfla.quickeconomy.util.AccountCache;
-import net.derfla.quickeconomy.util.DatabaseManager;
 import net.derfla.quickeconomy.util.DerflaAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -41,17 +44,18 @@ public class Main extends JavaPlugin {
     @Override
     public void onEnable() {
 
-        // Set command executors
-        getCommand("balance").setExecutor(new BalanceCommand());
-        getCommand("bal").setExecutor(new BalanceCommand());
-        getCommand("quickeconomy").setExecutor(new QuickeconomyCommand());
-        getCommand("bank").setExecutor(new BankCommand());
+        // Register commands
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
+            commands.registrar().register(BankCommand.createCommand().build());
+            commands.registrar().register(QuickeconomyCommand.createCommand().build());
+            commands.registrar().register(BalanceCommand.createCommand().build());
+            commands.registrar().register(BalanceCommand.createShortCommand().build());
+        });
 
         // Register events
         registerEvents();
 
         // Config file
-        getConfig().options().copyDefaults(true);
         saveDefaultConfig();
 
         // Database and file usage
@@ -71,7 +75,7 @@ public class Main extends JavaPlugin {
 
         // Plugin startup logic
         getLogger().info("QuickEconomy has been enabled!");
-        if(DerflaAPI.updateAvailable()) getLogger().info("A new update is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
+        if(DerflaAPI.updateAvailable()) getLogger().info("A new version of QuickEconomy is available! Download the latest at: https://modrinth.com/plugin/quickeconomy/");
     }
 
     /**
@@ -117,9 +121,10 @@ public class Main extends JavaPlugin {
     private void setupSQLMode() {
         getLogger().info("Running in SQL mode. Attempting to connect to SQL server...");
         try {
-            DatabaseManager.connectToDatabase();
+            Utility.connectToDatabase();
             SQLMode = true;
-            DatabaseManager.createTables();
+            TableManagement.createTables();
+            if (UpgradeUtility.requiresUpgrade()) UpgradeUtility.startUpgrades();
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
@@ -133,8 +138,8 @@ public class Main extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
-        DatabaseManager.closePool();
-        DatabaseManager.shutdownExecutorService(); // Shutdown async thread handler (for database operations)
+        Utility.closePool();
+        Utility.shutdownExecutorService(); // Shutdown async thread handler (for database operations)
     }
 
     /**

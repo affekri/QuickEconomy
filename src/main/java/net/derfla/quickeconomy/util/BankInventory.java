@@ -155,6 +155,7 @@ public class BankInventory implements InventoryHolder {
      */
     public Boolean trigger(ItemStack itemStack, boolean bankInventory, ClickType clickType) {
         double exchangeRate = getExchangeRate();
+        String targetUUID = TypeChecker.trimUUID(String.valueOf(target.getUniqueId()));
         //check if the clicked item is in the BankInventory
         if (bankInventory) {
             switch (itemStack.getType()) {
@@ -167,11 +168,11 @@ public class BankInventory implements InventoryHolder {
                     int diamondAmount;
                     if (clickType.isLeftClick()) diamondAmount = 64;
                     else diamondAmount = 1;
-                    if (Balances.getPlayerBalance(String.valueOf(target.getUniqueId())) < exchangeRate * diamondAmount){
+                    if (Balances.getPlayerBalance(targetUUID) < exchangeRate * diamondAmount){
                         target.sendMessage(Component.translatable("balance.notenough", Styles.ERRORSTYLE));
                         return true;
                     }
-                    Balances.executeTransaction("withdrawal", "bank", String.valueOf(target.getUniqueId()), null, exchangeRate * diamondAmount, "");
+                    Balances.executeTransaction("p2n", "bank", targetUUID, "Bank", exchangeRate * diamondAmount, "Bank withdrawal");
                     target.getInventory().addItem(new ItemStack(Material.DIAMOND, diamondAmount));
                     return true;
                 case GOLD_INGOT:
@@ -181,7 +182,7 @@ public class BankInventory implements InventoryHolder {
                 case GOLD_BLOCK:
                     // Check balance logic
                     target.closeInventory();
-                    target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(target.getUniqueId())))).style(Styles.INFOSTYLE));
+                    target.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(targetUUID))).style(Styles.INFOSTYLE));
                     return true;
                 default:
                     // Do nothing for other item types
@@ -198,7 +199,7 @@ public class BankInventory implements InventoryHolder {
             itemAmount = 1;
             target.getInventory().removeItem(new ItemStack(itemStack.getType(), 1));
         }
-        Balances.executeTransaction("deposit", "bank", null, String.valueOf(target.getUniqueId()), itemAmount * exchangeRate, "");
+        Balances.executeTransaction("n2p", "bank", "Bank", targetUUID, itemAmount * exchangeRate, "Bank deposit");
         return true;
 
 

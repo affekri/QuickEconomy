@@ -11,6 +11,8 @@ database:
   password: pass
   file:
   poolSize: 10
+  # Don't touch the database.version setting!
+  version: 1.2
 # Shops
 shop:
   emptyShopOwnerMessage: true

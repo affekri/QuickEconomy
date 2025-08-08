@@ -1,6 +1,7 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.AccountManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.model.PlayerAccount;
 import org.bukkit.configuration.ConfigurationSection;
@@ -59,8 +60,9 @@ public class AccountCache {
      */
     public static void init() {
         if(Main.SQLMode) {
-            accountMap = DatabaseManager.listAllAccounts().join();
+            accountMap = AccountManagement.listAllAccounts().join();
         } else {
+            accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();
             ConfigurationSection players = file.getConfigurationSection("players");
             for(String uuid : players.getKeys(false)){
@@ -139,14 +141,34 @@ public class AccountCache {
      * @param uuid the player's UUID in trimmed format
      * @return true if the account exists in the cache, false otherwise
      */
-    public static boolean accountExists(String uuid) {
+    public static boolean accountExistsUUID(String uuid) {
         return accountMap.containsKey(uuid);
     }
-    
+
     /**
-     * Private constructor to prevent instantiation of this utility class.
+     * Checks if the provided player name exists in the account cache.
+     * @param playerName The name of the player.
+     * @return True if the name is present in the cache. False if it's not.
      */
-    private AccountCache() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+    public static boolean accountExistsName(String playerName) {
+        for(PlayerAccount account : accountMap.values()) {
+            if (playerName.equals(account.name())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get all the player names that are present in the account cache.
+     * @return A list with all the names of player accounts stored in the account cache.
+     */
+    public static List<String> getAllPlayerNames() {
+        if (accountMap.isEmpty()) return null;
+        List<String> playersArray = new ArrayList<String>();
+        for (String uuid : accountMap.keySet()) {
+            playersArray.add(accountMap.get(uuid).name());
+        }
+        return playersArray;
     }
 }

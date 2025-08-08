@@ -1,6 +1,8 @@
 package net.derfla.quickeconomy.util;
 
 import net.derfla.quickeconomy.Main;
+import net.derfla.quickeconomy.database.AccountManagement;
+import net.derfla.quickeconomy.database.TransactionManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -17,7 +19,7 @@ public class Balances {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         if (Main.SQLMode) {
-            double balance = DatabaseManager.displayBalance(trimmedUUID).join();
+            double balance = AccountManagement.displayBalance(trimmedUUID).join();
             return balance;
         }
 
@@ -37,7 +39,7 @@ public class Balances {
 
         AccountCache.getPlayerAccount(trimmedUUID).balance(money);
         if (Main.SQLMode) {
-            DatabaseManager.setPlayerBalance(uuid, money, 0).join();
+            AccountManagement.setPlayerBalance(uuid, money, 0).join();
             return;
         }
 
@@ -52,7 +54,7 @@ public class Balances {
 
     public static void addPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
-        addPlayerBalanceChange(trimmedUUID, money);
+        if (uuid != null) addPlayerBalanceChange(trimmedUUID, money);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) + money);
     }
 
@@ -73,7 +75,7 @@ public class Balances {
 
         if(Main.SQLMode) {
 
-            DatabaseManager.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
+            AccountManagement.setPlayerBalanceChange(trimmedUUID, moneyChange).join();
             return;
         }
 
@@ -92,35 +94,52 @@ public class Balances {
         setPlayerBalanceChange(uuid, getPlayerBalanceChange(uuid) + money);
     }
 
-    public static boolean hasAccount(String uuid) {
+    public static boolean hasAccountUUID(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
-        if(AccountCache.accountExists(trimmedUUID)) return true;
-
-        if(Main.SQLMode) {
-            return (boolean) DatabaseManager.accountExists(trimmedUUID).join();
-
-        }
-
-        FileConfiguration file = BalanceFile.get();
-        return file.contains("players." + trimmedUUID);
+        return AccountCache.accountExistsUUID(trimmedUUID);
     }
 
+    public static boolean hasAccountName(String playerName) {
+        return AccountCache.accountExistsName(playerName);
+    }
+
+    /**
+     * Create a transaction between two players or one player and a 'null' account.
+     * This is the preferred way of interacting with player balances. Both for SQL and file mode.
+     * 'Null accounts' are accounts marked as n in the transactType parameter. These are accounts that do not exist in the database/balance file.
+     * Please note that this method does not handle any kind of messaging to either the source or destination. Please handle that separately.
+     * @param transactType Define what kind of transaction this is. Accepted values are 'p2p', 'p2n' and 'n2p'.
+     * @param induce What is executing the transaction. Could be a command.
+     * @param source Where coins will be drawn from. If it is a 'p2x' transaction, this has to be a trimmed player UUID.
+     * @param destination Where coins will be sent to. If it is a 'x2p' transaction, this has to be a trimmed player UUID.
+     * @param amount The amount of coins that will be transferred.
+     * @param transactionMessage Optional message to explain the transaction.
+     */
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
-
-        String sourceUUID = TypeChecker.trimUUID(source);
-        String destinationUUID = TypeChecker.trimUUID(destination);
+        if (!("p2p".equalsIgnoreCase(transactType) || "p2n".equalsIgnoreCase(transactType) || "n2p".equalsIgnoreCase(transactType))) {
+            throw new IllegalArgumentException("Invalid transaction type! Allowed values are 'p2p', 'p2n' and 'n2p'");
+        }
+        if (transactType.charAt(0) == 'p' && source.length() != 32) {
+            throw new IllegalArgumentException("This transaction type requires the source parameter to be a trimmed player UUID!");
+        }
+        if (transactType.charAt(2) == 'p' && destination.length() != 32) {
+            throw new IllegalArgumentException("This transaction type requires the destination parameter to be a trimmed player UUID!");
+        }
 
         if(Main.SQLMode) {
-            DatabaseManager.executeTransaction(transactType, induce, source, destination, amount, transactionMessage).join();
-            if (source != null) AccountCache.getPlayerAccount(sourceUUID).balance(AccountCache.getPlayerAccount(sourceUUID).balance() - amount);
-            if (destination != null) AccountCache.getPlayerAccount(destinationUUID).balance(AccountCache.getPlayerAccount(destinationUUID).balance() + amount);
+            // Execute the transaction for SQL mode
+            TransactionManagement.executeTransaction(transactType.toLowerCase(), induce, source, destination, amount, transactionMessage).join();
+
+            // Update the account cache for SQL mode. For file mode account cache will be updated in setPlayerBalance.
+            if (transactType.charAt(0) == 'p') AccountCache.getPlayerAccount(source).balance(AccountCache.getPlayerAccount(source).balance() - amount);
+            if (transactType.charAt(2) == 'p') AccountCache.getPlayerAccount(destination).balance(AccountCache.getPlayerAccount(destination).balance() + amount);
             return;
         }
-        if (source != null)
+        if (transactType.charAt(0) == 'p')
             subPlayerBalance(source, amount);
-        if (destination != null)
+        if (transactType.charAt(2) == 'p')
             addPlayerBalance(destination, amount);
 
     }
@@ -132,7 +151,7 @@ public class Balances {
 
         if (Main.SQLMode) {
 
-            DatabaseManager.updatePlayerName(uuid, name).join();
+            AccountManagement.updatePlayerName(uuid, name).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();
@@ -164,7 +183,7 @@ public class Balances {
         AccountCache.addAccount(uuid, name);
 
         if (Main.SQLMode) {
-            DatabaseManager.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
+            AccountManagement.addAccount(uuid, name, 0.0, 0.0, result -> {}).join();
             return;
         }
         FileConfiguration file = BalanceFile.get();

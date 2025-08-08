@@ -11,12 +11,40 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Utility class for managing the balance.yml file that stores player balance data.
+ * This class provides methods to create, read, write, and maintain the balance configuration file.
+ * 
+ * The balance file stores player economic data including:
+ * - Player balances
+ * - Balance change tracking
+ * - Player name to UUID mappings
+ * 
+ * This class supports migration from name-based to UUID-based player identification.
+ * 
+ * @author QuickEconomy
+ * @version 1.0
+ */
 public class BalanceFile {
 
+    /** The physical balance.yml file */
     private static File file;
+    
+    /** The YAML configuration object for reading/writing balance data */
     private static FileConfiguration customFile;
+    
+    /** Reference to the main plugin instance */
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Initializes the balance file system. Creates the balance.yml file if it doesn't exist
+     * and loads it into memory for configuration access.
+     * 
+     * This method should be called during plugin initialization to ensure the balance
+     * file is ready for use.
+     * 
+     * @throws SecurityException if file creation is denied by security manager
+     */
     public static void setup(){
         // Setup logic, gets called when plugin is loaded
         file = new File(plugin.getDataFolder(), "balance.yml");
@@ -39,6 +67,12 @@ public class BalanceFile {
         customFile = YamlConfiguration.loadConfiguration(file);
     }
 
+    /**
+     * Retrieves the FileConfiguration object for the balance file.
+     * 
+     * @return the FileConfiguration instance for balance.yml, or null if not initialized
+     * @throws IllegalStateException if the configuration has not been properly initialized
+     */
     public static FileConfiguration get() {
         if (customFile == null) {
             plugin.getLogger().severe("Custom file not initialized. Did you call setup()?");
@@ -46,6 +80,12 @@ public class BalanceFile {
         return customFile;
     }
 
+    /**
+     * Saves the current state of the balance configuration to the balance.yml file.
+     * 
+     * Any changes made to the configuration in memory will be persisted to disk.
+     * If saving fails, a warning is logged but no exception is thrown.
+     */
     public static void save(){
         // Saves the file
         try {
@@ -56,6 +96,13 @@ public class BalanceFile {
         }
     }
 
+    /**
+     * Reloads the balance configuration from the balance.yml file.
+     * 
+     * This method discards any unsaved changes in memory and reloads the
+     * configuration from the file on disk. Use this to refresh data after
+     * external modifications to the file.
+     */
     public static void reload() {
         // Reloads the file
         if (file.exists()) {
@@ -66,6 +113,14 @@ public class BalanceFile {
         }
     }
 
+    /**
+     * Deletes the balance.yml file from the filesystem.
+     * 
+     * This is a destructive operation that permanently removes all balance data.
+     * Use with extreme caution as this action cannot be undone.
+     * 
+     * @return true if the file was successfully deleted, false otherwise
+     */
     public static boolean delete() {
         // Deletes the file
         if (file.exists()) {
@@ -82,11 +137,35 @@ public class BalanceFile {
         }
     }
 
+    /**
+     * Checks the current format version of the balance file.
+     * 
+     * The format determines how player data is stored:
+     * - "playerName": Legacy format using player names as keys
+     * - "uuid": Modern format using player UUIDs as keys
+     * 
+     * @return the format string, defaults to "playerName" if not set
+     */
     public static String checkFormat() {
         if(!get().contains("format")) return "playerName";
         return get().getString("format");
     }
 
+    /**
+     * Converts the balance file from name-based format to UUID-based format.
+     * 
+     * This migration process:
+     * 1. Backs up existing player data to "old_players" section
+     * 2. Converts each player entry from name-based to UUID-based keys
+     * 3. Fetches UUIDs from Mojang API for each player name
+     * 4. Handles duplicate accounts and missing UUIDs
+     * 5. Updates the format flag to "uuid"
+     * 
+     * The conversion is performed in batches to manage memory usage and provide
+     * progress feedback. Manual intervention may be required for duplicate accounts.
+     * 
+     * @throws RuntimeException if the conversion process encounters critical errors
+     */
     public static void convertKeys() {
         plugin.getLogger().info("Converting balance.yml to UUID-format.");
         try {

@@ -20,33 +20,135 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class QuickeconomyCommand {
-
-    static final Plugin plugin = Main.getInstance();
+/**
+ * Primary executor and tab-completer for the base QuickEconomy command.
+ * <p>
+ * Handles the following subcommands when executed by a {@link org.bukkit.command.CommandSender}:
+ * <ul>
+ *   <li><b>migrate</b>: Toggle between file storage and SQL database, migrating data as needed.</li>
+ *   <li><b>rollback</b>: Revert the SQL database state back to a specific timestamp.</li>
+ *   <li><b>setup</b>: Display current storage configuration and plugin version information.</li>
+ * </ul>
+ * When no subcommand is provided, contextual help lines are sent based on the sender's permissions.
+ */
+public class QuickeconomyCommand implements TabExecutor {
 
     /**
-     * Create the /quickeconomy command. Command logic is handled separately, in private methods in this class, for clarity.
+     * Owning plugin instance used to access configuration, logging, and metadata.
      */
-    public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
-        return Commands.literal("quickeconomy").requires(sender -> sender.getSender().hasPermission("quickeconomy.help"))
-                .executes(QuickeconomyCommand::runPluginInfoLogic)
-                .then(Commands.literal("migrate").requires(sender -> sender.getSender().hasPermission("quickeconomy.migrate"))
-                        .executes(QuickeconomyCommand::runMigrateLogic)
-                ).then(Commands.literal("rollback").requires(sender -> sender.getSender().hasPermission("quickeconomy.rollback"))
-                        .then(Commands.argument("year", IntegerArgumentType.integer(1900, 9999))
-                            .then(Commands.argument("month", IntegerArgumentType.integer(1, 12))
-                                .then(Commands.argument("day", IntegerArgumentType.integer(1,31))
-                                    .then(Commands.argument("hour", IntegerArgumentType.integer(0, 23))
-                                            .then(Commands.argument("minute", IntegerArgumentType.integer(0, 59))
-                                                    .then(Commands.argument("second", IntegerArgumentType.integer(0, 59))
-                        .executes(QuickeconomyCommand::runRollbackLogic))))))))
-                .then(Commands.literal("setup").requires(sender -> sender.getSender().hasPermission("quickeconomy.setup"))
-                        .executes(QuickeconomyCommand::runSetupLogic));
-    }
+    static Plugin plugin = Main.getInstance();
 
-    private static int runPluginInfoLogic(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+    /**
+     * Execute the QuickEconomy base command.
+     *
+     * @param sender  the command invoker (player or console)
+     * @param command the Bukkit command instance
+     * @param string  the command label used
+     * @param strings the command arguments, where the first element is treated as a subcommand
+     * @return {@code true} when the command was handled (including help output); {@code false} otherwise
+     */
+    @Override
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
+        if (strings.length >= 1) {
+            switch (strings[0].toLowerCase()){
+                case "migrate":
+                    if(!sender.hasPermission("quickeconomy.migrate") && sender instanceof Player) {
+                        break;
+                    }
+                    if(Main.SQLMode) {
+                        DatabaseManager.migrateToBalanceFile();
+                        plugin.getConfig().set("database.enabled", false);
+                        plugin.saveConfig();
+                        Main.SQLMode = false;
+                        sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
+                        return true;
+                    } else {
+                        boolean connectedAndSetup = false;
+                        try{
+                            DatabaseManager.connectToDatabase();
+                            DatabaseManager.createTables();
+                            plugin.getConfig().set("database.enabled", true);
+                            plugin.saveConfig();
+                            Main.SQLMode = true;
+                            sender.sendMessage(Component.translatable("qecommand.migrate.database").style(Styles.INFOSTYLE));
+                            connectedAndSetup = true;
+                        } catch (Exception e) {
+                            sender.sendMessage(Component.translatable("qecommand.migrate.database.fail").style(Styles.ERRORSTYLE));
+                            plugin.getLogger().warning("Failed to connect to database during migration attempt! " + e.getMessage());
+                            plugin.getConfig().set("database.enabled", false);
+                            plugin.saveConfig();
+                            Main.SQLMode = false;
+                        }
+
+                        if (connectedAndSetup) {
+                            DatabaseManager.migrateToDatabase();
+                        }
+                        return true;
+                    }
+                case "rollback":
+                    if(!Main.SQLMode) {
+                        // Rollback is only available when connected to a database
+                        break;
+                    }
+                    if(!sender.hasPermission("quickeconomy.rollback") && sender instanceof Player) {
+                        break;
+                    }
+                    // Ensure proper validation of input parameters
+                    if (strings.length < 5) {
+                        sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
+                        return true;
+                    }
+                    
+                    String timestampString;
+                    try {
+                        // Zero-pad month and day to ensure correct format
+                        String year = strings[1];
+                        String month = String.format("%02d", Integer.parseInt(strings[2]));
+                        String day = String.format("%02d", Integer.parseInt(strings[3]));
+                        String time = strings[4];
+                        
+                        timestampString = year + "-" + month + "-" + day + " " + time;
+                        
+                        // Validate that the timestamp can be parsed
+                        Timestamp.valueOf(timestampString);
+                    } catch (Exception e) {
+                        sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
+                        plugin.getLogger().info("Rollback failed: " + e.getMessage());
+                        return true;
+                    }
+                    
+                    // Execute rollback asynchronously and handle the result
+                    DatabaseManager.rollback(timestampString).whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            sender.sendMessage(Component.translatable("qecommand.rollback.fail").style(Styles.ERRORSTYLE));
+                            plugin.getLogger().info("Rollback failed: " + ex.getMessage());
+                        } else {
+                            sender.sendMessage(Component.translatable("qecommand.rollback.success").style(Styles.INFOSTYLE));
+                            plugin.getLogger().info("Rollback complete to " + timestampString);
+                        }
+                    });
+                    return true;
+                case "setup":
+                    if(!sender.hasPermission("quickeconomy.setup") && sender instanceof Player) {
+                        break;
+                    }
+                    String storageMethod = Main.SQLMode ? "SQL Server" : "File";
+                    String connections = Main.SQLMode ? "(" + DatabaseManager.dataSource.getMaximumPoolSize() + ")" : "";
+                    sender.sendMessage(Component.translatable("qecommand.setup", Component.text(storageMethod + " " + connections), Component.text(plugin.getPluginMeta().getVersion())).style(Styles.INFOSTYLE));
+                    if(DerflaAPI.updateAvailable()) {
+                        sender.sendMessage(Component.translatable("quickeconomy.update").style(Styles.INFOSTYLE).clickEvent(ClickEvent.openUrl("https://modrinth.com/plugin/quickeconomy/")));
+                    }
+                    return true;
+            }
+        }
+
         // Send applicable help messages based on permissions
         if (sender.hasPermission("quickeconomy.balance")) {
             sender.sendMessage(Component.translatable("qecommand.balance", Styles.INFOSTYLE));
@@ -75,48 +177,38 @@ public class QuickeconomyCommand {
         if (sender.hasPermission("quickeconomy.setup")) {
             sender.sendMessage(Component.translatable("qecommand.setup.info", Styles.INFOSTYLE));
         }
-        return Command.SINGLE_SUCCESS;
+        return true;
+
     }
 
-    private static int runMigrateLogic(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        if(Main.SQLMode) {
-            Migration.migrateToBalanceFile();
-            plugin.getConfig().set("database.enabled", false);
-            plugin.saveConfig();
-            Main.SQLMode = false;
-            sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
-            return Command.SINGLE_SUCCESS;
-        } else {
-            boolean connectedAndSetup = false;
-            try{
-                Utility.connectToDatabase();
-                TableManagement.createTables();
-                plugin.getConfig().set("database.enabled", true);
-                plugin.saveConfig();
-                Main.SQLMode = true;
-                sender.sendMessage(Component.translatable("qecommand.migrate.database").style(Styles.INFOSTYLE));
-                connectedAndSetup = true;
-            } catch (Exception e) {
-                sender.sendMessage(Component.translatable("qecommand.migrate.database.fail").style(Styles.ERRORSTYLE));
-                plugin.getLogger().warning("Failed to connect to database during migration attempt! " + e.getMessage());
-                plugin.getConfig().set("database.enabled", false);
-                plugin.saveConfig();
-                Main.SQLMode = false;
+    /**
+     * Provide tab-completions for the QuickEconomy base command.
+     * <p>
+     * For the first argument, proposes available subcommands based on the sender's permissions
+     * and the current storage mode.
+     *
+     * @param sender  the tab-completion requester
+     * @param command the Bukkit command instance
+     * @param s       the command label
+     * @param strings the current argument tokens
+     * @return a list of completion candidates for the current argument, or an empty list when none
+     */
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
+        if(strings.length == 1){
+            List<String> returnList = new ArrayList<>();
+            if(sender.hasPermission("quickeconomy.migrate")){
+                returnList.add("migrate");
             }
-
-            if (connectedAndSetup) {
-                Migration.migrateToDatabase();
+            if(sender.hasPermission("quickeconomy.rollback") && Main.SQLMode){
+                returnList.add("rollback");
             }
-            return Command.SINGLE_SUCCESS;
-        }
-    }
-
-    private static int runRollbackLogic(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        if(!Main.SQLMode) {
-            // Rollback is only available when connected to a database
-            return Command.SINGLE_SUCCESS;
+            if(sender.hasPermission("quickeconomy.setup")) {
+                returnList.add("setup");
+            }
+            return returnList.stream()
+                    .filter(subCommand -> subCommand.toLowerCase().startsWith(strings[0]))
+                    .collect(Collectors.toList());
         }
 
         String timestampString;
@@ -152,6 +244,13 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Sends setup information (storage method, connection pool size, and plugin version)
+     * to the command sender resolved from the provided command context.
+     *
+     * @param ctx Brigadier command context used to resolve the sender
+     * @return {@link Command#SINGLE_SUCCESS} on success
+     */
     private static int runSetupLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String storageMethod = Main.SQLMode ? "SQL Server" : "File";

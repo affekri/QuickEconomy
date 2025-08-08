@@ -33,18 +33,35 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * bStats Metrics Collection Class
+ * 
+ * This class provides functionality for collecting and sending plugin usage statistics
+ * to bStats (https://bStats.org). It collects anonymous data to help plugin authors
+ * understand how their plugins are being used.
+ * 
+ * @author bStats Team
+ * @version 3.0.2
+ * @since 1.0.0
+ */
 public class Metrics {
 
+    /** The plugin instance this metrics collector is associated with */
     private final Plugin plugin;
 
+    /** The underlying metrics base that handles data collection and transmission */
     private final MetricsBase metricsBase;
 
     /**
-     * Creates a new Metrics instance.
+     * Creates a new Metrics instance for collecting plugin statistics.
+     * 
+     * Initializes the bStats configuration, sets up data collection parameters,
+     * and creates the underlying MetricsBase instance. If no configuration exists,
+     * it creates a default configuration file with appropriate settings.
      *
-     * @param plugin Your plugin instance.
-     * @param serviceId The id of the service. It can be found at <a
-     *     href="https://bStats.org/what-is-my-plugin-id">What is my plugin id?</a>
+     * @param plugin Your plugin instance that will be monitored
+     * @param serviceId The unique service ID for your plugin, obtainable from
+     *                  <a href="https://bStats.org/what-is-my-plugin-id">bStats plugin ID page</a>
      */
     public Metrics(JavaPlugin plugin, int serviceId) {
         this.plugin = plugin;
@@ -97,20 +114,32 @@ public class Metrics {
                         logResponseStatusText);
     }
 
-    /** Shuts down the underlying scheduler service. */
+    /**
+     * Shuts down the underlying scheduler service.
+     * This should be called when the plugin is disabled to clean up resources.
+     */
     public void shutdown() {
         metricsBase.shutdown();
     }
 
     /**
-     * Adds a custom chart.
+     * Adds a custom chart to the metrics collection.
+     * Custom charts allow plugins to send specific data points to bStats
+     * for visualization on their plugin page.
      *
-     * @param chart The chart to add.
+     * @param chart The custom chart to add to the metrics collection
      */
     public void addCustomChart(CustomChart chart) {
         metricsBase.addCustomChart(chart);
     }
 
+    /**
+     * Appends platform-specific data to the JSON builder.
+     * This includes server information like player count, Bukkit version,
+     * Java version, OS details, and plugin metadata.
+     * 
+     * @param builder The JSON object builder to append data to
+     */
     private void appendPlatformData(JsonObjectBuilder builder) {
         builder.appendField("playerAmount", getPlayerAmount());
         builder.appendField("onlineMode", Bukkit.getOnlineMode() ? 1 : 0);
@@ -127,10 +156,22 @@ public class Metrics {
         builder.appendField("softDependencies", String.join(", ", plugin.getPluginMeta().getPluginSoftDependencies()));
     }
 
+    /**
+     * Appends service-specific data to the JSON builder.
+     * This includes plugin-specific information like version.
+     * 
+     * @param builder The JSON object builder to append data to
+     */
     private void appendServiceData(JsonObjectBuilder builder) {
         builder.appendField("pluginVersion", plugin.getPluginMeta().getVersion());
     }
 
+    /**
+     * Gets the current number of online players on the server.
+     * Uses reflection to support different Bukkit API versions.
+     * 
+     * @return The number of online players
+     */
     private int getPlayerAmount() {
         try {
             Method onlinePlayersMethod = Class.forName("org.bukkit.Server").getMethod("getOnlinePlayers");
@@ -143,63 +184,84 @@ public class Metrics {
         }
     }
 
+    /**
+     * The core metrics collection and transmission engine.
+     * This class handles the actual data collection, formatting, and
+     * transmission to the bStats service.
+     */
     public static class MetricsBase {
 
-        /** The version of the Metrics class. */
+        /** The version of the Metrics class */
         public static final String METRICS_VERSION = "3.0.2";
 
+        /** The bStats API endpoint URL template for data submission */
         private static final String REPORT_URL = "https://bStats.org/api/v2/data/%s";
 
+        /** Scheduler for periodic data submission tasks */
         private final ScheduledExecutorService scheduler;
 
+        /** The platform identifier (e.g., "bukkit") */
         private final String platform;
 
+        /** Unique server identifier */
         private final String serverUuid;
 
+        /** The service ID for this plugin */
         private final int serviceId;
 
+        /** Consumer for appending platform-specific data */
         private final Consumer<JsonObjectBuilder> appendPlatformDataConsumer;
 
+        /** Consumer for appending service-specific data */
         private final Consumer<JsonObjectBuilder> appendServiceDataConsumer;
 
+        /** Consumer for handling task submission */
         private final Consumer<Runnable> submitTaskConsumer;
 
+        /** Supplier to check if the service is still enabled */
         private final Supplier<Boolean> checkServiceEnabledSupplier;
 
+        /** Consumer for logging errors */
         private final BiConsumer<String, Throwable> errorLogger;
 
+        /** Consumer for logging information messages */
         private final Consumer<String> infoLogger;
 
+        /** Whether errors should be logged */
         private final boolean logErrors;
 
+        /** Whether sent data should be logged */
         private final boolean logSentData;
 
+        /** Whether response status text should be logged */
         private final boolean logResponseStatusText;
 
+        /** Set of custom charts to include in metrics */
         private final Set<CustomChart> customCharts = new HashSet<>();
 
+        /** Whether metrics collection is enabled */
         private final boolean enabled;
 
         /**
-         * Creates a new MetricsBase class instance.
+         * Creates a new MetricsBase class instance with comprehensive configuration.
+         * 
+         * This constructor initializes the metrics collection system with all necessary
+         * parameters for data collection, formatting, and transmission to bStats.
+         * It sets up a dedicated scheduler thread and configures logging options.
          *
-         * @param platform The platform of the service.
-         * @param serviceId The id of the service.
-         * @param serverUuid The server uuid.
-         * @param enabled Whether or not data sending is enabled.
-         * @param appendPlatformDataConsumer A consumer that receives a {@code JsonObjectBuilder} and
-         *     appends all platform-specific data.
-         * @param appendServiceDataConsumer A consumer that receives a {@code JsonObjectBuilder} and
-         *     appends all service-specific data.
-         * @param submitTaskConsumer A consumer that takes a runnable with the submit task. This can be
-         *     used to delegate the data collection to a another thread to prevent errors caused by
-         *     concurrency. Can be {@code null}.
-         * @param checkServiceEnabledSupplier A supplier to check if the service is still enabled.
-         * @param errorLogger A consumer that accepts log message and an error.
-         * @param infoLogger A consumer that accepts info log messages.
-         * @param logErrors Whether or not errors should be logged.
-         * @param logSentData Whether or not the sent data should be logged.
-         * @param logResponseStatusText Whether or not the response status text should be logged.
+         * @param platform The platform identifier (e.g., "bukkit", "sponge")
+         * @param serverUuid The unique server identifier for anonymization
+         * @param serviceId The unique service ID for this plugin from bStats
+         * @param enabled Whether metrics collection and transmission is enabled
+         * @param appendPlatformDataConsumer Consumer that appends platform-specific data to JSON
+         * @param appendServiceDataConsumer Consumer that appends service-specific data to JSON
+         * @param submitTaskConsumer Consumer for task submission delegation (can be null)
+         * @param checkServiceEnabledSupplier Supplier to verify if the service is still enabled
+         * @param errorLogger Consumer for logging error messages and exceptions
+         * @param infoLogger Consumer for logging informational messages
+         * @param logErrors Whether error messages should be logged
+         * @param logSentData Whether transmitted data should be logged for debugging
+         * @param logResponseStatusText Whether HTTP response status should be logged
          */
         public MetricsBase(
                 String platform,
@@ -244,14 +306,29 @@ public class Metrics {
             }
         }
 
+        /**
+         * Adds a custom chart to the metrics collection.
+         * 
+         * @param chart The custom chart to add
+         */
         public void addCustomChart(CustomChart chart) {
             this.customCharts.add(chart);
         }
 
+        /**
+         * Shuts down the metrics scheduler and stops data collection.
+         */
         public void shutdown() {
             scheduler.shutdown();
         }
 
+        /**
+         * Starts the periodic data submission process.
+         * Schedules initial and recurring tasks to submit metrics data to bStats.
+         * Uses randomized delays to distribute server load evenly.
+         * WARNING: Modifying this code will get your plugin banned on bStats. Just
+         * don't do it!
+         */
         private void startSubmitting() {
             final Runnable submitTask =
                     () -> {
@@ -281,6 +358,11 @@ public class Metrics {
                     submitTask, initialDelay + secondDelay, 1000 * 60 * 30, TimeUnit.MILLISECONDS);
         }
 
+        /**
+         * Collects and submits metrics data to bStats.
+         * Builds the JSON payload with platform data, service data, and custom charts,
+         * then schedules the actual network transmission.
+         */
         private void submitData() {
             final JsonObjectBuilder baseJsonBuilder = new JsonObjectBuilder();
             appendPlatformDataConsumer.accept(baseJsonBuilder);
@@ -311,6 +393,13 @@ public class Metrics {
                     });
         }
 
+        /**
+         * Sends the metrics data to the bStats API endpoint.
+         * Compresses the data using GZIP and transmits it via HTTPS POST request.
+         * 
+         * @param data The JSON data to transmit
+         * @throws Exception if network transmission fails
+         */
         private void sendData(JsonObjectBuilder.JsonObject data) throws Exception {
             if (logSentData) {
                 infoLogger.accept("Sent bStats metrics data: " + data.toString());
@@ -343,7 +432,11 @@ public class Metrics {
             }
         }
 
-        /** Checks that the class was properly relocated. */
+        /**
+         * Checks that the bStats class was properly relocated to prevent conflicts.
+         * This ensures that plugins don't use the default bStats package which
+         * could cause conflicts between different plugins.
+         */
         private void checkRelocation() {
             // You can use the property to disable the check in your test environment
             if (System.getProperty("bstats.relocatecheck") == null
@@ -364,10 +457,12 @@ public class Metrics {
         }
 
         /**
-         * Gzips the given string.
+         * Compresses the given string using GZIP compression.
+         * This reduces the size of data transmitted to bStats servers.
          *
-         * @param str The string to gzip.
-         * @return The gzipped string.
+         * @param str The string to compress
+         * @return The compressed byte array, or null if input is null
+         * @throws IOException if compression fails
          */
         private static byte[] compress(final String str) throws IOException {
             if (str == null) {
@@ -381,21 +476,33 @@ public class Metrics {
         }
     }
 
+    /**
+     * A simple pie chart that displays a single string value.
+     * This chart type is useful for displaying categorical data like
+     * server version, game mode, or configuration options.
+     */
     public static class SimplePie extends CustomChart {
 
+        /** The callable that provides the chart data */
         private final Callable<String> callable;
 
         /**
-         * Class constructor.
+         * Creates a new SimplePie chart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns the string value for the chart
          */
         public SimplePie(String chartId, Callable<String> callable) {
             super(chartId);
             this.callable = callable;
         }
 
+        /**
+         * Retrieves the chart data as a JSON object.
+         * 
+         * @return The chart data as JSON, or null if no data available
+         * @throws Exception if data retrieval fails
+         */
         @Override
         protected JsonObjectBuilder.JsonObject getChartData() throws Exception {
             String value = callable.call();
@@ -407,15 +514,20 @@ public class Metrics {
         }
     }
 
+    /**
+     * A multi-line chart that displays multiple numeric values over time.
+     * Useful for showing trends and comparing multiple metrics simultaneously.
+     */
     public static class MultiLineChart extends CustomChart {
 
+        /** The callable that provides the chart data as a map */
         private final Callable<Map<String, Integer>> callable;
 
         /**
-         * Class constructor.
+         * Creates a new MultiLineChart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns a map of line names to values
          */
         public MultiLineChart(String chartId, Callable<Map<String, Integer>> callable) {
             super(chartId);
@@ -447,15 +559,20 @@ public class Metrics {
         }
     }
 
+    /**
+     * An advanced pie chart that displays multiple categories with their values.
+     * This chart shows the distribution of different categories as slices of a pie.
+     */
     public static class AdvancedPie extends CustomChart {
 
+        /** The callable that provides the chart data as a map */
         private final Callable<Map<String, Integer>> callable;
 
         /**
-         * Class constructor.
+         * Creates a new AdvancedPie chart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns a map of category names to values
          */
         public AdvancedPie(String chartId, Callable<Map<String, Integer>> callable) {
             super(chartId);
@@ -487,15 +604,20 @@ public class Metrics {
         }
     }
 
+    /**
+     * A simple bar chart that displays categories with single values.
+     * Each category is represented as a bar with its corresponding value.
+     */
     public static class SimpleBarChart extends CustomChart {
 
+        /** The callable that provides the chart data as a map */
         private final Callable<Map<String, Integer>> callable;
 
         /**
-         * Class constructor.
+         * Creates a new SimpleBarChart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns a map of category names to values
          */
         public SimpleBarChart(String chartId, Callable<Map<String, Integer>> callable) {
             super(chartId);
@@ -517,15 +639,20 @@ public class Metrics {
         }
     }
 
+    /**
+     * An advanced bar chart that displays categories with multiple values.
+     * Each category can have multiple bars representing different metrics.
+     */
     public static class AdvancedBarChart extends CustomChart {
 
+        /** The callable that provides the chart data as a map of arrays */
         private final Callable<Map<String, int[]>> callable;
 
         /**
-         * Class constructor.
+         * Creates a new AdvancedBarChart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns a map of category names to value arrays
          */
         public AdvancedBarChart(String chartId, Callable<Map<String, int[]>> callable) {
             super(chartId);
@@ -557,15 +684,20 @@ public class Metrics {
         }
     }
 
+    /**
+     * A drilldown pie chart that displays hierarchical data.
+     * Users can click on pie slices to see sub-categories within each main category.
+     */
     public static class DrilldownPie extends CustomChart {
 
+        /** The callable that provides nested chart data */
         private final Callable<Map<String, Map<String, Integer>>> callable;
 
         /**
-         * Class constructor.
+         * Creates a new DrilldownPie chart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns nested maps for hierarchical data
          */
         public DrilldownPie(String chartId, Callable<Map<String, Map<String, Integer>>> callable) {
             super(chartId);
@@ -601,10 +733,21 @@ public class Metrics {
         }
     }
 
+    /**
+     * Abstract base class for all custom chart types.
+     * Provides common functionality for chart data collection and formatting.
+     */
     public abstract static class CustomChart {
 
+        /** The unique identifier for this chart */
         private final String chartId;
 
+        /**
+         * Creates a new custom chart with the specified ID.
+         * 
+         * @param chartId The unique identifier for this chart
+         * @throws IllegalArgumentException if chartId is null
+         */
         protected CustomChart(String chartId) {
             if (chartId == null) {
                 throw new IllegalArgumentException("chartId must not be null");
@@ -612,6 +755,13 @@ public class Metrics {
             this.chartId = chartId;
         }
 
+        /**
+         * Builds the JSON request object for this chart.
+         * 
+         * @param errorLogger Consumer for logging errors that occur during data retrieval
+         * @param logErrors Whether errors should be logged
+         * @return The JSON object for the chart request, or null if data is unavailable
+         */
         public JsonObjectBuilder.JsonObject getRequestJsonObject(
                 BiConsumer<String, Throwable> errorLogger, boolean logErrors) {
             JsonObjectBuilder builder = new JsonObjectBuilder();
@@ -632,18 +782,29 @@ public class Metrics {
             return builder.build();
         }
 
+        /**
+         * Abstract method that subclasses must implement to provide chart data.
+         * 
+         * @return The chart data as a JSON object, or null if no data available
+         * @throws Exception if data retrieval fails
+         */
         protected abstract JsonObjectBuilder.JsonObject getChartData() throws Exception;
     }
 
+    /**
+     * A single line chart that displays a single numeric value over time.
+     * Useful for tracking individual metrics like player count or server performance.
+     */
     public static class SingleLineChart extends CustomChart {
 
+        /** The callable that provides the chart data */
         private final Callable<Integer> callable;
 
         /**
-         * Class constructor.
+         * Creates a new SingleLineChart.
          *
-         * @param chartId The id of the chart.
-         * @param callable The callable which is used to request the chart data.
+         * @param chartId The unique identifier for this chart
+         * @param callable The callable that returns the numeric value for the chart
          */
         public SingleLineChart(String chartId, Callable<Integer> callable) {
             super(chartId);
@@ -662,17 +823,23 @@ public class Metrics {
     }
 
     /**
-     * An extremely simple JSON builder.
+     * An extremely simple JSON builder for constructing JSON objects.
      *
-     * <p>While this class is neither feature-rich nor the most performant one, it's sufficient enough
-     * for its use-case.
+     * <p>While this class is neither feature-rich nor the most performant JSON builder available,
+     * it's sufficient for the metrics data collection use-case. It provides basic functionality
+     * to build JSON objects with various data types.
      */
     public static class JsonObjectBuilder {
 
+        /** The string builder used to construct the JSON */
         private StringBuilder builder = new StringBuilder();
 
+        /** Whether at least one field has been added to the JSON object */
         private boolean hasAtLeastOneField = false;
 
+        /**
+         * Creates a new JSON object builder and initializes it with an opening brace.
+         */
         public JsonObjectBuilder() {
             builder.append("{");
         }
@@ -846,20 +1013,31 @@ public class Metrics {
         }
 
         /**
-         * A super simple representation of a JSON object.
+         * A simple representation of a JSON object.
          *
-         * <p>This class only exists to make methods of the {@link JsonObjectBuilder} type-safe and not
-         * allow a raw string inputs for methods like {@link JsonObjectBuilder#appendField(String,
-         * JsonObject)}.
+         * <p>This class provides type safety for the {@link JsonObjectBuilder} by wrapping
+         * the final JSON string. It prevents raw string inputs for methods that expect
+         * JSON objects, ensuring proper data handling.
          */
         public static class JsonObject {
 
+            /** The JSON string representation */
             private final String value;
 
+            /**
+             * Creates a new JSON object wrapper.
+             * 
+             * @param value The JSON string to wrap
+             */
             private JsonObject(String value) {
                 this.value = value;
             }
 
+            /**
+             * Returns the JSON string representation.
+             * 
+             * @return The JSON string
+             */
             @Override
             public String toString() {
                 return value;

@@ -15,14 +15,48 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+/**
+ * Utility class for managing an in-memory cache of player accounts to improve performance.
+ * This cache reduces database/file system access by storing frequently accessed player account
+ * data in memory for quick retrieval.
+ * 
+ * <p>The cache stores {@link PlayerAccount} objects mapped by their UUID (in trimmed format).
+ * This allows for fast O(1) lookups when accessing player balance information, names, and
+ * other account details.</p>
+ * 
+ * <p>The cache is initialized during plugin startup and populated from either the database
+ * (in SQL mode) or the balance file (in file mode). The cache is kept synchronized with
+ * the underlying storage throughout the plugin's operation.</p>
+ * 
+ * <p><strong>Thread Safety:</strong> This class is not thread-safe and should be accessed
+ * from the main server thread only.</p>
+ * 
+ * @author QuickEconomy
+ * @version 1.0
+ * @since 1.0
+ * @see PlayerAccount
+ * @see DatabaseManager
+ * @see BalanceFile
+ */
 public class AccountCache {
 
     static Plugin plugin = Main.getInstance();
     private static HashMap<String, PlayerAccount> accountMap;
 
     /**
-     * Method to call to initiate the account cache.
-     * Is called in startup, in onEnable.
+     * Initializes the account cache by loading all player accounts from the configured storage system.
+     * This method must be called during plugin startup (onEnable) to populate the cache.
+     * 
+     * <p>The initialization process varies depending on the plugin's mode:
+     * <ul>
+     *   <li><strong>SQL Mode:</strong> Loads accounts from the database using {@link DatabaseManager}</li>
+     *   <li><strong>File Mode:</strong> Loads accounts from the balance.yml file</li>
+     * </ul>
+     * </p>
+     * 
+     * <p>After successful initialization, the total number of loaded accounts is logged.</p>
+     * 
+     * @throws RuntimeException if the cache cannot be initialized due to storage access errors
      */
     public static void init() {
         if(Main.SQLMode) {
@@ -41,17 +75,22 @@ public class AccountCache {
     }
 
     /**
-     * Get a PlayerAccount from the AccountCache.
-     * @param UUID The UUID of the player to get the PlayerAccount object.
-     * @return PlayerAccount of the corresponding player.
+     * Retrieves a PlayerAccount from the cache using the player's UUID.
+     * This provides fast O(1) access to player account data without requiring database/file access.
+     * 
+     * @param UUID the player's UUID in trimmed format (32 characters without dashes)
+     * @return the PlayerAccount object for the specified player, or null if not found in cache
      */
     public static PlayerAccount getPlayerAccount(String UUID) {
         return accountMap.get(UUID);
     }
 
     /**
-     * Get a list of strings. Each PlayerAccount has their own string in the list. Utilizes the custom PlayerAccount.toString method. Mainly built for the '/bal list' command.
-     * @return A list of PlayerAccount strings.
+     * Retrieves a list of all cached accounts as formatted strings for display purposes.
+     * Each PlayerAccount is converted to its string representation using the custom toString method.
+     * This method is primarily used for the '/bal list' command.
+     * 
+     * @return a list of formatted account strings, or null if the cache is empty
      */
     public static List<String>listAllAccounts() {
         List<String> accountList = new ArrayList<>();
@@ -66,9 +105,12 @@ public class AccountCache {
     }
 
     /**
-     * Add an account to the cache. This should only be used when a new account is actually being created. Not when just populating the cache, for this refer to AccountCache.init().
-     * @param uuid The UUID of the new player.
-     * @param name The name of the new player.
+     * Adds a new account to the cache with default values (zero balance and change).
+     * This method should only be used when creating a new player account, not during cache initialization.
+     * For cache population during startup, use {@link #init()} instead.
+     * 
+     * @param uuid the UUID of the new player (in trimmed format)
+     * @param name the name of the new player
      */
     public static void addAccount(String uuid, String name) {
         String timeStamp = TypeChecker.convertToUTC(Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -76,9 +118,11 @@ public class AccountCache {
     }
 
     /**
-     * Get the UUID from a player in the account cache.
-     * @param playerName The name of the player.
-     * @return A string with the UUID. If the playerName is not found in the cache, it returns an empty string.
+     * Retrieves a player's UUID by searching the cache for their current name.
+     * This performs a linear search through all cached accounts to find the matching name.
+     * 
+     * @param playerName the name of the player to search for
+     * @return the player's UUID in trimmed format, or an empty string if not found
      */
     public static String getUUID(String playerName) {
         for(String uuid : accountMap.keySet()) {
@@ -91,9 +135,11 @@ public class AccountCache {
     }
 
     /**
-     * Checks if the provided UUID key exists in the account cache.
-     * @param uuid The UUID of the player.
-     * @return True if the UUID is present in the cache. False if it's not.
+     * Checks if an account exists in the cache for the specified UUID.
+     * This provides a fast way to verify account existence without accessing underlying storage.
+     * 
+     * @param uuid the player's UUID in trimmed format
+     * @return true if the account exists in the cache, false otherwise
      */
     public static boolean accountExistsUUID(String uuid) {
         return accountMap.containsKey(uuid);

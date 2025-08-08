@@ -17,10 +17,22 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Listener class that handles inventory click events.
+ * Manages interactions with bank and shop inventories, processing transactions and item purchases.
+ */
 public class InventoryClickListener implements Listener {
 
     Style errorStyle = Styles.ERRORSTYLE;
 
+    /**
+     * Handles the event when a player clicks on an item in an inventory.
+     * Processes clicks in bank inventories for deposit/withdrawal operations and shop inventories
+     * for item purchases. Manages transaction processing, inventory updates, and error handling
+     * for complex multi-owner shop scenarios.
+     *
+     * @param event The InventoryClickEvent containing information about the inventory interaction
+     */
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         // Filter out bad events

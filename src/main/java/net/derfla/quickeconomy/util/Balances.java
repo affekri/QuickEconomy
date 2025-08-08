@@ -11,10 +11,24 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * Player balance utilities for QuickEconomy.
+ * <p>
+ * Provides read and write operations for balances and balance change snapshots,
+ * transparently supporting both SQL mode and file mode based on {@link net.derfla.quickeconomy.Main#SQLMode}.
+ * This class also exposes simple helpers for account presence checks and performing
+ * high-level transactions that delegate to database logic when enabled.
+ */
 public class Balances {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Get the current balance for a player.
+     *
+     * @param uuid player UUID (trimmed or dashed)
+     * @return current balance; 0.0 when not found or file unavailable
+     */
     public static double getPlayerBalance(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
@@ -34,6 +48,13 @@ public class Balances {
         return AccountCache.getPlayerAccount(trimmedUUID).balance();
     }
 
+    /**
+     * Set the player's balance.
+     * Updates the in-memory cache and then persists to SQL or balance.yml.
+     *
+     * @param uuid  player UUID (trimmed or dashed)
+     * @param money new balance amount
+     */
     public static void setPlayerBalance(String uuid, double money) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
@@ -52,22 +73,46 @@ public class Balances {
         BalanceFile.save();
     }
 
+    /**
+     * Increase the player's balance by the given amount and record balance change.
+     *
+     * @param uuid  player UUID (trimmed or dashed)
+     * @param money positive amount to add
+     */
     public static void addPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         if (uuid != null) addPlayerBalanceChange(trimmedUUID, money);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) + money);
     }
 
+    /**
+     * Decrease the player's balance by the given amount.
+     *
+     * @param uuid  player UUID (trimmed or dashed)
+     * @param money positive amount to subtract
+     */
     public static void subPlayerBalance(String uuid, double money){
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         setPlayerBalance(trimmedUUID, getPlayerBalance(trimmedUUID) - money);
     }
 
+    /**
+     * Get the current balance change accumulator.
+     *
+     * @param uuid player UUID (trimmed or dashed)
+     * @return change value in memory (persisted depending on mode)
+     */
     public static double getPlayerBalanceChange(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
         return  AccountCache.getPlayerAccount(trimmedUUID).change();
     }
 
+    /**
+     * Set the current balance change accumulator.
+     *
+     * @param uuid         player UUID (trimmed or dashed)
+     * @param moneyChange  new change value
+     */
     public static void setPlayerBalanceChange(String uuid, double moneyChange) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
@@ -90,31 +135,49 @@ public class Balances {
         BalanceFile.save();
     }
 
+    /**
+     * Increment the balance change accumulator by the given amount.
+     *
+     * @param uuid  player UUID (trimmed or dashed)
+     * @param money delta to add to change accumulator
+     */
     public static void addPlayerBalanceChange(String uuid, double money) {
         setPlayerBalanceChange(uuid, getPlayerBalanceChange(uuid) + money);
     }
 
+    /**
+     * Check whether an account exists for the given UUID in the cache.
+     *
+     * @param uuid player UUID (trimmed or dashed)
+     * @return true if present in cache; false otherwise
+     */
     public static boolean hasAccountUUID(String uuid) {
         String trimmedUUID = TypeChecker.trimUUID(uuid);
 
         return AccountCache.accountExistsUUID(trimmedUUID);
     }
 
+    /**
+     * Check whether an account exists for the given player name in the cache.
+     *
+     * @param playerName player name to search for
+     * @return true if present in cache; false otherwise
+     */
     public static boolean hasAccountName(String playerName) {
         return AccountCache.accountExistsName(playerName);
     }
 
     /**
-     * Create a transaction between two players or one player and a 'null' account.
-     * This is the preferred way of interacting with player balances. Both for SQL and file mode.
-     * 'Null accounts' are accounts marked as n in the transactType parameter. These are accounts that do not exist in the database/balance file.
-     * Please note that this method does not handle any kind of messaging to either the source or destination. Please handle that separately.
-     * @param transactType Define what kind of transaction this is. Accepted values are 'p2p', 'p2n' and 'n2p'.
-     * @param induce What is executing the transaction. Could be a command.
-     * @param source Where coins will be drawn from. If it is a 'p2x' transaction, this has to be a trimmed player UUID.
-     * @param destination Where coins will be sent to. If it is a 'x2p' transaction, this has to be a trimmed player UUID.
-     * @param amount The amount of coins that will be transferred.
-     * @param transactionMessage Optional message to explain the transaction.
+     * Creates a transaction between two players or one player and a logical 'null' account.
+     * Delegates to database-backed logic in SQL mode; otherwise adjusts balances in file mode.
+     *
+     * @param transactType       transaction kind: 'p2p', 'p2n', or 'n2p'
+     * @param induce             what triggered the transaction (e.g., command)
+     * @param source             source UUID for 'p2x', or logical source for 'n2p'
+     * @param destination        destination UUID for 'x2p', or logical destination for 'p2n'
+     * @param amount             amount to transfer (positive)
+     * @param transactionMessage optional description
+     * @throws IllegalArgumentException when parameters are invalid for the transaction type
      */
     public static void executeTransaction(String transactType, String induce, String source,
                                           String destination, double amount, String transactionMessage) {
@@ -144,6 +207,13 @@ public class Balances {
 
     }
 
+    /**
+     * Update the player name associated with the given UUID.
+     * Updates cache first, then persists to SQL or file if changed.
+     *
+     * @param uuid player UUID (trimmed or dashed)
+     * @param name new player name
+     */
     public static void updatePlayerName(String uuid, String name) {
 
 
@@ -178,6 +248,13 @@ public class Balances {
         }
     }
 
+    /**
+     * Create a new account with zero balance and change values.
+     * Updates cache first, then persists to SQL or balance.yml.
+     *
+     * @param uuid player UUID (trimmed or dashed)
+     * @param name player name
+     */
     public static void addAccount(String uuid, String name) {
 
         AccountCache.addAccount(uuid, name);

@@ -15,20 +15,27 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Transactional operations against the database, including executing transfers
+ * and rendering transaction views. Operations are asynchronous and safe for
+ * use off the main server thread.
+ */
 public class TransactionManagement {
 
     static Plugin plugin = Main.getInstance();
 
     /**
-     * This method is designed to only be used by the method executeTransaction in util.Balances.java!
-     * Handles transaction execution for SQL mode.
-     * @param transactType Type of transaction.
-     * @param induce What is executing the transaction.
-     * @param source Where coins will be drawn from.
-     * @param destination Where coins will be sent to.
-     * @param amount The amount of coins that will be transferred.
-     * @param transactionMessage Optional message to explain the transaction.
-     * @return CompletableFuture Void
+     * Execute a transaction and record it in the {@code Transactions} table.
+     * <p>
+     * Designed to be invoked by {@link net.derfla.quickeconomy.util.Balances#executeTransaction}.
+     *
+     * @param transactType       type descriptor, e.g. "p?p" indicating source/destination kinds
+     * @param induce             context of what triggered the transaction
+     * @param source             UUID of the source account, or logical value like "Bank" when not a player
+     * @param destination        UUID of the destination account, or logical value like "Bank"
+     * @param amount             positive amount to transfer
+     * @param transactionMessage optional message describing the transaction
+     * @return a future completing when the transaction is committed
      */
     public static CompletableFuture<Void> executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                                              String destination, double amount, String transactionMessage) {
@@ -124,6 +131,14 @@ public class TransactionManagement {
         }));
     }
 
+    /**
+     * Render a window of the transaction view for a given player to a simple text block.
+     *
+     * @param uuid          player UUID (trimmed or dashed)
+     * @param displayPassed null for all, true for passed-only, false for failed-only
+     * @param page          1-based page index
+     * @return a future with a textual listing of transactions for the selected page
+     */
     public static CompletableFuture<String> displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;

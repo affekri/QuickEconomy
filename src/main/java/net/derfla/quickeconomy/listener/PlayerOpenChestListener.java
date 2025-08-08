@@ -13,8 +13,19 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 
+/**
+ * Listener class that handles chest opening events.
+ * Manages access control for locked chests and shop state management.
+ */
 public class PlayerOpenChestListener implements Listener {
 
+    /**
+     * Handles the event when a player attempts to open a chest.
+     * Enforces access control for locked shop chests, manages shop state transitions,
+     * and performs maintenance tasks such as removing empty shops from the database.
+     *
+     * @param event The InventoryOpenEvent containing information about the chest opening attempt
+     */
     @EventHandler
     public void onPlayerOpenChest(InventoryOpenEvent event){
         if (!event.getInventory().getType().equals(InventoryType.CHEST)) return;

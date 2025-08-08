@@ -27,10 +27,33 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Primary executor and tab-completer for the base QuickEconomy command.
+ * <p>
+ * Handles the following subcommands when executed by a {@link org.bukkit.command.CommandSender}:
+ * <ul>
+ *   <li><b>migrate</b>: Toggle between file storage and SQL database, migrating data as needed.</li>
+ *   <li><b>rollback</b>: Revert the SQL database state back to a specific timestamp.</li>
+ *   <li><b>setup</b>: Display current storage configuration and plugin version information.</li>
+ * </ul>
+ * When no subcommand is provided, contextual help lines are sent based on the sender's permissions.
+ */
 public class QuickeconomyCommand implements TabExecutor {
 
+    /**
+     * Owning plugin instance used to access configuration, logging, and metadata.
+     */
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Execute the QuickEconomy base command.
+     *
+     * @param sender  the command invoker (player or console)
+     * @param command the Bukkit command instance
+     * @param string  the command label used
+     * @param strings the command arguments, where the first element is treated as a subcommand
+     * @return {@code true} when the command was handled (including help output); {@code false} otherwise
+     */
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         if (strings.length >= 1) {
@@ -158,6 +181,18 @@ public class QuickeconomyCommand implements TabExecutor {
 
     }
 
+    /**
+     * Provide tab-completions for the QuickEconomy base command.
+     * <p>
+     * For the first argument, proposes available subcommands based on the sender's permissions
+     * and the current storage mode.
+     *
+     * @param sender  the tab-completion requester
+     * @param command the Bukkit command instance
+     * @param s       the command label
+     * @param strings the current argument tokens
+     * @return a list of completion candidates for the current argument, or an empty list when none
+     */
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if(strings.length == 1){
@@ -209,6 +244,13 @@ public class QuickeconomyCommand implements TabExecutor {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Sends setup information (storage method, connection pool size, and plugin version)
+     * to the command sender resolved from the provided command context.
+     *
+     * @param ctx Brigadier command context used to resolve the sender
+     * @return {@link Command#SINGLE_SUCCESS} on success
+     */
     private static int runSetupLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String storageMethod = Main.SQLMode ? "SQL Server" : "File";

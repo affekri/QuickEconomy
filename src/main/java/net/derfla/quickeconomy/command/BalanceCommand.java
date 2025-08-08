@@ -29,8 +29,61 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Comprehensive command handler for balance-related operations in QuickEconomy.
+ * <p>
+ * This command provides extensive functionality for managing player balances, including:
+ * <ul>
+ *   <li><strong>View Balance:</strong> Check your own or other players' balances</li>
+ *   <li><strong>Transfer Money:</strong> Send money between players with optional messages</li>
+ *   <li><strong>Administrative Tools:</strong> Set, add, or subtract balances (with permissions)</li>
+ *   <li><strong>Transaction History:</strong> View paginated transaction logs (SQL mode only)</li>
+ *   <li><strong>Balance Listing:</strong> List all player balances (with permissions)</li>
+ * </ul>
+ * </p>
+ * <p>
+ * The command supports both file-based and SQL database storage modes, with some features
+ * like transaction history only available in SQL mode. Permission-based access control
+ * ensures that administrative functions are restricted to authorized users.
+ * </p>
+ * <p>
+ * <strong>Command Syntax Examples:</strong>
+ * <ul>
+ *   <li>{@code /bal} - View your own balance</li>
+ *   <li>{@code /bal send <amount> <player> [message]} - Send money to another player</li>
+ *   <li>{@code /bal set <amount> [player]} - Set a player's balance (admin)</li>
+ *   <li>{@code /bal add <amount> [player]} - Add to a player's balance (admin)</li>
+ *   <li>{@code /bal subtract <amount> [player]} - Subtract from a player's balance (admin)</li>
+ *   <li>{@code /bal transactions [page]} - View transaction history</li>
+ *   <li>{@code /bal list [player]} - List balances</li>
+ * </ul>
+ * </p>
+ *
+ * @author QuickEconomy
+ * @since 1.0
+ * @see PlayerAccount
+ * @see AccountCache
+ * @see Balances
+ * @see TransactionManagement
+ * @see CommandExecutor
+ * @see TabCompleter
+ */
 public class BalanceCommand implements CommandExecutor, TabCompleter {
 
+    /**
+     * Executes the balance command with comprehensive subcommand handling.
+     * <p>
+     * This method serves as the main entry point for all balance-related operations.
+     * It handles various subcommands and provides appropriate functionality based on
+     * the arguments provided and the sender's permissions.
+     * </p>
+     *
+     * @param sender the command sender (player or console)
+     * @param command the command that was executed
+     * @param string the command label used
+     * @param strings the command arguments specifying the operation and parameters
+     * @return true if the command was handled successfully, false otherwise
+     */
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         if (strings.length == 0) {
@@ -66,6 +119,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Handles the logic for adding money to a player's balance via Brigadier commands.
+     * <p>
+     * This method processes the "add" subcommand by extracting the amount and target player
+     * from the command context, then executing a transaction to add the specified amount
+     * to the player's balance.
+     * </p>
+     *
+     * @param ctx the command context containing arguments and source information
+     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
+     */
     private static int runAddLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
@@ -85,6 +149,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /**
+     * Handles the logic for subtracting money from a player's balance via Brigadier commands.
+     * <p>
+     * This method processes the "subtract" subcommand by extracting the amount and target
+     * player from the command context, then executing a transaction to remove the specified
+     * amount from the player's balance.
+     * </p>
+     *
+     * @param ctx the command context containing arguments and source information
+     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
+     */
     private static int runSubLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
@@ -105,6 +180,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /**
+     * Handles the logic for sending money between players via Brigadier commands.
+     * <p>
+     * This method processes the "send" subcommand, facilitating peer-to-peer money transfers.
+     * It performs validation to prevent self-transfers and ensures sufficient balance before
+     * executing the transaction.
+     * </p>
+     *
+     * @param ctx the command context containing money amount, target player, and optional message
+     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
+     */
     private static int runSendLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money = ctx.getArgument("money", Double.class);
@@ -296,6 +382,20 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
     }
 
 
+    /**
+     * Provides tab completion suggestions for the balance command.
+     * <p>
+     * This method generates contextual suggestions based on the current argument position
+     * and the sender's permissions. It supports completion for subcommands, amount suggestions,
+     * player names, and page numbers depending on the context.
+     * </p>
+     *
+     * @param sender the command sender requesting tab completion
+     * @param command the command being completed
+     * @param s the command alias used
+     * @param strings the current command arguments
+     * @return a list of completion suggestions, or null if no suggestions available
+     */
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if (strings.length == 1) {

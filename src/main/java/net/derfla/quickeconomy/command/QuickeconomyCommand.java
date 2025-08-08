@@ -22,10 +22,31 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Main command executor for the QuickEconomy plugin.
+ * Handles administrative commands including data migration, rollback operations, and setup information.
+ * Implements TabExecutor for both command execution and tab completion functionality.
+ */
 public class QuickeconomyCommand implements TabExecutor {
 
+    /** Static reference to the main plugin instance for accessing configuration and logging. */
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Executes the main QuickEconomy command with various administrative subcommands.
+     * 
+     * Supported operations:
+     * - migrate: Switches between file and database storage modes
+     * - rollback [year] [month] [day] [time]: Rolls back database to a specific timestamp (SQL mode only)
+     * - setup: Shows current plugin configuration and version information
+     * - No arguments: Displays help information based on user permissions
+     *
+     * @param sender  The command sender
+     * @param command The command that was executed
+     * @param string  The alias used to call this command
+     * @param strings The arguments passed to the command
+     * @return true if the command was handled successfully, false otherwise
+     */
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         if (strings.length >= 1) {
@@ -153,6 +174,19 @@ public class QuickeconomyCommand implements TabExecutor {
 
     }
 
+    /**
+     * Provides tab completion suggestions for the QuickEconomy command.
+     * 
+     * Tab completion behavior:
+     * - First argument: Suggests available subcommands (migrate, rollback, setup) based on permissions
+     * - For rollback command: Suggests date/time components in sequence (year, month, day, time format)
+     *
+     * @param sender  The command sender requesting tab completion
+     * @param command The command being tab completed
+     * @param s       The alias used to call this command
+     * @param strings The arguments typed so far
+     * @return A list of possible completions, or empty list if no completions are available
+     */
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if(strings.length == 1){

@@ -24,8 +24,32 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Command executor for the balance command system.
+ * Handles all balance-related operations including viewing, setting, adding, subtracting,
+ * sending money between players, viewing transactions, and listing balances.
+ * Implements both CommandExecutor for command handling and TabCompleter for tab completion.
+ */
 public class BalanceCommand implements CommandExecutor, TabCompleter {
 
+    /**
+     * Executes the balance command with various subcommands.
+     * 
+     * Supported operations:
+     * - No arguments: Shows the sender's balance (players only)
+     * - set [amount] [player]: Sets a player's balance (requires permission)
+     * - add [amount] [player]: Adds to a player's balance (requires permission)
+     * - subtract [amount] [player]: Subtracts from a player's balance (requires permission)
+     * - send [amount] [player]: Sends money from sender to another player
+     * - transactions [page]: Shows transaction history (SQL mode only)
+     * - list [player]: Lists all balances or a specific player's balance
+     *
+     * @param sender  The command sender
+     * @param command The command that was executed
+     * @param string  The alias used to call this command
+     * @param strings The arguments passed to the command
+     * @return true if the command was handled successfully, false otherwise
+     */
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String string, @NotNull String[] strings) {
         if (strings.length == 0) {
@@ -318,7 +342,20 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-
+    /**
+     * Provides tab completion suggestions for the balance command.
+     * 
+     * Tab completion behavior:
+     * - First argument: Suggests available subcommands based on permissions
+     * - Second argument: Suggests amounts or page numbers depending on subcommand
+     * - Third argument: Suggests player names for commands that target other players
+     *
+     * @param sender  The command sender requesting tab completion
+     * @param command The command being tab completed
+     * @param s       The alias used to call this command
+     * @param strings The arguments typed so far
+     * @return A list of possible completions, or null if no completions are available
+     */
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
         if (strings.length == 1) {

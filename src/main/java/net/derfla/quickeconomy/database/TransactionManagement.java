@@ -177,9 +177,9 @@ public class TransactionManagement {
                     String message = rs.getString("Message");
                     transactions.append(dateTimeLocal).append(" ").append(amount);
                     if (sourcePlayerName == null) {
-                        transactions.append(" -> ").append("[").append(sourceUUID).append("]");
+                        transactions.append(" <- ").append("[").append(sourceUUID).append("]");
                     } else if (destinationPlayerName == null) {
-                        transactions.append(" <- ").append("[").append(destinationUUID).append("]");
+                        transactions.append(" -> ").append("[").append(destinationUUID).append("]");
                     } else if (sourceUUID.equalsIgnoreCase(trimmedUuid)) {
                         transactions.append(" -> ").append(destinationPlayerName);
                     } else if (destinationUUID.equalsIgnoreCase(trimmedUuid)) {

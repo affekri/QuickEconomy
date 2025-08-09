@@ -51,7 +51,16 @@ public class PlayerClickSignListener implements Listener {
                 return;
             }
             List<String> owners = BlockOwner.getChestOwner(chest);
-            assert owners != null;
+            // Handle bug where shop chest data has been erased.
+            if(owners == null) {
+                String owner1 = TypeChecker.getRawString(sign.getSide(Side.FRONT).line(2));
+                String owner2 = TypeChecker.getRawString(sign.getSide(Side.FRONT).line(3));
+                String owner1UUID = Balances.getUUID(owner1);
+                String owner2UUID = "";
+                if(!owner2.isEmpty()) Balances.getUUID(owner2);
+                BlockOwner.setPlayerLocked(chest, owner1UUID, owner2UUID);
+            }
+            owners = BlockOwner.getChestOwner(chest);
             String seller = owners.getFirst();
             String seller2 = "";
             if(owners.size() == 2) seller2 = owners.getLast();

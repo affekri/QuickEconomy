@@ -123,7 +123,8 @@ public class Main extends JavaPlugin {
         try {
             Utility.connectToDatabase();
             SQLMode = true;
-            TableManagement.createTables();
+            // Ensure tables are fully created before running any upgrades to avoid race conditions
+            TableManagement.createTables().join();
             if (UpgradeUtility.requiresUpgrade()) UpgradeUtility.startUpgrades();
         } catch (Exception e) {
             getLogger().severe("Could not establish a database connection: " + e.getMessage());

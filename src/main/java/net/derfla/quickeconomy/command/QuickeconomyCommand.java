@@ -16,34 +16,15 @@ import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Timestamp;
 
-/**
- * Primary executor and tab-completer for the base QuickEconomy command.
- * <p>
- * Handles the following subcommands:
- * <ul>
- *   <li><b>migrate</b>: Toggle between file storage and SQL database, migrating data as needed.</li>
- *   <li><b>rollback</b>: Revert the SQL database state back to a specific timestamp.</li>
- *   <li><b>setup</b>: Display current storage configuration and plugin version information.</li>
- * </ul>
- * When no subcommand is provided, contextual help lines are sent based on the sender's permissions.
- */
 public class QuickeconomyCommand {
 
-    /**
-     * Owning plugin instance used to access configuration, logging, and metadata.
-     */
     static Plugin plugin = Main.getInstance();
 
-    /**
-     * Create the /quickeconomy command and its subcommands.
-     * Handles permission checks and delegates logic to private methods.
-     *
-     * @return a {@link LiteralArgumentBuilder} for the /quickeconomy command
-     */
     public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
         return Commands.literal("quickeconomy").requires(sender -> sender.getSender().hasPermission("quickeconomy.help"))
                 .executes(QuickeconomyCommand::runPluginInfoLogic)
@@ -61,16 +42,8 @@ public class QuickeconomyCommand {
                         .executes(QuickeconomyCommand::runSetupLogic));
     }
 
-    /**
-     * Sends contextual help and info lines to the sender based on their permissions.
-     * This is the default action when /quickeconomy is run without subcommands.
-     *
-     * @param ctx the Brigadier command context
-     * @return {@link Command#SINGLE_SUCCESS} always
-     */
     private static int runPluginInfoLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        // Send applicable help messages based on permissions
         if (sender.hasPermission("quickeconomy.balance")) {
             sender.sendMessage(Component.translatable("qecommand.balance", Styles.INFOSTYLE));
         }
@@ -101,33 +74,24 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Handles the /quickeconomy migrate subcommand.
-     * Toggles between file and SQL storage, migrating data as needed.
-     * Updates plugin configuration and notifies the sender of the result.
-     *
-     * @param ctx the Brigadier command context
-     * @return {@link Command#SINGLE_SUCCESS} always
-     */
     private static int runMigrateLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (Main.SQLMode) {
-            Migration.migrateToBalanceFile();
-            plugin.getConfig().set("database.enabled", false);
-            plugin.saveConfig();
-            Main.SQLMode = false;
-            sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
-            return Command.SINGLE_SUCCESS;
+            Migration.migrateToBalanceFile().thenRun(() -> {
+                plugin.getConfig().set("database.enabled", false);
+                plugin.saveConfig();
+                Main.SQLMode = false;
+                sender.sendMessage(Component.translatable("qecommand.migrate.file").style(Styles.INFOSTYLE));
+            });
         } else {
-            boolean connectedAndSetup = false;
             try {
                 Utility.connectToDatabase();
-                TableManagement.createTables();
+                TableManagement.createTables().join();
                 plugin.getConfig().set("database.enabled", true);
                 plugin.saveConfig();
                 Main.SQLMode = true;
                 sender.sendMessage(Component.translatable("qecommand.migrate.database").style(Styles.INFOSTYLE));
-                connectedAndSetup = true;
+                Migration.migrateToDatabase();
             } catch (Exception e) {
                 sender.sendMessage(Component.translatable("qecommand.migrate.database.fail").style(Styles.ERRORSTYLE));
                 plugin.getLogger().warning("Failed to connect to database during migration attempt! " + e.getMessage());
@@ -135,32 +99,18 @@ public class QuickeconomyCommand {
                 plugin.saveConfig();
                 Main.SQLMode = false;
             }
-
-            if (connectedAndSetup) {
-                Migration.migrateToDatabase();
-            }
-            return Command.SINGLE_SUCCESS;
         }
+        return Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Handles the /quickeconomy rollback subcommand.
-     * Rolls back the SQL database to a specific timestamp, if in SQL mode.
-     * Notifies the sender of success or failure.
-     *
-     * @param ctx the Brigadier command context (expects year, month, day, hour, minute, second arguments)
-     * @return {@link Command#SINGLE_SUCCESS} always
-     */
     private static int runRollbackLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (!Main.SQLMode) {
-            // Rollback is only available when connected to a database
             return Command.SINGLE_SUCCESS;
         }
 
         String timestampString;
         try {
-            // Zero-pad month and day to ensure correct format
             String year = String.valueOf(ctx.getArgument("year", Integer.class));
             String month = String.format("%02d", ctx.getArgument("month", Integer.class));
             String day = String.format("%02d", ctx.getArgument("day", Integer.class));
@@ -169,8 +119,6 @@ public class QuickeconomyCommand {
             String second = String.format("%02d", ctx.getArgument("second", Integer.class));
 
             timestampString = year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
-
-            // Validate that the timestamp can be parsed
             Timestamp.valueOf(timestampString);
         } catch (Exception e) {
             sender.sendMessage(Component.translatable("qecommand.rollback.date.fail").style(Styles.ERRORSTYLE));
@@ -178,7 +126,6 @@ public class QuickeconomyCommand {
             return Command.SINGLE_SUCCESS;
         }
 
-        // Execute rollback asynchronously and handle the result
         System.rollback(timestampString).whenComplete((result, ex) -> {
             if (ex != null) {
                 sender.sendMessage(Component.translatable("qecommand.rollback.fail").style(Styles.ERRORSTYLE));
@@ -191,14 +138,6 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Handles the /quickeconomy setup subcommand.
-     * Sends storage method, connection pool size, and plugin version to the sender.
-     * Also notifies about available updates.
-     *
-     * @param ctx the Brigadier command context
-     * @return {@link Command#SINGLE_SUCCESS} always
-     */
     private static int runSetupLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String storageMethod = Main.SQLMode ? "SQL Server" : "File";

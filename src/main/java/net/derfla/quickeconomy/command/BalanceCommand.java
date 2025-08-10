@@ -1,17 +1,16 @@
 package net.derfla.quickeconomy.command;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.command.argument.AccountArgument;
 import net.derfla.quickeconomy.database.TransactionManagement;
+import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.model.PlayerAccount;
 import net.derfla.quickeconomy.util.*;
 import net.kyori.adventure.text.Component;
@@ -19,61 +18,96 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.UUID;
 
-/**
- * Comprehensive command handler for balance-related operations in QuickEconomy.
- * <p>
- * This command provides extensive functionality for managing player balances, including:
- * <ul>
- *   <li><strong>View Balance:</strong> Check your own or other players' balances</li>
- *   <li><strong>Transfer Money:</strong> Send money between players with optional messages</li>
- *   <li><strong>Administrative Tools:</strong> Set, add, or subtract balances (with permissions)</li>
- *   <li><strong>Transaction History:</strong> View paginated transaction logs (SQL mode only)</li>
- *   <li><strong>Balance Listing:</strong> List all player balances (with permissions)</li>
- * </ul>
- * </p>
- * <p>
- * The command supports both file-based and SQL database storage modes, with some features
- * like transaction history only available in SQL mode. Permission-based access control
- * ensures that administrative functions are restricted to authorized users.
- * </p>
- * <p>
- * <strong>Command Syntax Examples:</strong>
- * <ul>
- *   <li>{@code /bal} - View your own balance</li>
- *   <li>{@code /bal send <amount> <player> [message]} - Send money to another player</li>
- *   <li>{@code /bal set <amount> [player]} - Set a player's balance (admin)</li>
- *   <li>{@code /bal add <amount> [player]} - Add to a player's balance (admin)</li>
- *   <li>{@code /bal subtract <amount> [player]} - Subtract from a player's balance (admin)</li>
- *   <li>{@code /bal transactions [page]} - View transaction history</li>
- *   <li>{@code /bal list [player]} - List balances</li>
- * </ul>
- * </p>
- *
- * @author QuickEconomy
- * @since 1.0
- * @see PlayerAccount
- * @see AccountCache
- * @see Balances
- * @see TransactionManagement
- * @see CommandExecutor
- * @see TabCompleter
- */
-public class BalanceCommand implements BasicCommand {
 
-    @Override
-    public Command<CommandSourceStack> getCommand() {
-        return create();
+public class BalanceCommand {
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCommandTree(String rootLiteral) {
+        BalanceCommand handler = new BalanceCommand();
+        return Commands.literal(rootLiteral)
+                .requires(sender -> sender.getSender().hasPermission("quickeconomy.balance"))
+                .executes(BalanceCommand::runBalanceLogic)
+                .then(Commands.literal("set").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", StringArgumentType.string())
+                                .executes(handler::runSetLogic)
+                                .then(Commands.argument("player", new AccountArgument())
+                                        .executes(handler::runSetLogic))))
+                .then(Commands.literal("add").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", StringArgumentType.string())
+                                .executes(handler::runAddLogic)
+                                .then(Commands.argument("player", new AccountArgument())
+                                        .executes(handler::runAddLogic))))
+                .then(Commands.literal("subtract").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
+                        .then(Commands.argument("money", StringArgumentType.string())
+                                .executes(handler::runSubLogic)
+                                .then(Commands.argument("player", new AccountArgument())
+                                        .executes(handler::runSubLogic))))
+                .then(Commands.literal("send").requires(sender -> sender.getExecutor() instanceof Player)
+                        .then(Commands.argument("money", StringArgumentType.string())
+                                .then(Commands.argument("player", new AccountArgument())
+                                        .executes(handler::runSendLogic)
+                                        .then(Commands.argument("message", StringArgumentType.greedyString())
+                                                .executes(handler::runSendLogic)))))
+                .then(Commands.literal("list").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.seeall"))
+                        .executes(ctx -> {
+                            if(Main.SQLMode) {
+                                ctx.getSource().getSender().sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
+                            } else {
+                                // List all balances in file mode
+                                FileConfiguration file = BalanceFile.get();
+                                if (file == null) {
+                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
+                                    return Command.SINGLE_SUCCESS;
+                                }
+                                ConfigurationSection players = file.getConfigurationSection("players");
+                                if (players == null) {
+                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
+                                    return Command.SINGLE_SUCCESS;
+                                }
+                                StringBuilder balanceList = new StringBuilder();
+                                for (String uuid : players.getKeys(false)) {
+                                    String name = players.getString(uuid + ".name");
+                                    float balance = (float) players.getDouble(uuid + ".balance");
+                                    if (name != null && balance > 0) {
+                                        balanceList.append(name).append(": ").append(balance).append("\n");
+                                    }
+                                }
+                                if (balanceList.length() > 0) {
+                                    ctx.getSource().getSender().sendMessage(balanceList.toString());
+                                } else {
+                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
+                                }
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        })
+                )
+                .then(Commands.literal("transactions").requires(sender -> Main.SQLMode && sender.getSender() instanceof Player)
+                        .executes(BalanceCommand::runTransactionsLogic)
+                        .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                .executes(BalanceCommand::runTransactionsLogic)))
+                .then(Commands.argument("player", new AccountArgument())
+                        .executes(handler::runSeeLogic));
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
+        return buildCommandTree("balance");
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> createShortCommand() {
+        return buildCommandTree("bal");
+    }
+
+    private static int runBalanceLogic(CommandContext<CommandSourceStack> ctx) {
+        if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+            ctx.getSource().getSender().sendMessage("You can only see your balance as a player!");
+            return Command.SINGLE_SUCCESS;
+        }
+        player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int runSetLogic(CommandContext<CommandSourceStack> ctx) {
@@ -85,7 +119,7 @@ public class BalanceCommand implements BasicCommand {
             sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid",Component.text(e.getMessage()), Styles.ERRORSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         }
         String playerUUID;
@@ -111,17 +145,7 @@ public class BalanceCommand implements BasicCommand {
         return com.mojang.brigadier.Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Handles the logic for adding money to a player's balance via Brigadier commands.
-     * <p>
-     * This method processes the "add" subcommand by extracting the amount and target player
-     * from the command context, then executing a transaction to add the specified amount
-     * to the player's balance.
-     * </p>
-     *
-     * @param ctx the command context containing arguments and source information
-     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
-     */
+
     private int runAddLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money;
@@ -131,7 +155,7 @@ public class BalanceCommand implements BasicCommand {
             sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage()), Styles.ERRORSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         }
         try {
@@ -150,17 +174,7 @@ public class BalanceCommand implements BasicCommand {
         }
     }
 
-    /**
-     * Handles the logic for subtracting money from a player's balance via Brigadier commands.
-     * <p>
-     * This method processes the "subtract" subcommand by extracting the amount and target
-     * player from the command context, then executing a transaction to remove the specified
-     * amount from the player's balance.
-     * </p>
-     *
-     * @param ctx the command context containing arguments and source information
-     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
-     */
+
     private int runSubLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money;
@@ -170,7 +184,7 @@ public class BalanceCommand implements BasicCommand {
             sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage()), Styles.ERRORSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         }
         try {
@@ -190,17 +204,7 @@ public class BalanceCommand implements BasicCommand {
         }
     }
 
-    /**
-     * Handles the logic for sending money between players via Brigadier commands.
-     * <p>
-     * This method processes the "send" subcommand, facilitating peer-to-peer money transfers.
-     * It performs validation to prevent self-transfers and ensures sufficient balance before
-     * executing the transaction.
-     * </p>
-     *
-     * @param ctx the command context containing money amount, target player, and optional message
-     * @return {@link Command#SINGLE_SUCCESS} indicating successful command execution
-     */
+
     private int runSendLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         double money;
@@ -210,7 +214,7 @@ public class BalanceCommand implements BasicCommand {
             sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage()), Styles.ERRORSTYLE));
+            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         }
         PlayerAccount account = ctx.getArgument("player", PlayerAccount.class);
@@ -238,13 +242,17 @@ public class BalanceCommand implements BasicCommand {
 
         Balances.executeTransaction("p2p", "command", trimmedPlayerUUID, targetUUID, money, message);
 
-                player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(account.name())).style(Styles.INFOSTYLE));
-                Player onlineTarget = Bukkit.getPlayer(account.name());
-                if (onlineTarget != null) {
-                    // Alerts the receiving player if it's online
-                    onlineTarget.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
-                }
-                return com.mojang.brigadier.Command.SINGLE_SUCCESS;
+        player.sendMessage(Component.translatable("balcommand.send", Component.text(money), Component.text(account.name())).style(Styles.INFOSTYLE));
+        Player onlineTarget = Bukkit.getPlayer(convertedUUID);
+        if (onlineTarget != null) {
+            // Alerts the receiving player if it's online
+            if (message.isEmpty()) {
+                onlineTarget.sendMessage(Component.translatable("balcommand.send.receive", Component.text(money), Component.text(player.getName())).style(Styles.INFOSTYLE));
+            } else {
+                onlineTarget.sendMessage(Component.translatable("balcommand.send.receivemesssage", Component.text(money), Component.text(player.getName()), Component.text(message)).style(Styles.INFOSTYLE));
+            }
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private int runSeeLogic(CommandContext<CommandSourceStack> ctx) {
@@ -259,91 +267,7 @@ public class BalanceCommand implements BasicCommand {
         return com.mojang.brigadier.Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Creates the Brigadier command structure for the balance command.
-     * <p>
-     * This method constructs the command tree using Brigadier, defining all subcommands,
-     * arguments, and permission requirements. It provides a structured and type-safe
-     * way to handle complex command syntax.
-     * </p>
-     *
-     */
-    public Command<CommandSourceStack> create() {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("bal")
-                .executes(ctx -> {
-                    if (!(ctx.getSource().getSender() instanceof Player)) {
-                        ctx.getSource().getSender().sendMessage("You can only see your balance as a player!");
-                        return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-                    }
-                    Player player = ((Player) ctx.getSource().getSender()).getPlayer();
-                    player.sendMessage(Component.translatable("balance.see", Component.text(Balances.getPlayerBalance(String.valueOf(player.getUniqueId())))).style(Styles.INFOSTYLE));
-                    return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-                })
-                .then(Commands.literal("send")
-                        .then(Commands.argument("money", StringArgumentType.string())
-                                .then(Commands.argument("player", new AccountArgument())
-                                        .executes(this::runSendLogic)
-                                        .then(Commands.argument("message", StringArgumentType.greedyString())
-                                                .executes(this::runSendLogic)))))
-                .then(Commands.literal("set").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
-                                .executes(this::runSetLogic)
-                                .then(Commands.argument("player", new AccountArgument())
-                                        .executes(this::runSetLogic))))
-                .then(Commands.literal("add").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
-                                .executes(this::runAddLogic)
-                                .then(Commands.argument("player", new AccountArgument())
-                                        .executes(this::runAddLogic))))
-                .then(Commands.literal("subtract").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
-                                .executes(this::runSubLogic)
-                                .then(Commands.argument("player", new AccountArgument())
-                                        .executes(this::runSubLogic))))
-                .then(Commands.literal("list").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.seeall"))
-                        .executes(ctx -> {
-                            if(Main.SQLMode) {
-                                ctx.getSource().getSender().sendMessage(AccountCache.listAllAccounts().toString().replace(",", "\n").replace("[", "").replace("]", ""));
-                            } else {
-                                // List all balances in file mode
-                                FileConfiguration file = BalanceFile.get();
-                                if (file == null) {
-                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                                    return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-                                }
-                                ConfigurationSection players = file.getConfigurationSection("players");
-                                if (players == null) {
-                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                                    return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-                                }
-                                StringBuilder balanceList = new StringBuilder();
-                                for (String uuid : players.getKeys(false)) {
-                                    String name = players.getString(uuid + ".name");
-                                    float balance = (float) players.getDouble(uuid + ".balance");
-                                    if (name != null && balance > 0) {
-                                        balanceList.append(name).append(": ").append(balance).append("\n");
-                                    }
-                                }
-                                if (balanceList.length() > 0) {
-                                    ctx.getSource().getSender().sendMessage(balanceList.toString());
-                                } else {
-                                    ctx.getSource().getSender().sendMessage(Component.translatable("balcommand.incorrectarg", Styles.ERRORSTYLE));
-                                }
-                            }
-                            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-                        })
-                )
-                .then(Commands.literal("transactions").requires(sender -> Main.SQLMode && sender.getSender() instanceof Player)
-                        .executes(this::runTransactionsLogic)
-                        .then(Commands.argument("page", IntegerArgumentType.integer(1))
-                                .executes(this::runTransactionsLogic)))
-                .then(Commands.argument("player", new AccountArgument())
-                        .executes(this::runSeeLogic)
-                );
-        return builder.build();
-    }
-
-    private int runTransactionsLogic(CommandContext<CommandSourceStack> ctx) {
+    private static int runTransactionsLogic(CommandContext<CommandSourceStack> ctx) {
         Player transactionsPlayer = (Player) ctx.getSource().getSender();
         int page;
         try {

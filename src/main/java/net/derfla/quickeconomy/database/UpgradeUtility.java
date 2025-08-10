@@ -154,10 +154,11 @@ public class UpgradeUtility {
      */
     private static CompletableFuture<Void> upgradeToV1o3() {
         List<String> tableUpgradeQueries = new ArrayList<>();
-        String removeForeignKeysConstraints = "ALTER TABLE Transactions DROP FOREIGN KEY transactions_ibfk_1, DROP FOREIGN KEY transactions_ibfk_2;";
-        tableUpgradeQueries.add(removeForeignKeysConstraints);
-        String changeNullToBank = "UPDATE transactions set destination = 'Bank' WHERE destination is null; UPDATE transactions t SET t.source = 'Bank' WHERE t.source is null;";
-        tableUpgradeQueries.add(changeNullToBank);
+        tableUpgradeQueries.add("ALTER TABLE Transactions DROP FOREIGN KEY transactions_ibfk_1;");
+        tableUpgradeQueries.add("ALTER TABLE Transactions DROP FOREIGN KEY transactions_ibfk_2;");
+
+        tableUpgradeQueries.add("UPDATE Transactions SET Destination = 'Bank' WHERE Destination IS NULL;");
+        tableUpgradeQueries.add("UPDATE Transactions SET Source = 'Bank' WHERE Source IS NULL;");
 
         return Utility.getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
@@ -174,8 +175,12 @@ public class UpgradeUtility {
                             try (Statement statement = conn.createStatement()) {
                                 statement.executeUpdate(currentQuery);
                             } catch (SQLException e) {
-                                plugin.getLogger().severe("SQL Error when executing upgrade query!");
-                                throw new CompletionException(e);
+                                if (currentQuery.startsWith("ALTER TABLE Transactions DROP FOREIGN KEY")) {
+                                    plugin.getLogger().info("Skipping missing foreign key during upgradeToV1o3: " + e.getMessage());
+                                } else {
+                                    plugin.getLogger().severe("SQL Error when executing upgrade query!");
+                                    throw new CompletionException(e);
+                                }
                             }
                         }, executorService)
                 );

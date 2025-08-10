@@ -16,15 +16,29 @@ import net.derfla.quickeconomy.util.Styles;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Timestamp;
 
+/**
+ * Brigadier command tree for the base QuickEconomy administrative command.
+ *
+ * <p>Includes the following subcommands:
+ * migrate (toggle storage and perform migrations),
+ * rollback (revert database to a specific timestamp), and
+ * setup (display storage/mode/version info). When invoked without
+ * subcommands, it prints contextual help based on sender permissions.</p>
+ */
 public class QuickeconomyCommand {
 
+    /** Owning plugin instance used for configuration and logging. */
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Builds the /quickeconomy Brigadier command and all subcommands.
+     *
+     * @return a literal builder for the quickeconomy root command
+     */
     public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
         return Commands.literal("quickeconomy").requires(sender -> sender.getSender().hasPermission("quickeconomy.help"))
                 .executes(QuickeconomyCommand::runPluginInfoLogic)
@@ -42,6 +56,12 @@ public class QuickeconomyCommand {
                         .executes(QuickeconomyCommand::runSetupLogic));
     }
 
+    /**
+     * Sends contextual help/info lines based on sender permissions.
+     *
+     * @param ctx command context
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
     private static int runPluginInfoLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (sender.hasPermission("quickeconomy.balance")) {
@@ -74,6 +94,12 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Handles the migrate subcommand to toggle between file and SQL storage.
+     *
+     * @param ctx command context
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
     private static int runMigrateLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (Main.SQLMode) {
@@ -103,6 +129,13 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Handles the rollback subcommand, parsing date/time components and
+     * invoking the database rollback routine in SQL mode.
+     *
+     * @param ctx command context
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
     private static int runRollbackLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (!Main.SQLMode) {
@@ -138,6 +171,13 @@ public class QuickeconomyCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Handles the setup subcommand, showing storage mode, pool size and
+     * plugin version. Also advertises updates when available.
+     *
+     * @param ctx command context
+     * @return {@link Command#SINGLE_SUCCESS}
+     */
     private static int runSetupLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String storageMethod = Main.SQLMode ? "SQL Server" : "File";

@@ -24,8 +24,22 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.UUID;
 
 
+/**
+ * Brigadier command builder for balance-related operations.
+ *
+ * <p>Provides commands to view and manage player balances, including:
+ * set/add/subtract, peer-to-peer transfers with optional message, listing
+ * balances (file/SQL), and paginated transaction history (SQL mode).
+ * Permission checks are enforced per subcommand.</p>
+ */
 public class BalanceCommand {
 
+    /**
+     * Builds the Brigadier command tree for the given root literal.
+     *
+     * @param rootLiteral the root command literal (e.g., "balance" or "bal")
+     * @return a literal builder representing the full command with subcommands
+     */
     private static LiteralArgumentBuilder<CommandSourceStack> buildCommandTree(String rootLiteral) {
         BalanceCommand handler = new BalanceCommand();
         return Commands.literal(rootLiteral)
@@ -93,10 +107,20 @@ public class BalanceCommand {
                         .executes(handler::runSeeLogic));
     }
 
+    /**
+     * Creates the Brigadier command for the long form root: "balance".
+     *
+     * @return the builder for the balance command
+     */
     public static LiteralArgumentBuilder<CommandSourceStack> createCommand() {
         return buildCommandTree("balance");
     }
 
+    /**
+     * Creates the Brigadier command for the short alias: "bal".
+     *
+     * @return the builder for the bal command
+     */
     public static LiteralArgumentBuilder<CommandSourceStack> createShortCommand() {
         return buildCommandTree("bal");
     }

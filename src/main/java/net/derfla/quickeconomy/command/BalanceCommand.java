@@ -254,9 +254,15 @@ public class BalanceCommand {
             sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
             return com.mojang.brigadier.Command.SINGLE_SUCCESS;
         }
-
-        String targetUUID = AccountCache.getUUID(account.name());
-        UUID convertedUUID = UUID.fromString(TypeChecker.untrimUUID(targetUUID));
+        String targetUUID;
+        UUID convertedUUID;
+        try {
+            targetUUID = AccountCache.getUUID(account.name());
+            convertedUUID = UUID.fromString(TypeChecker.untrimUUID(targetUUID));
+        } catch (Exception e) {
+            sender.sendMessage(Component.translatable("balcommand.send.self", Styles.ERRORSTYLE));
+            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
+        }
 
         String trimmedPlayerUUID = TypeChecker.trimUUID(String.valueOf(player.getUniqueId()));
         if (Balances.getPlayerBalance(trimmedPlayerUUID) < money) {

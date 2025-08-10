@@ -83,7 +83,7 @@ public class TypeChecker {
             return null;
         }
         if (uuid.length() == 36) {
-            return uuid.replaceAll("-", "");
+            return uuid.replace("-", "");
         }
         else if (uuid.length() == 32) {
             return uuid;
@@ -109,8 +109,12 @@ public class TypeChecker {
             return null;
         }
         if (uuid.length() == 32) {
-            return uuid.replaceAll("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5");
-        } 
+            return uuid.substring(0, 8) + "-" +
+                   uuid.substring(8, 12) + "-" +
+                   uuid.substring(12, 16) + "-" +
+                   uuid.substring(16, 20) + "-" +
+                   uuid.substring(20, 32);
+        }
         else if (uuid.length() == 36) {
             return uuid;
         }

@@ -22,10 +22,23 @@ import static net.derfla.quickeconomy.database.AccountManagement.addAccount;
 import static net.derfla.quickeconomy.database.AccountManagement.setPlayerBalance;
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
+/**
+ * Utilities for migrating data between the file-based storage (balance.yml)
+ * and the SQL database, as well as exporting database tables to CSV.
+ * <p>
+ * All heavy operations are performed asynchronously to avoid blocking the
+ * server thread.
+ */
 public class Migration {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Migrate all player balances from the balance file to the SQL database.
+     * Creates player accounts as needed and updates existing ones in batches.
+     *
+     * @return a future that completes when migration is finished
+     */
     public static CompletableFuture<Void> migrateToDatabase() {
         AtomicInteger failedCounter = new AtomicInteger(0);
         return CompletableFuture.runAsync(() -> {
@@ -88,6 +101,11 @@ public class Migration {
         }, executorService); // Use the executorService for async execution
     }
 
+    /**
+     * Migrate all player accounts from the SQL database into the balance file.
+     *
+     * @return a future that completes when export to the file is finished and saved
+     */
     public static CompletableFuture<Void> migrateToBalanceFile() {
         String sqlCount = "SELECT COUNT(*) AS playerCount FROM PlayerAccounts";
         String sqlFetch = "SELECT UUID, PlayerName, Balance, BalChange FROM PlayerAccounts LIMIT ? OFFSET ?";
@@ -165,6 +183,11 @@ public class Migration {
         });
     }
 
+    /**
+     * Export all database tables used by QuickEconomy to a CSV file.
+     *
+     * @return a future that completes when the export file has been written
+     */
     public static CompletableFuture<Void> exportDatabase() {
         String sqlAccounts = "SELECT * FROM PlayerAccounts";
         String sqlTransactions = "SELECT * FROM Transactions";
@@ -207,6 +230,16 @@ public class Migration {
         }, executorService));
     }
 
+    /**
+     * Export the result of an SQL query to an open CSV writer in batches.
+     *
+     * @param conn       an open SQL connection
+     * @param sql        the SQL query to paginate with LIMIT/OFFSET
+     * @param tableName  label used for logging
+     * @param csvWriter  open writer to receive CSV data
+     * @param batchSize  number of rows per page
+     * @return a future that completes when all rows are written
+     */
     public static CompletableFuture<Void> exportTableToCSV(Connection conn, String sql, String tableName, FileWriter csvWriter, int batchSize) {
         return CompletableFuture.runAsync(() -> {
             try {

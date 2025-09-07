@@ -12,8 +12,19 @@ import org.bukkit.event.block.BlockBreakEvent;
 
 import java.util.List;
 
+/**
+ * Listener class that handles sign breaking events.
+ * Manages permission checks and cleanup for bank and shop signs.
+ */
 public class PlayerBreakSignListener implements Listener {
 
+    /**
+     * Handles the event when a player attempts to break a sign.
+     * Enforces permission requirements for breaking bank and shop signs,
+     * performs cleanup operations for shop signs, and prevents unauthorized sign destruction.
+     *
+     * @param event The BlockBreakEvent containing information about the sign break attempt
+     */
     @EventHandler
     public void onPlayerBreakSign(BlockBreakEvent event) {
         if (!(event.getBlock().getState() instanceof Sign)) {

@@ -8,8 +8,19 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryType;
 
+/**
+ * Listener class that handles hopper minecart inventory movement events.
+ * Prevents hopper minecarts from extracting items from locked shop chests.
+ */
 public class HopperMoveItemEvent implements Listener {
 
+    /**
+     * Handles the event when a hopper minecart attempts to move items from an inventory.
+     * Prevents hopper minecarts from extracting items from locked shop chests,
+     * maintaining shop security and preventing unauthorized item theft.
+     *
+     * @param event The InventoryMoveItemEvent containing information about the item movement attempt
+     */
     @EventHandler
     public void onHopperMoveItem(InventoryMoveItemEvent event) {
         if (!(event.getInitiator().getHolder() instanceof HopperMinecart)) return;

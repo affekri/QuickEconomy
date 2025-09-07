@@ -16,10 +16,21 @@ import java.util.concurrent.CompletionException;
 
 import static net.derfla.quickeconomy.database.Utility.executorService;
 
+/**
+ * Schema management and view creation helpers for the QuickEconomy database.
+ * <p>
+ * Creates required tables if they do not exist and maintains per-player views
+ * for transactions and empty shops listings.
+ */
 public class TableManagement {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Ensure all required database tables exist.
+     *
+     * @return a future that completes when creation/verification is done
+     */
     public static CompletableFuture<Void> createTables() {
         return Utility.getConnectionAsync().thenCompose(conn -> {
             if (conn == null) {
@@ -51,13 +62,7 @@ public class TableManagement {
                     + "  Passed tinyint(1),"
                     + "  PassedReason varchar(16) DEFAULT NULL,"
                     + "  TransactionMessage varchar(32),"
-                    + "  PRIMARY KEY (TransactionID),";
-            // MySQL specific foreign key syntax, for SQLite this might need adjustment
-            if ("mysql".equalsIgnoreCase(plugin.getConfig().getString("database.type"))) {
-                Transactions += "  FOREIGN KEY (Source) REFERENCES PlayerAccounts(UUID),"
-                        + "  FOREIGN KEY (Destination) REFERENCES PlayerAccounts(UUID)";
-            }
-            Transactions += ");";
+                    + "  PRIMARY KEY (TransactionID));";
             tableCreationQueries.add(Transactions);
 
             String Autopays = "CREATE TABLE IF NOT EXISTS Autopays ("
@@ -127,6 +132,16 @@ public class TableManagement {
     }
 
     // Helper method for creating views
+    /**
+     * Shared helper to check for a view's existence and create it if missing.
+     *
+     * @param viewName        the view name to create
+     * @param databaseName    database/schema name
+     * @param createViewSql   SQL to create the view with parameter placeholders
+     * @param createViewParams values to bind to the view creation SQL
+     * @param logMsgContext   additional context for logs (e.g., UUID)
+     * @return a future that completes when the view exists
+     */
     private static CompletableFuture<Void> createViewInternal(String viewName, String databaseName, String createViewSql, String[] createViewParams, String logMsgContext) {
         String checkSQL = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
 
@@ -162,6 +177,12 @@ public class TableManagement {
         });
     }
 
+    /**
+     * Create a per-player transactions view if it does not exist.
+     *
+     * @param uuid the player's UUID (trimmed or dashed)
+     * @return a future that completes when the view exists
+     */
     public static CompletableFuture<Void> createTransactionsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);
@@ -191,6 +212,12 @@ public class TableManagement {
         return createViewInternal(viewName, databaseName, sql, params, "UUID: " + untrimmedUuid);
     }
 
+    /**
+     * Create a per-player empty shops view if it does not exist.
+     *
+     * @param uuid the player's UUID (trimmed or dashed)
+     * @return a future that completes when the view exists
+     */
     static CompletableFuture<Void> createEmptyShopsView(@NotNull String uuid) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String untrimmedUuid = TypeChecker.untrimUUID(uuid);

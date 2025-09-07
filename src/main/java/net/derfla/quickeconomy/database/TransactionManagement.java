@@ -15,15 +15,33 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Transactional operations against the database, including executing transfers
+ * and rendering transaction views. Operations are asynchronous and safe for
+ * use off the main server thread.
+ */
 public class TransactionManagement {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Execute a transaction and record it in the {@code Transactions} table.
+     * <p>
+     * Designed to be invoked by {@link net.derfla.quickeconomy.util.Balances#executeTransaction}.
+     *
+     * @param transactType       type descriptor, e.g. "p?p" indicating source/destination kinds
+     * @param induce             context of what triggered the transaction
+     * @param source             UUID of the source account, or logical value like "Bank" when not a player
+     * @param destination        UUID of the destination account, or logical value like "Bank"
+     * @param amount             positive amount to transfer
+     * @param transactionMessage optional message describing the transaction
+     * @return a future completing when the transaction is committed
+     */
     public static CompletableFuture<Void> executeTransaction(@NotNull String transactType, @NotNull String induce, String source,
                                                              String destination, double amount, String transactionMessage) {
-        // Sort UUIDs to prevent deadlocks
-        String trimmedSource = source != null ? TypeChecker.trimUUID(source) : null;
-        String trimmedDestination = destination != null ? TypeChecker.trimUUID(destination) : null;
+
+        boolean sourceIsPlayer = transactType.charAt(0) == 'p';
+        boolean destinationIsPlayer = transactType.charAt(2) == 'p';
 
         Instant currentTime = Instant.now();
         String currentUTCTimeString = currentTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
@@ -41,10 +59,10 @@ public class TransactionManagement {
 
                 // Update source account balance if applicable
                 Double newSourceBalance = null;
-                if (trimmedSource != null) {
+                if (sourceIsPlayer) {
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateSource.setString(1, trimmedSource);
+                        pstmtUpdateSource.setString(1, source);
                         ResultSet rs = pstmtUpdateSource.executeQuery();
                         if (rs.next()) {
                             newSourceBalance = rs.getDouble(1) - amount;  // Calculate new source balance
@@ -53,17 +71,17 @@ public class TransactionManagement {
 
                     try (PreparedStatement pstmtUpdateSource = conn.prepareStatement(sqlUpdateSource)) {
                         pstmtUpdateSource.setDouble(1, amount);
-                        pstmtUpdateSource.setString(2, trimmedSource);
+                        pstmtUpdateSource.setString(2, source);
                         pstmtUpdateSource.executeUpdate();
                     }
                 }
 
                 // Update destination account balance if applicable
                 Double newDestinationBalance = null;
-                if (trimmedDestination != null) {
+                if (destinationIsPlayer) {
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(
                             "SELECT Balance FROM PlayerAccounts WHERE UUID = ?")) {
-                        pstmtUpdateDestination.setString(1, trimmedDestination);
+                        pstmtUpdateDestination.setString(1, destination);
                         ResultSet rs = pstmtUpdateDestination.executeQuery();
                         if (rs.next()) {
                             newDestinationBalance = rs.getDouble(1) + amount;  // Calculate new destination balance
@@ -72,40 +90,33 @@ public class TransactionManagement {
 
                     try (PreparedStatement pstmtUpdateDestination = conn.prepareStatement(sqlUpdateDestination)) {
                         pstmtUpdateDestination.setDouble(1, amount);
-                        pstmtUpdateDestination.setString(2, trimmedDestination);
+                        pstmtUpdateDestination.setString(2, destination);
                         pstmtUpdateDestination.executeUpdate();
                     }
                 }
 
                 // Insert into Transactions table
                 try (PreparedStatement pstmtInsertTransaction = conn.prepareStatement(sqlInsertTransaction)) {
-                    pstmtInsertTransaction.setString(1, currentUTCTimeString); // Use the formatted UTC SSS time
-                    pstmtInsertTransaction.setString(2, transactType);                   // TransactionType
-                    pstmtInsertTransaction.setString(3, induce);                         // Induce
-                    pstmtInsertTransaction.setString(4, trimmedSource);                  // Source
-                    pstmtInsertTransaction.setString(5, trimmedDestination);             // Destination
-                    pstmtInsertTransaction.setObject(6, newSourceBalance);               // NewSourceBalance (nullable)
-                    pstmtInsertTransaction.setObject(7, newDestinationBalance);          // NewDestinationBalance (nullable)
-                    pstmtInsertTransaction.setDouble(8, amount);                         // Amount
-                    pstmtInsertTransaction.setInt(9, 1);                               // Passed (always 1 if successful)
-                    pstmtInsertTransaction.setString(10, transactionMessage);            // TransactionMessage
+                    pstmtInsertTransaction.setString(1, currentUTCTimeString);  // Use the formatted UTC SSS time
+                    pstmtInsertTransaction.setString(2, transactType);          // TransactionType
+                    pstmtInsertTransaction.setString(3, induce);                // Induce
+                    pstmtInsertTransaction.setString(4, source);                // Source
+                    pstmtInsertTransaction.setString(5, destination);           // Destination
+                    pstmtInsertTransaction.setObject(6, newSourceBalance);      // NewSourceBalance (nullable)
+                    pstmtInsertTransaction.setObject(7, newDestinationBalance); // NewDestinationBalance (nullable)
+                    pstmtInsertTransaction.setDouble(8, amount);                // Amount
+                    pstmtInsertTransaction.setInt(9, 1);                        // Passed (always 1 if successful)
+                    pstmtInsertTransaction.setString(10, transactionMessage);   // TransactionMessage
                     pstmtInsertTransaction.executeUpdate();
                 }
 
                 // Commit the transaction
                 conn.commit();
-                if (trimmedDestination != null) Balances.addPlayerBalanceChange(trimmedDestination, amount);
+                if (destinationIsPlayer) Balances.addPlayerBalanceChange(destination, amount);
             } catch (SQLException e) {
                 conn.rollback();
-                if(trimmedDestination != null && trimmedSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + " to " + trimmedDestination + ": " + e.getMessage());
-                } else if (trimmedSource != null) {
-                    plugin.getLogger().severe("Error executing transaction from " + trimmedSource + ": " + e.getMessage());
-                } else if (trimmedDestination != null) {
-                    plugin.getLogger().severe("Error executing transaction to " + trimmedDestination + ": " + e.getMessage());
-                } else {
-                    plugin.getLogger().severe("Error executing transaction: " + e.getMessage());
-                }
+                plugin.getLogger().severe("Error executing transaction from " + source + " to " + destination + ": " + e.getMessage());
+
                 throw e;
             } finally {
                 try {
@@ -120,6 +131,14 @@ public class TransactionManagement {
         }));
     }
 
+    /**
+     * Render a window of the transaction view for a given player to a simple text block.
+     *
+     * @param uuid          player UUID (trimmed or dashed)
+     * @param displayPassed null for all, true for passed-only, false for failed-only
+     * @param page          1-based page index
+     * @return a future with a textual listing of transactions for the selected page
+     */
     public static CompletableFuture<String> displayTransactionsView(@NotNull String uuid, Boolean displayPassed, int page) {
         String trimmedUuid = TypeChecker.trimUUID(uuid);
         String viewName = "vw_Transactions_" + trimmedUuid;
@@ -158,11 +177,9 @@ public class TransactionManagement {
                     String message = rs.getString("Message");
                     transactions.append(dateTimeLocal).append(" ").append(amount);
                     if (sourcePlayerName == null) {
-                        // Deposit to bank
-                        transactions.append(" -> ").append("[BANK]");
+                        transactions.append(" <- ").append("[").append(sourceUUID).append("]");
                     } else if (destinationPlayerName == null) {
-                        // Withdraw from bank
-                        transactions.append(" <- ").append("[BANK]");
+                        transactions.append(" -> ").append("[").append(destinationUUID).append("]");
                     } else if (sourceUUID.equalsIgnoreCase(trimmedUuid)) {
                         transactions.append(" -> ").append(destinationPlayerName);
                     } else if (destinationUUID.equalsIgnoreCase(trimmedUuid)) {

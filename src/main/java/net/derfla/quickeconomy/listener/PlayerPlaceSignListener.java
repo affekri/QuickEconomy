@@ -15,12 +15,24 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 
+/**
+ * Listener class that handles sign placement and modification events.
+ * Creates and configures bank and shop signs with proper formatting and validation.
+ */
 public class PlayerPlaceSignListener implements Listener {
 
     static Plugin plugin = Main.getInstance();
     private static final Component bankHeader = Component.text("[BANK]").style(Styles.BANKHEADER);
     private static final Component shopHeader = Component.text("[SHOP]").style(Styles.SHOPHEADER);
 
+    /**
+     * Handles the event when a player places or modifies a sign.
+     * Creates bank signs for item banking operations and shop signs for item selling.
+     * Validates sign content, checks permissions, ensures chest availability for shops,
+     * and configures proper ownership and locking mechanisms.
+     *
+     * @param event The SignChangeEvent containing information about the sign creation/modification
+     */
     @EventHandler
     public void onPlayerPlaceSign(SignChangeEvent event) {
         if (!(event.getBlock().getState() instanceof Sign)) {
@@ -134,9 +146,22 @@ public class PlayerPlaceSignListener implements Listener {
         }
     }
 
+    /**
+     * Gets the formatted bank header component used for bank signs.
+     * This component contains the styled "[BANK]" text that identifies bank signs.
+     *
+     * @return The styled Component representing the bank header
+     */
     public static Component getBankHeaderComponent(){
         return bankHeader;
     }
+    
+    /**
+     * Gets the formatted shop header component used for shop signs.
+     * This component contains the styled "[SHOP]" text that identifies shop signs.
+     *
+     * @return The styled Component representing the shop header
+     */
     public static Component getShopHeaderComponent(){
         return shopHeader;
     }

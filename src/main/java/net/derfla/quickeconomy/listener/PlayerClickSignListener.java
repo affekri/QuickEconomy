@@ -13,8 +13,19 @@ import org.bukkit.event.player.PlayerInteractEvent;
 
 import java.util.List;
 
+/**
+ * Listener class that handles sign click events.
+ * Manages interactions with bank and shop signs, opening appropriate inventories.
+ */
 public class PlayerClickSignListener implements Listener {
 
+    /**
+     * Handles the event when a player right-clicks on a sign.
+     * Processes interactions with bank and shop signs, opening bank inventories for banking operations
+     * and shop inventories for purchasing items. Performs permission checks and validates sign integrity.
+     *
+     * @param event The PlayerInteractEvent containing information about the sign interaction
+     */
     @EventHandler
     public void onPlayerClickSign(PlayerInteractEvent event){
         Player player = event.getPlayer();
@@ -51,7 +62,16 @@ public class PlayerClickSignListener implements Listener {
                 return;
             }
             List<String> owners = BlockOwner.getChestOwner(chest);
-            assert owners != null;
+            // Handle bug where shop chest data has been erased.
+            if(owners == null) {
+                String owner1 = TypeChecker.getRawString(sign.getSide(Side.FRONT).line(2));
+                String owner2 = TypeChecker.getRawString(sign.getSide(Side.FRONT).line(3));
+                String owner1UUID = Balances.getUUID(owner1);
+                String owner2UUID = "";
+                if(!owner2.isEmpty()) Balances.getUUID(owner2);
+                BlockOwner.setPlayerLocked(chest, owner1UUID, owner2UUID);
+            }
+            owners = BlockOwner.getChestOwner(chest);
             String seller = owners.getFirst();
             String seller2 = "";
             if(owners.size() == 2) seller2 = owners.getLast();

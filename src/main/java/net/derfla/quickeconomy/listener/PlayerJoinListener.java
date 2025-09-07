@@ -16,10 +16,22 @@ import org.bukkit.plugin.Plugin;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Listener class that handles player join events.
+ * Manages player account initialization, update notifications, and balance change tracking.
+ */
 public class PlayerJoinListener implements Listener {
 
     static Plugin plugin = Main.getInstance();
 
+    /**
+     * Handles the event when a player joins the server.
+     * Initializes player translation settings, manages account creation/updates,
+     * sends update notifications to operators, handles welcome messages with balance changes,
+     * and provides empty shop notifications when using SQL mode.
+     *
+     * @param event The PlayerJoinEvent containing information about the joining player
+     */
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();

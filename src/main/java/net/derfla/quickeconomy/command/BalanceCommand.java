@@ -132,8 +132,8 @@ public class BalanceCommand {
                                                 .executes(BalanceCommand::runSendLogic)))))
 
                 .then(Commands.literal("transactions").requires(sender -> sender.getExecutor() instanceof Player)
-                        .then(Commands.argument("page", IntegerArgumentType.integer(1)))
-                        .executes(BalanceCommand::runTransactionLogic).executes(BalanceCommand::runTransactionLogic))
+                        .then(Commands.argument("page", IntegerArgumentType.integer(1)).executes(BalanceCommand::runTransactionLogic))
+                        .executes(BalanceCommand::runTransactionLogic))
 
                 .then(Commands.literal("list").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.seeall"))
                         .then(Commands.argument("player", new AccountArgument()).executes(BalanceCommand::runListLogic))

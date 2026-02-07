@@ -9,6 +9,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.derfla.quickeconomy.Main;
 import net.derfla.quickeconomy.command.argument.AccountArgument;
+import net.derfla.quickeconomy.command.argument.MoneyArgument;
 import net.derfla.quickeconomy.database.TransactionManagement;
 import net.derfla.quickeconomy.file.BalanceFile;
 import net.derfla.quickeconomy.model.PlayerAccount;
@@ -46,22 +47,22 @@ public class BalanceCommand {
                 .requires(sender -> sender.getSender().hasPermission("quickeconomy.balance"))
                 .executes(BalanceCommand::runBalanceLogic)
                 .then(Commands.literal("set").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
+                        .then(Commands.argument("money", new MoneyArgument())
                                 .executes(handler::runSetLogic)
                                 .then(Commands.argument("player", new AccountArgument())
                                         .executes(handler::runSetLogic))))
                 .then(Commands.literal("add").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
+                        .then(Commands.argument("money", new MoneyArgument())
                                 .executes(handler::runAddLogic)
                                 .then(Commands.argument("player", new AccountArgument())
                                         .executes(handler::runAddLogic))))
                 .then(Commands.literal("subtract").requires(sender -> sender.getSender().hasPermission("quickeconomy.balance.modifyall"))
-                        .then(Commands.argument("money", StringArgumentType.string())
+                        .then(Commands.argument("money", new MoneyArgument())
                                 .executes(handler::runSubLogic)
                                 .then(Commands.argument("player", new AccountArgument())
                                         .executes(handler::runSubLogic))))
                 .then(Commands.literal("send").requires(sender -> sender.getExecutor() instanceof Player)
-                        .then(Commands.argument("money", StringArgumentType.string())
+                        .then(Commands.argument("money", new MoneyArgument())
                                 .then(Commands.argument("player", new AccountArgument())
                                         .executes(handler::runSendLogic)
                                         .then(Commands.argument("message", StringArgumentType.greedyString())
@@ -136,16 +137,7 @@ public class BalanceCommand {
 
     private int runSetLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        double money;
-        try {
-            money = AbbreviationUtil.fromString(ctx.getArgument("money", String.class));
-        } catch (NumberFormatException e) {
-            sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        }
+        double money = ctx.getArgument("money", Double.class);
         String playerUUID;
         try {
             PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
@@ -172,16 +164,7 @@ public class BalanceCommand {
 
     private int runAddLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        double money;
-        try {
-            money = AbbreviationUtil.fromString(ctx.getArgument("money", String.class));
-        } catch (NumberFormatException e) {
-            sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        }
+        double money = ctx.getArgument("money", Double.class);
         try {
             PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
             Balances.executeTransaction("n2p", "command", "Server", AccountCache.getUUID(targetPlayer.name()), money, "Balance added by command.");
@@ -201,16 +184,7 @@ public class BalanceCommand {
 
     private int runSubLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        double money;
-        try {
-            money = AbbreviationUtil.fromString(ctx.getArgument("money", String.class));
-        } catch (NumberFormatException e) {
-            sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        }
+        double money = ctx.getArgument("money", Double.class);
         try {
             PlayerAccount targetPlayer = ctx.getArgument("player", PlayerAccount.class);
             Balances.executeTransaction("p2n", "command", AccountCache.getUUID(targetPlayer.name()), "Server", money, "Balance subtracted by command.");
@@ -231,16 +205,7 @@ public class BalanceCommand {
 
     private int runSendLogic(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        double money;
-        try {
-            money = AbbreviationUtil.fromString(ctx.getArgument("money", String.class));
-        } catch (NumberFormatException e) {
-            sender.sendMessage(Component.translatable("balcommand.invalidnumber", Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        } catch (IllegalArgumentException e) {
-            sender.sendMessage(Component.translatable("balcommand.abbreviation.invalid", Component.text(e.getMessage())).style(Styles.ERRORSTYLE));
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS;
-        }
+        double money = ctx.getArgument("money", Double.class);
         PlayerAccount account = ctx.getArgument("player", PlayerAccount.class);
         String message;
         try {

@@ -35,7 +35,7 @@ import java.util.List;
  * @version 1.0
  * @since 1.0
  * @see PlayerAccount
- * @see DatabaseManager
+ * @see AccountManagement
  * @see BalanceFile
  */
 public class AccountCache {
@@ -49,7 +49,7 @@ public class AccountCache {
      * 
      * <p>The initialization process varies depending on the plugin's mode:
      * <ul>
-     *   <li><strong>SQL Mode:</strong> Loads accounts from the database using {@link DatabaseManager}</li>
+     *   <li><strong>SQL Mode:</strong> Loads accounts from the database using {@link AccountManagement}</li>
      *   <li><strong>File Mode:</strong> Loads accounts from the balance.yml file</li>
      * </ul>
      * </p>
@@ -65,6 +65,7 @@ public class AccountCache {
             accountMap = new HashMap<>();
             FileConfiguration file = BalanceFile.get();
             ConfigurationSection players = file.getConfigurationSection("players");
+            if (players == null) return;
             for(String uuid : players.getKeys(false)){
                 accountMap.put(uuid,
                         new PlayerAccount(players.getString(uuid + ".name"), players.getDouble(uuid + ".balance"), players.getDouble(uuid + ".change"), players.getString(uuid + ".created")));

@@ -1,10 +1,11 @@
 name: QuickEconomy
-version: '${project.version}'
+description: $description
+version: '${version}'
 main: net.derfla.quickeconomy.Main
-api-version: '1.21.7'
+api-version: '26.3'
 authors:
   - AffeKri
-description: A lightweight economy plugin. For Minecraft servers running PaperMC.
+  - HellRemus
 website: https://docs.derfla.net/quickeconomy/
 permissions:
   quickeconomy.balance:
